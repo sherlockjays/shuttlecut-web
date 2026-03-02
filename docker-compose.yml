@@ -12,11 +12,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://shuttlecut:password@postgres:5432/shuttlecut
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: change-this-in-production
-      STORAGE_PATH: /data/videos
-      CORS_ORIGINS: http://localhost:3000
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      STORAGE_PATH: ${STORAGE_PATH}
+      CORS_ORIGINS: ${CORS_ORIGINS}
     volumes:
       - video_data:/data/videos
     depends_on:
@@ -27,9 +27,9 @@ services:
     build: ./backend
     command: celery -A workers.tasks.celery worker --loglevel=info --concurrency=2
     environment:
-      DATABASE_URL: postgresql://shuttlecut:password@postgres:5432/shuttlecut
-      REDIS_URL: redis://redis:6379/0
-      STORAGE_PATH: /data/videos
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      STORAGE_PATH: ${STORAGE_PATH}
     volumes:
       - video_data:/data/videos
     depends_on:
@@ -39,9 +39,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: shuttlecut
-      POSTGRES_USER: shuttlecut
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pg_data:/var/lib/postgresql/data
     ports:

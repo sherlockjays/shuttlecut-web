@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000"
+const BASE = import.meta.env.VITE_API_URL || ""
 
 function headers() {
   const token = localStorage.getItem("token")
@@ -49,11 +49,15 @@ export const videos = {
       xhr.send(fd)
     })
   },
-  streamUrl: (videoId: string) => `${BASE}/api/videos/stream/${videoId}`,
+  streamUrl: (videoId: string) => `${BASE}/api/videos/stream/${videoId}?token=${localStorage.getItem("token") || ""}`,
 }
 
 export const exports = {
   start: (projectId: number) => apiFetch(`/api/export/${projectId}`, { method: "POST" }),
   status: (exportId: number) => apiFetch(`/api/export/${exportId}/status`),
-  wsUrl: (exportId: number) => `${BASE.replace("http", "ws")}/api/export/ws/${exportId}`,
+  wsUrl: (exportId: number) => {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:"
+    return `${proto}//${window.location.host}/api/export/ws/${exportId}`
+  },
+  downloadUrl: (exportId: number) => `${BASE}/api/export/${exportId}/download?token=${localStorage.getItem("token") || ""}`,
 }

@@ -1,6 +1,9 @@
 """내보내기 - Celery 비동기 + WebSocket 진행률"""
 import json
+import os
+from pathlib import Path
 from fastapi import APIRouter, Depends, WebSocket, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from models.database import get_db, User, Project, Export
@@ -33,7 +36,22 @@ def start_export(
     db.add(export); db.commit(); db.refresh(export)
 
     # Celery 작업 시작
-    run_export.delay(export.id, project.__dict__.copy())
+    project_data = {
+        "id": project.id,
+        "video_path": project.video_path,
+        "fps": project.fps,
+        "total_frames": project.total_frames,
+        "match_date": project.match_date,
+        "tournament_name": project.tournament_name,
+        "level": project.level,
+        "match_name": project.match_name,
+        "player1_name": project.player1_name,
+        "player2_name": project.player2_name,
+        "player1_score": project.player1_score,
+        "player2_score": project.player2_score,
+        "rallies": project.rallies,
+    }
+    run_export.delay(export.id, project_data)
 
     return {"export_id": export.id}
 
@@ -51,6 +69,34 @@ def export_status(export_id: int, user: User = Depends(current_user), db: Sessio
         "youtube_url": export.youtube_url,
         "error_msg": export.error_msg,
     }
+
+
+@router.get("/{export_id}/download")
+def download_export(export_id: int, token: str | None = None, db: Session = Depends(get_db)):
+    from api.routes.auth import current_user as _current_user
+    from fastapi.security import OAuth2PasswordBearer
+    from jose import jwt, JWTError
+    import os as _os
+    SECRET_KEY = _os.getenv("SECRET_KEY", "changeme")
+    try:
+        payload = jwt.decode(token or "", SECRET_KEY, algorithms=["HS256"])
+        user = db.query(User).get(int(payload["sub"]))
+        if not user:
+            raise HTTPException(401)
+    except (JWTError, Exception):
+        raise HTTPException(401)
+
+    export = db.query(Export).join(Project).filter(
+        Export.id == export_id, Project.user_id == user.id
+    ).first()
+    if not export:
+        raise HTTPException(404)
+    if export.status != "done" or not export.output_path:
+        raise HTTPException(400, "아직 완료되지 않은 내보내기입니다.")
+    if not Path(export.output_path).exists():
+        raise HTTPException(404, "파일을 찾을 수 없습니다.")
+    filename = f"export_{export_id}.mp4"
+    return FileResponse(export.output_path, media_type="video/mp4", filename=filename)
 
 
 @router.websocket("/ws/{export_id}")

@@ -1,10 +1,9 @@
-"""moviepy + PIL 기반 영상 내보내기 - QThread로 백그라운드 실행"""
+"""moviepy + PIL 기반 영상 내보내기 - 웹 서버용 (PyQt6 없음)"""
 
 import os
 import numpy as np
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-from PyQt6.QtCore import QThread, pyqtSignal
 
 try:
     from moviepy.editor import VideoFileClip, concatenate_videoclips
@@ -15,15 +14,20 @@ except ImportError:
 
 from .rally_manager import Rally
 
-FONT_PATH = "C:/Windows/Fonts/malgunbd.ttf"
+# Linux 환경 폰트 (NanumGothic 없으면 기본 폰트 사용)
+FONT_PATH = "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf"
+if not Path(FONT_PATH).exists():
+    FONT_PATH = None  # PIL 기본 폰트 사용
 TAIL_SECONDS = 1.5   # 랠리 끝점 이후 추가 시간
 
 
 def _get_font(size: int) -> ImageFont.FreeTypeFont:
-    try:
-        return ImageFont.truetype(FONT_PATH, size)
-    except OSError:
-        return ImageFont.load_default()
+    if FONT_PATH:
+        try:
+            return ImageFont.truetype(FONT_PATH, size)
+        except OSError:
+            pass
+    return ImageFont.load_default()
 
 
 def _fmt(seconds: float) -> str:
@@ -132,118 +136,3 @@ def generate_timeline_txt(rallies: list[Rally], fps: float,
         offset += clip_duration
 
     return "\n".join(lines)
-
-
-class Exporter(QThread):
-    progress = pyqtSignal(int, str)   # percent, message
-    finished = pyqtSignal(str, str)   # video_path, txt_path
-    error = pyqtSignal(str)
-
-    def __init__(self,
-                 video_path: str,
-                 fps: float,
-                 rallies: list[Rally],
-                 date: str,
-                 tournament: str,
-                 level: str,
-                 match_name: str,
-                 p1_name: str,
-                 p2_name: str,
-                 output_path: str,
-                 parent=None):
-        super().__init__(parent)
-        self.video_path = video_path
-        self.fps = fps
-        self.rallies = rallies
-        self.date = date
-        self.tournament = tournament
-        self.level = level
-        self.match_name = match_name
-        self.p1_name = p1_name
-        self.p2_name = p2_name
-        self.output_path = output_path
-
-    def run(self):
-        try:
-            video = VideoFileClip(self.video_path)
-            total_dur = video.duration
-            clips = []
-            total = len(self.rallies)
-
-            date = self.date
-            tournament = self.tournament
-            level = self.level
-            match_name = self.match_name
-            p1_name = self.p1_name
-            p2_name = self.p2_name
-
-            for i, rally in enumerate(self.rallies):
-                start_t = rally.start_frame / self.fps
-                end_marker_t = rally.end_frame / self.fps
-                end_t = min(end_marker_t + TAIL_SECONDS, total_dur)
-
-                # 득점 전 점수 (랠리 진행 중)
-                p1_pre, p2_pre = rally.p1_score, rally.p2_score
-                # 득점 후 점수 (tail 구간)
-                if rally.winner == 1:
-                    p1_post, p2_post = p1_pre + 1, p2_pre
-                elif rally.winner == 2:
-                    p1_post, p2_post = p1_pre, p2_pre + 1
-                else:
-                    p1_post, p2_post = p1_pre, p2_pre
-
-                subclip = video.subclip(start_t, end_t)
-
-                # 마킹 지점 이전: 득점 전 점수 / 이후(tail): 득점 후 점수
-                score_change_t = end_marker_t - start_t
-
-                def make_overlay(p1a=p1_pre, p2a=p2_pre, p1b=p1_post, p2b=p2_post, sct=score_change_t):
-                    def overlay(get_frame, t):
-                        frame = get_frame(t)
-                        p1 = p1b if t >= sct else p1a
-                        p2 = p2b if t >= sct else p2a
-                        return draw_scoreboard(
-                            frame,
-                            date, tournament, level, match_name,
-                            p1_name, p1,
-                            p2_name, p2,
-                        )
-                    return overlay
-
-                subclip = subclip.fl(make_overlay())
-                clips.append(subclip)
-
-                pct = int((i + 1) / total * 80)
-                self.progress.emit(pct, f"랠리 {i+1}/{total} 처리 중...")
-
-            self.progress.emit(85, "클립 합치는 중...")
-            final = concatenate_videoclips(clips)
-
-            self.progress.emit(90, "영상 파일 저장 중...")
-            final.write_videofile(
-                self.output_path,
-                codec="libx264",
-                audio_codec="aac",
-                preset="ultrafast",
-                threads=4,
-                logger=None,
-            )
-            final.close()
-            video.close()
-
-            # 타임라인 txt 저장
-            self.progress.emit(97, "타임라인 파일 생성 중...")
-            txt_path = str(Path(self.output_path).with_suffix(".txt"))
-            txt_content = generate_timeline_txt(
-                self.rallies, self.fps,
-                self.date, self.tournament, self.level, self.match_name,
-                self.p1_name, self.p2_name,
-            )
-            with open(txt_path, "w", encoding="utf-8") as f:
-                f.write(txt_content)
-
-            self.progress.emit(100, "완료!")
-            self.finished.emit(self.output_path, txt_path)
-
-        except Exception as e:
-            self.error.emit(str(e))

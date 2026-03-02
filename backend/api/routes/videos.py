@@ -34,8 +34,23 @@ async def upload_video(
     return {"video_id": video_id, "path": str(dest), "filename": file.filename}
 
 
+def stream_user(token: str = None, db: Session = Depends(get_db)) -> User:
+    from jose import jwt, JWTError
+    from api.routes.auth import SECRET_KEY, ALGORITHM
+    if not token:
+        raise HTTPException(status_code=401)
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user = db.query(User).get(int(payload["sub"]))
+        if not user:
+            raise HTTPException(status_code=401)
+        return user
+    except JWTError:
+        raise HTTPException(status_code=401)
+
+
 @router.get("/stream/{video_id}")
-async def stream_video(video_id: str, request: Request, user: User = Depends(current_user)):
+async def stream_video(video_id: str, request: Request, user: User = Depends(stream_user)):
     # 파일 탐색
     user_dir = STORAGE / str(user.id)
     matches = list(user_dir.glob(f"{video_id}.*"))

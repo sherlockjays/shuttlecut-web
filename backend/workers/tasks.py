@@ -1,5 +1,6 @@
 """Celery 작업 - 영상 내보내기"""
-import os, json, redis
+import os, json, redis, sys
+sys.path.insert(0, "/app")
 from pathlib import Path
 from celery import Celery
 from sqlalchemy.orm import Session
@@ -18,7 +19,6 @@ def _publish(export_id: int, pct: int, msg: str, status: str = "processing"):
 @celery.task
 def run_export(export_id: int, project_data: dict):
     from models.database import SessionLocal, Export, User, Project
-    from core.exporter import Exporter as _Exporter
     from core.rally_manager import Rally
 
     db: Session = SessionLocal()
@@ -41,7 +41,6 @@ def run_export(export_id: int, project_data: dict):
         # 진행률 콜백을 위한 래퍼
         class ProgressExporter:
             def __init__(self):
-                from core.exporter import Exporter
                 # moviepy 기반 동기 내보내기 직접 실행
                 self._run(rallies, project_data, output_path)
 

@@ -6,8 +6,13 @@ import os
 load_dotenv()
 
 from api.routes import videos, projects, export, auth
+from models.database import init_db
 
 app = FastAPI(title="ShuttleCut API", version="1.0.0")
+
+@app.on_event("startup")
+def startup():
+    init_db()
 
 app.add_middleware(
     CORSMiddleware,

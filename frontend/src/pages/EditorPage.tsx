@@ -26,6 +26,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   const [markStart, setMarkStart] = useState(0)
   const [exportPct, setExportPct] = useState<number | null>(null)
   const [exportMsg, setExportMsg] = useState("")
+  const [exportDoneId, setExportDoneId] = useState<number | null>(null)
   const [saved, setSaved] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -111,13 +112,17 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
 
   // 내보내기
   const startExport = async () => {
-    setExportPct(0); setExportMsg("시작 중...")
+    setExportPct(0); setExportMsg("시작 중..."); setExportDoneId(null)
     const res = await exportsApi.start(projectId)
     const ws = new WebSocket(exportsApi.wsUrl(res.export_id))
     ws.onmessage = e => {
       const d = JSON.parse(e.data)
       setExportPct(d.pct); setExportMsg(d.msg)
-      if (d.status === "done" || d.status === "error") {
+      if (d.status === "done") {
+        ws.close()
+        setExportDoneId(res.export_id)
+        setTimeout(() => setExportPct(null), 500)
+      } else if (d.status === "error") {
         ws.close()
         setTimeout(() => setExportPct(null), 3000)
       }
@@ -270,6 +275,17 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
                   <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${exportPct}%` }} />
                 </div>
                 <p className="text-xs text-gray-400 text-center">{exportMsg}</p>
+              </div>
+            ) : exportDoneId !== null ? (
+              <div className="flex gap-2">
+                <a href={exportsApi.downloadUrl(exportDoneId)}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium transition-colors text-center">
+                  다운로드
+                </a>
+                <button onClick={() => setExportDoneId(null)}
+                  className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl transition-colors">
+                  다시
+                </button>
               </div>
             ) : (
               <button onClick={startExport} disabled={data.rallies.length === 0}
