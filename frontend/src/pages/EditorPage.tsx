@@ -255,14 +255,17 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
           <section>
             <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">점수판</h3>
             <div className="bg-gray-900 rounded-xl p-3 text-center">
-              <div className="flex items-center justify-between mb-2">
-                <input value={data.player1_name} onChange={e => update({ player1_name: e.target.value })}
-                  className="bg-transparent text-yellow-300 font-medium text-sm w-24 outline-none" />
-                <span className="text-2xl font-bold text-white">
-                  {data.player1_score} - {data.player2_score}
-                </span>
-                <input value={data.player2_name} onChange={e => update({ player2_name: e.target.value })}
-                  className="bg-transparent text-yellow-300 font-medium text-sm w-24 text-right outline-none" />
+              <div className="grid grid-cols-2 divide-x divide-gray-700 mb-2">
+                <div className="flex flex-col items-center pr-2">
+                  <input value={data.player1_name} onChange={e => update({ player1_name: e.target.value })}
+                    className="bg-transparent text-yellow-300 font-medium text-sm w-full text-center outline-none" />
+                  <span className="text-2xl font-bold text-white">{data.player1_score}</span>
+                </div>
+                <div className="flex flex-col items-center pl-2">
+                  <input value={data.player2_name} onChange={e => update({ player2_name: e.target.value })}
+                    className="bg-transparent text-yellow-300 font-medium text-sm w-full text-center outline-none" />
+                  <span className="text-2xl font-bold text-white">{data.player2_score}</span>
+                </div>
               </div>
               <div className="flex gap-2 mt-2">
                 <button onClick={() => addScore(1)}
