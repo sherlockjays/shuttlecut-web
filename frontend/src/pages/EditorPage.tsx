@@ -26,6 +26,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   const [markStart, setMarkStart] = useState(0)
   const [exportPct, setExportPct] = useState<number | null>(null)
   const [exportMsg, setExportMsg] = useState("")
+  const [exportEta, setExportEta] = useState<number | null>(null)
   const [exportDoneId, setExportDoneId] = useState<number | null>(null)
   const [saved, setSaved] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -111,19 +112,34 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   }
 
   // 내보내기
+  const fmtEta = (sec: number) => {
+    if (sec <= 0) return "거의 완료..."
+    const m = Math.floor(sec / 60), s = sec % 60
+    return m > 0 ? `약 ${m}분 ${s}초 남음` : `약 ${s}초 남음`
+  }
+
   const startExport = async () => {
-    setExportPct(0); setExportMsg("시작 중..."); setExportDoneId(null)
-    const res = await exportsApi.start(projectId)
+    setExportPct(0); setExportMsg("시작 중..."); setExportEta(null); setExportDoneId(null)
+    let res
+    try {
+      res = await exportsApi.start(projectId)
+    } catch (e: any) {
+      setExportMsg(e.message || "내보내기 실패")
+      setTimeout(() => setExportPct(null), 3000)
+      return
+    }
     const ws = new WebSocket(exportsApi.wsUrl(res.export_id))
     ws.onmessage = e => {
       const d = JSON.parse(e.data)
       setExportPct(d.pct); setExportMsg(d.msg)
+      setExportEta(d.eta ?? null)
       if (d.status === "done") {
         ws.close()
         setExportDoneId(res.export_id)
         setTimeout(() => setExportPct(null), 500)
       } else if (d.status === "error") {
         ws.close()
+        setExportEta(null)
         setTimeout(() => setExportPct(null), 3000)
       }
     }
@@ -271,10 +287,13 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
           <section className="mt-auto">
             {exportPct !== null ? (
               <div>
-                <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <span>{exportMsg}</span>
+                  <span>{exportEta !== null ? fmtEta(exportEta) : ""}</span>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
                   <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${exportPct}%` }} />
                 </div>
-                <p className="text-xs text-gray-400 text-center">{exportMsg}</p>
               </div>
             ) : exportDoneId !== null ? (
               <div className="flex gap-2">

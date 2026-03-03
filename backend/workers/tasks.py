@@ -1,5 +1,5 @@
 """Celery 작업 - 영상 내보내기"""
-import os, json, redis, sys
+import os, json, redis, sys, time
 sys.path.insert(0, "/app")
 from pathlib import Path
 from celery import Celery
@@ -10,10 +10,19 @@ celery = Celery("shuttlecut", broker=REDIS_URL, backend=REDIS_URL)
 r = redis.from_url(REDIS_URL)
 
 
-def _publish(export_id: int, pct: int, msg: str, status: str = "processing"):
-    r.publish(f"export_progress:{export_id}", json.dumps({
-        "pct": pct, "msg": msg, "status": status
-    }))
+def _publish(export_id: int, pct: int, msg: str, status: str = "processing", eta: int | None = None):
+    payload = {"pct": pct, "msg": msg, "status": status}
+    if eta is not None:
+        payload["eta"] = eta
+    r.publish(f"export_progress:{export_id}", json.dumps(payload))
+
+
+def _calc_eta(pct: int, start_time: float) -> int | None:
+    if pct <= 5:
+        return None
+    elapsed = time.time() - start_time
+    remaining = elapsed / (pct / 100) - elapsed
+    return max(0, int(remaining))
 
 
 @celery.task
@@ -27,6 +36,7 @@ def run_export(export_id: int, project_data: dict):
     try:
         export.status = "processing"
         db.commit()
+        _start = time.time()
         _publish(export_id, 5, "내보내기 시작...")
 
         rallies = [
@@ -85,13 +95,28 @@ def run_export(export_id: int, project_data: dict):
 
                     clips.append(sub.fl(make_overlay()))
                     pct = 10 + int((i + 1) / total * 70)
-                    _publish(export_id, pct, f"랠리 {i+1}/{total} 처리 중...")
+                    _publish(export_id, pct, f"랠리 {i+1}/{total} 처리 중...", eta=_calc_eta(pct, _start))
 
-                _publish(export_id, 82, "클립 합치는 중...")
+                _publish(export_id, 82, "클립 합치는 중...", eta=_calc_eta(82, _start))
                 final = concatenate_videoclips(clips)
-                _publish(export_id, 88, "영상 저장 중...")
+                _publish(export_id, 88, "영상 저장 중...", eta=_calc_eta(88, _start))
+
+                # write_videofile 진행률 콜백
+                try:
+                    import proglog
+                    class _WriteLogger(proglog.ProgressBarLogger):
+                        def bars_callback(self, bar, attr, value, old_value=None):
+                            if attr == "index":
+                                t = self.bars.get(bar, {}).get("total") or 1
+                                frac = min(1.0, value / t)
+                                pct = int(88 + frac * 11)  # 88→99
+                                _publish(export_id, pct, "영상 저장 중...", eta=_calc_eta(pct, _start))
+                    _write_logger = _WriteLogger()
+                except Exception:
+                    _write_logger = None
+
                 final.write_videofile(out, codec="libx264", audio_codec="aac",
-                                      preset="ultrafast", threads=4, logger=None)
+                                      preset="ultrafast", threads=4, logger=_write_logger)
                 final.close(); video.close()
 
                 # 타임라인 txt
@@ -105,7 +130,7 @@ def run_export(export_id: int, project_data: dict):
                 with open(txt_path, "w", encoding="utf-8") as f:
                     f.write(txt)
 
-        _publish(export_id, 10, "영상 처리 시작...")
+        _publish(export_id, 10, "영상 처리 시작...", eta=None)
         ProgressExporter()
 
         export.status = "done"

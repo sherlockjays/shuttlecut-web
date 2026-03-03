@@ -12,7 +12,31 @@ from workers.tasks import run_export
 
 router = APIRouter()
 
-PLAN_LIMITS = {"free": 3, "standard": 30, "club": 99999}
+PLAN_LIMITS = {"free": 3, "standard": 30, "club": 99999, "admin": 999999999}
+
+
+@router.get("/")
+def list_exports(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """내 내보내기 히스토리 목록"""
+    result = (
+        db.query(Export)
+        .join(Project)
+        .filter(Project.user_id == user.id)
+        .order_by(Export.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": e.id,
+            "project_id": e.project_id,
+            "project_title": e.project.title,
+            "status": e.status,
+            "youtube_url": e.youtube_url,
+            "error_msg": e.error_msg,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        }
+        for e in result
+    ]
 
 
 @router.post("/{project_id}")

@@ -2,8 +2,9 @@ import { useState, useEffect } from "react"
 import LoginPage from "./pages/LoginPage"
 import DashboardPage from "./pages/DashboardPage"
 import EditorPage from "./pages/EditorPage"
+import ExportHistoryPage from "./pages/ExportHistoryPage"
 
-export type Page = "login" | "dashboard" | "editor"
+export type Page = "login" | "dashboard" | "editor" | "history"
 
 export default function App() {
   const [page, setPage] = useState<Page>("login")
@@ -19,8 +20,10 @@ export default function App() {
   if (page === "login")
     return <LoginPage onLogin={() => setPage("dashboard")} />
   if (page === "dashboard")
-    return <DashboardPage onOpenEditor={openEditor} onLogout={logout} />
+    return <DashboardPage onOpenEditor={openEditor} onLogout={logout} onOpenHistory={() => setPage("history")} />
   if (page === "editor" && projectId)
     return <EditorPage projectId={projectId} onBack={() => setPage("dashboard")} />
+  if (page === "history")
+    return <ExportHistoryPage onBack={() => setPage("dashboard")} />
   return null
 }

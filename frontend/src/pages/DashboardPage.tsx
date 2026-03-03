@@ -4,8 +4,8 @@ import { projects } from "../api"
 type Project = { id: number; title: string; updated_at: string }
 
 export default function DashboardPage({
-  onOpenEditor, onLogout,
-}: { onOpenEditor: (id: number) => void; onLogout: () => void }) {
+  onOpenEditor, onLogout, onOpenHistory,
+}: { onOpenEditor: (id: number) => void; onLogout: () => void; onOpenHistory: () => void }) {
   const [list, setList] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -29,9 +29,14 @@ export default function DashboardPage({
       {/* 헤더 */}
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">🏸 ShuttleCut</h1>
-        <button onClick={onLogout} className="text-gray-400 hover:text-white text-sm transition-colors">
-          로그아웃
-        </button>
+        <div className="flex items-center gap-4">
+          <button onClick={onOpenHistory} className="text-gray-400 hover:text-white text-sm transition-colors">
+            내보내기 기록
+          </button>
+          <button onClick={onLogout} className="text-gray-400 hover:text-white text-sm transition-colors">
+            로그아웃
+          </button>
+        </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8">

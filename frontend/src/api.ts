@@ -53,6 +53,7 @@ export const videos = {
 }
 
 export const exports = {
+  list: () => apiFetch("/api/export/"),
   start: (projectId: number) => apiFetch(`/api/export/${projectId}`, { method: "POST" }),
   status: (exportId: number) => apiFetch(`/api/export/${exportId}/status`),
   wsUrl: (exportId: number) => {
