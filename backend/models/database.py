@@ -13,14 +13,15 @@ Base = declarative_base()
 
 class User(Base):
     __tablename__ = "users"
-    id            = Column(Integer, primary_key=True)
-    email         = Column(String, unique=True, nullable=False)
-    hashed_pw     = Column(String, nullable=True)   # Google OAuth면 None
-    google_id     = Column(String, nullable=True)
-    plan          = Column(String, default="free")  # free / standard / club
-    export_count  = Column(Integer, default=0)      # 이번 달 내보내기 횟수
-    created_at    = Column(DateTime, default=datetime.utcnow)
-    projects      = relationship("Project", back_populates="user")
+    id                      = Column(Integer, primary_key=True)
+    email                   = Column(String, unique=True, nullable=False)
+    hashed_pw               = Column(String, nullable=True)   # Google OAuth면 None
+    google_id               = Column(String, nullable=True)
+    plan                    = Column(String, default="free")  # free / standard / club
+    export_count            = Column(Integer, default=0)      # 이번 달 내보내기 횟수
+    youtube_refresh_token   = Column(String, nullable=True)   # YouTube OAuth 토큰
+    created_at              = Column(DateTime, default=datetime.utcnow)
+    projects                = relationship("Project", back_populates="user")
 
 
 class Project(Base):

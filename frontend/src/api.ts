@@ -61,4 +61,12 @@ export const exports = {
     return `${proto}//${window.location.host}/api/export/ws/${exportId}`
   },
   downloadUrl: (exportId: number) => `${BASE}/api/export/${exportId}/download?token=${localStorage.getItem("token") || ""}`,
+  uploadToYoutube: (exportId: number) => apiFetch(`/api/export/${exportId}/youtube`, { method: "POST" }),
+  delete: (exportId: number) => apiFetch(`/api/export/${exportId}`, { method: "DELETE" }),
+}
+
+export const youtube = {
+  status: () => apiFetch("/api/youtube/status"),
+  authUrl: () => `${BASE}/api/youtube/auth?token=${localStorage.getItem("token") || ""}`,
+  disconnect: () => apiFetch("/api/youtube/disconnect", { method: "DELETE" }),
 }

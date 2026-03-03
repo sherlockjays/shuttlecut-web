@@ -154,3 +154,44 @@ def run_export(export_id: int, project_data: dict):
         _publish(export_id, 0, str(e), status="error")
     finally:
         db.close()
+
+
+@celery.task
+def upload_to_youtube(export_id: int):
+    """완료된 내보내기를 YouTube에 업로드"""
+    from models.database import SessionLocal, Export, Project, User
+    from core.youtube_uploader import get_youtube_service, upload_video
+
+    db: Session = SessionLocal()
+    export = db.query(Export).get(export_id)
+
+    try:
+        project = db.query(Project).get(export.project_id)
+        user = db.query(User).get(project.user_id)
+
+        if not user.youtube_refresh_token:
+            raise Exception("YouTube 계정이 연결되지 않았습니다.")
+
+        youtube = get_youtube_service(user.youtube_refresh_token)
+
+        title_parts = [p for p in [
+            project.match_date, project.tournament_name, project.match_name
+        ] if p]
+        title = " ".join(title_parts) or project.title or "ShuttleCut 내보내기"
+
+        description = f"{project.player1_name} vs {project.player2_name}\n"
+        if project.level:
+            description += f"급수: {project.level}\n"
+        description += "\n#배드민턴 #ShuttleCut #badminton"
+
+        youtube_url = upload_video(youtube, export.output_path, title, description)
+
+        export.youtube_url = youtube_url
+        db.commit()
+
+    except Exception as e:
+        export.youtube_url = None  # 재시도 가능하도록 초기화
+        db.commit()
+        raise e
+    finally:
+        db.close()

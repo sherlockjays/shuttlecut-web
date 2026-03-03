@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from models.database import get_db, User, Project, Export
 from api.routes.auth import current_user
-from workers.tasks import run_export
+from workers.tasks import run_export, upload_to_youtube
 
 router = APIRouter()
 
@@ -121,6 +121,55 @@ def download_export(export_id: int, token: str | None = None, db: Session = Depe
         raise HTTPException(404, "파일을 찾을 수 없습니다.")
     filename = f"export_{export_id}.mp4"
     return FileResponse(export.output_path, media_type="video/mp4", filename=filename)
+
+
+@router.post("/{export_id}/youtube")
+def start_youtube_upload(
+    export_id: int,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """완료된 내보내기를 YouTube에 업로드"""
+    if not user.youtube_refresh_token:
+        raise HTTPException(400, "YouTube 계정이 연결되지 않았습니다.")
+
+    export = db.query(Export).join(Project).filter(
+        Export.id == export_id, Project.user_id == user.id
+    ).first()
+    if not export:
+        raise HTTPException(404)
+    if export.status != "done" or not export.output_path:
+        raise HTTPException(400, "완료된 내보내기가 아닙니다.")
+    if not Path(export.output_path).exists():
+        raise HTTPException(404, "내보내기 파일을 찾을 수 없습니다.")
+
+    export.youtube_url = "uploading"
+    db.commit()
+
+    upload_to_youtube.delay(export_id)
+    return {"message": "YouTube 업로드를 시작했습니다.", "export_id": export_id}
+
+
+@router.delete("/{export_id}")
+def delete_export(export_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """내보내기 기록 삭제 + 출력 파일 삭제"""
+    export = db.query(Export).join(Project).filter(
+        Export.id == export_id, Project.user_id == user.id
+    ).first()
+    if not export:
+        raise HTTPException(404)
+
+    # 출력 파일 삭제 (.mp4 + .txt)
+    if export.output_path:
+        for p in [export.output_path, export.output_path.replace(".mp4", ".txt")]:
+            try:
+                Path(p).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+    db.delete(export)
+    db.commit()
+    return {"ok": True}
 
 
 @router.websocket("/ws/{export_id}")

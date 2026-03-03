@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { projects, videos, exports as exportsApi } from "../api"
+import { projects, videos, exports as exportsApi, youtube as youtubeApi } from "../api"
 
 type Rally = [number, number, number, number, number] // [start, end, p1, p2, winner]
 
@@ -28,6 +28,9 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   const [exportMsg, setExportMsg] = useState("")
   const [exportEta, setExportEta] = useState<number | null>(null)
   const [exportDoneId, setExportDoneId] = useState<number | null>(null)
+  const [ytConnected, setYtConnected] = useState(false)
+  const [ytUploading, setYtUploading] = useState(false)
+  const [ytUrl, setYtUrl] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -39,6 +42,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
         setVideoId(vid)
       }
     })
+    youtubeApi.status().then((s: { connected: boolean }) => setYtConnected(s.connected)).catch(() => {})
   }, [projectId])
 
   // 자동 저장 (3초 debounce)
@@ -116,6 +120,30 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
     if (sec <= 0) return "거의 완료..."
     const m = Math.floor(sec / 60), s = sec % 60
     return m > 0 ? `약 ${m}분 ${s}초 남음` : `약 ${s}초 남음`
+  }
+
+  const startYoutubeUpload = async () => {
+    if (!exportDoneId) return
+    setYtUploading(true)
+    try {
+      await exportsApi.uploadToYoutube(exportDoneId)
+      // 3초마다 폴링해서 youtube_url 확인
+      const poll = setInterval(async () => {
+        const s = await exportsApi.status(exportDoneId)
+        if (s.youtube_url && s.youtube_url !== "uploading") {
+          setYtUrl(s.youtube_url)
+          setYtUploading(false)
+          clearInterval(poll)
+        } else if (!s.youtube_url && !ytUploading) {
+          // 실패해서 null로 돌아온 경우
+          setYtUploading(false)
+          clearInterval(poll)
+        }
+      }, 3000)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "YouTube 업로드 실패")
+      setYtUploading(false)
+    }
   }
 
   const startExport = async () => {
@@ -296,15 +324,31 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
                 </div>
               </div>
             ) : exportDoneId !== null ? (
-              <div className="flex gap-2">
-                <a href={exportsApi.downloadUrl(exportDoneId)}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium transition-colors text-center">
-                  다운로드
-                </a>
-                <button onClick={() => setExportDoneId(null)}
-                  className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl transition-colors">
-                  다시
-                </button>
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <a href={exportsApi.downloadUrl(exportDoneId)}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium transition-colors text-center">
+                    다운로드
+                  </a>
+                  <button onClick={() => { setExportDoneId(null); setYtUrl(null) }}
+                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl transition-colors">
+                    다시
+                  </button>
+                </div>
+                {ytUrl ? (
+                  <a href={ytUrl} target="_blank" rel="noopener noreferrer"
+                    className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-xl text-sm font-medium transition-colors text-center">
+                    YouTube에서 보기 ↗
+                  </a>
+                ) : ytUploading ? (
+                  <div className="text-center text-xs text-gray-400 py-2">YouTube 업로드 중...</div>
+                ) : (
+                  <button onClick={startYoutubeUpload} disabled={!ytConnected}
+                    title={ytConnected ? "YouTube에 업로드" : "대시보드에서 YouTube 계정을 먼저 연결해주세요"}
+                    className="w-full bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2 rounded-xl text-sm font-medium transition-colors">
+                    YouTube 업로드
+                  </button>
+                )}
               </div>
             ) : (
               <button onClick={startExport} disabled={data.rallies.length === 0}

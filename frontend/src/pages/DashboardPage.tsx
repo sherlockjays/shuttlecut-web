@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { projects } from "../api"
+import { projects, youtube as youtubeApi } from "../api"
 
 type Project = { id: number; title: string; updated_at: string }
 
@@ -8,10 +8,24 @@ export default function DashboardPage({
 }: { onOpenEditor: (id: number) => void; onLogout: () => void; onOpenHistory: () => void }) {
   const [list, setList] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const [ytConnected, setYtConnected] = useState(false)
 
   useEffect(() => {
     projects.list().then(setList).finally(() => setLoading(false))
+    youtubeApi.status().then((s: any) => setYtConnected(s.connected)).catch(() => {})
+    // OAuth 콜백 후 돌아왔을 때 처리
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("youtube_connected") === "1") {
+      setYtConnected(true)
+      window.history.replaceState({}, "", "/")
+    }
   }, [])
+
+  const handleYtDisconnect = async () => {
+    if (!confirm("YouTube 계정 연결을 해제하시겠습니까?")) return
+    await youtubeApi.disconnect()
+    setYtConnected(false)
+  }
 
   const createNew = async () => {
     const res = await projects.create({ title: "새 프로젝트" })
@@ -29,10 +43,24 @@ export default function DashboardPage({
       {/* 헤더 */}
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">🏸 ShuttleCut</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button onClick={onOpenHistory} className="text-gray-400 hover:text-white text-sm transition-colors">
             내보내기 기록
           </button>
+          {ytConnected ? (
+            <div className="flex items-center gap-2">
+              <span className="text-red-400 text-xs font-medium">▶ YouTube 연결됨</span>
+              <button onClick={handleYtDisconnect}
+                className="text-gray-500 hover:text-gray-300 text-xs transition-colors">
+                해제
+              </button>
+            </div>
+          ) : (
+            <a href={youtubeApi.authUrl()}
+              className="text-gray-400 hover:text-white text-sm transition-colors">
+              YouTube 연결
+            </a>
+          )}
           <button onClick={onLogout} className="text-gray-400 hover:text-white text-sm transition-colors">
             로그아웃
           </button>

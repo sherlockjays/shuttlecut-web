@@ -44,30 +44,34 @@ def draw_scoreboard(frame_rgb: np.ndarray,
     img = Image.fromarray(frame_rgb)
     draw = ImageDraw.Draw(img)
 
-    font_sm = _get_font(16)
-    font_md = _get_font(20)
-    font_score = _get_font(38)
+    font_sm    = _get_font(22)
+    font_md    = _get_font(28)
+    font_score = _get_font(48)
 
-    x, y = 20, 20
-    bw = 420
+    x      = 20
+    y      = 20
+    bw     = 420
+    pad    = 10
+    row_h  = 66
+    line_h = 30
 
-    # ── 헤더: 날짜 / 대회명 / 급수 / 경기명 ──
+    # ── 헤더: 1행 = 날짜 / 대회명, 2행 = 급수 / 경기명 ──
     header_lines = []
-    if date:
-        header_lines.append(date)
-    parts = [p for p in [tournament, level, match_name] if p]
-    if parts:
-        header_lines.append("  |  ".join(parts))
+    line1 = "  /  ".join(p for p in [date, tournament] if p)
+    line2 = "  /  ".join(p for p in [level, match_name] if p)
+    if line1:
+        header_lines.append(line1)
+    if line2:
+        header_lines.append(line2)
 
-    header_h = 28 * len(header_lines) + 10 if header_lines else 0
+    header_h = line_h * len(header_lines) + pad if header_lines else 0
 
     if header_lines:
         draw.rectangle([(x, y), (x + bw, y + header_h)], fill=(30, 30, 30))
         for i, line in enumerate(header_lines):
-            draw.text((x + 10, y + 5 + i * 28), line, font=font_sm, fill=(220, 220, 220))
+            draw.text((x + pad, y + pad // 2 + i * line_h), line, font=font_sm, fill=(220, 220, 220))
 
     # ── 선수 행 ──
-    row_h = 54
     y0 = y + header_h
 
     for name, score, color in [
@@ -76,19 +80,19 @@ def draw_scoreboard(frame_rgb: np.ndarray,
     ]:
         draw.rectangle([(x, y0), (x + bw, y0 + row_h)], fill=(0, 0, 0))
 
-        # 팀명 수직 중앙 정렬 (top offset 보정)
+        # 팀명 수직 중앙 정렬
         name_bbox = draw.textbbox((0, 0), name[:18], font=font_md)
         name_h = name_bbox[3] - name_bbox[1]
         name_y = y0 + (row_h - name_h) // 2 - name_bbox[1]
-        draw.text((x + 10, name_y), name[:18], font=font_md, fill=color)
+        draw.text((x + pad, name_y), name[:18], font=font_md, fill=color)
 
-        # 점수 수직 중앙 정렬 (top offset 보정)
+        # 점수 수직 중앙 정렬
         score_txt = str(score)
         score_bbox = draw.textbbox((0, 0), score_txt, font=font_score)
         sw = score_bbox[2] - score_bbox[0]
         sh = score_bbox[3] - score_bbox[1]
         score_y = y0 + (row_h - sh) // 2 - score_bbox[1]
-        draw.text((x + bw - sw - 12, score_y), score_txt, font=font_score, fill=color)
+        draw.text((x + bw - sw - pad, score_y), score_txt, font=font_score, fill=color)
 
         y0 += row_h
 
@@ -98,7 +102,6 @@ def draw_scoreboard(frame_rgb: np.ndarray,
     draw.rectangle([(x, y), (x + bw, y + total_h)], outline=(255, 255, 255), width=2)
     if header_lines:
         draw.line([(x, y + header_h), (x + bw, y + header_h)], fill=(180, 180, 180), width=1)
-    # 두 팀 사이 구분선 (굵고 밝게)
     draw.line(
         [(x + 1, y + header_h + row_h), (x + bw - 1, y + header_h + row_h)],
         fill=(200, 200, 200), width=3,
