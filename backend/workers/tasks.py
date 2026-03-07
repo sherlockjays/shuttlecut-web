@@ -1,5 +1,5 @@
 """Celery 작업 - 영상 내보내기"""
-import os, json, redis, sys, time
+import os, json, redis, sys, time, subprocess, tempfile
 sys.path.insert(0, "/app")
 from pathlib import Path
 from celery import Celery
@@ -25,6 +25,92 @@ def _calc_eta(pct: int, start_time: float) -> int | None:
     return max(0, int(remaining))
 
 
+def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: float):
+    """ffmpeg native overlay로 영상 처리 (매 프레임 Python 처리 없음)"""
+    from core.exporter import make_scoreboard_image, generate_timeline_txt
+
+    video_path = pd["video_path"]
+    fps        = pd["fps"]
+    scale      = pd.get("scoreboard_scale", 1.0)
+    theme      = pd.get("scoreboard_theme", "dark")
+    ox         = int(11 * max(0.5, min(2.0, scale)))
+    oy         = int(11 * max(0.5, min(2.0, scale)))
+    TAIL       = 1.5
+    total      = len(rallies)
+    date       = pd.get("match_date", "")
+    tournament = pd.get("tournament_name", "")
+    level      = pd.get("level", "")
+    match_name = pd.get("match_name", "")
+    p1n        = pd.get("player1_name", "1팀")
+    p2n        = pd.get("player2_name", "2팀")
+
+    # 영상 길이 조회
+    probe = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", video_path],
+        capture_output=True, text=True, check=True,
+    )
+    duration = float(json.loads(probe.stdout)["format"]["duration"])
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        clip_files = []
+
+        for i, rally in enumerate(rallies):
+            start_t  = rally.start_frame / fps
+            end_t    = min(rally.end_frame / fps + TAIL, duration)
+            clip_dur = end_t - start_t
+            sct      = rally.end_frame / fps - start_t  # 클립 내 점수 변경 시각
+
+            p1a, p2a = rally.p1_score, rally.p2_score
+            p1b = p1a + 1 if rally.winner == 1 else p1a
+            p2b = p2a + 1 if rally.winner == 2 else p2a
+
+            before_path = f"{tmpdir}/r{i}_before.png"
+            after_path  = f"{tmpdir}/r{i}_after.png"
+            make_scoreboard_image(date, tournament, level, match_name, p1n, p1a, p2n, p2a, scale, theme).save(before_path)
+            make_scoreboard_image(date, tournament, level, match_name, p1n, p1b, p2n, p2b, scale, theme).save(after_path)
+
+            clip_path = f"{tmpdir}/clip{i:04d}.mp4"
+            fc = (
+                f"[0:v][1:v]overlay=x={ox}:y={oy}:enable='lt(t,{sct:.3f})'[v1];"
+                f"[v1][2:v]overlay=x={ox}:y={oy}:enable='gte(t,{sct:.3f})'[vout]"
+            )
+            cmd = [
+                "ffmpeg", "-y",
+                "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
+                "-i", before_path, "-i", after_path,
+                "-filter_complex", fc,
+                "-map", "[vout]", "-map", "0:a:0?",
+                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                "-c:a", "aac", "-threads", "0",
+                clip_path,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(f"ffmpeg 클립 {i} 실패:\n{result.stderr[-2000:]}")
+            clip_files.append(clip_path)
+
+            pct = 10 + int((i + 1) / total * 75)
+            _publish(export_id, pct, f"랠리 {i+1}/{total} 처리 중...", eta=_calc_eta(pct, start_time))
+
+        _publish(export_id, 87, "클립 합치는 중...", eta=_calc_eta(87, start_time))
+        concat_list = f"{tmpdir}/concat.txt"
+        with open(concat_list, "w") as f:
+            for cp in clip_files:
+                f.write(f"file '{cp}'\n")
+
+        result = subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", concat_list, "-c", "copy", out,
+        ], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg concat 실패:\n{result.stderr[-2000:]}")
+
+    txt_path = out.replace(".mp4", ".txt")
+    txt = generate_timeline_txt(rallies, fps, date, tournament, level, match_name, p1n, p2n)
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write(txt)
+
+
 @celery.task
 def run_export(export_id: int, project_data: dict):
     from models.database import SessionLocal, Export, User, Project
@@ -48,92 +134,8 @@ def run_export(export_id: int, project_data: dict):
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = str(output_dir / f"export_{export_id}.mp4")
 
-        # 진행률 콜백을 위한 래퍼
-        class ProgressExporter:
-            def __init__(self):
-                # moviepy 기반 동기 내보내기 직접 실행
-                self._run(rallies, project_data, output_path)
-
-            def _run(self, rallies, pd, out):
-                import cv2
-                from core.exporter import generate_timeline_txt
-                try:
-                    from moviepy.editor import VideoFileClip, concatenate_videoclips
-                except ImportError:
-                    import moviepy.editor as mpy
-                    VideoFileClip = mpy.VideoFileClip
-                    concatenate_videoclips = mpy.concatenate_videoclips
-                from core.exporter import draw_scoreboard
-                import numpy as np
-
-                video = VideoFileClip(pd["video_path"])
-                total = len(rallies)
-                clips = []
-                TAIL = 1.5
-
-                for i, rally in enumerate(rallies):
-                    start_t = rally.start_frame / pd["fps"]
-                    end_t = min(rally.end_frame / pd["fps"] + TAIL, video.duration)
-                    p1a, p2a = rally.p1_score, rally.p2_score
-                    p1b = p1a + 1 if rally.winner == 1 else p1a
-                    p2b = p2a + 1 if rally.winner == 2 else p2a
-                    sct = rally.end_frame / pd["fps"] - start_t
-                    sub = video.subclip(start_t, end_t)
-
-                    def make_overlay(a=p1a, b=p2a, c=p1b, d=p2b, s=sct):
-                        def fn(get_frame, t):
-                            p1 = c if t >= s else a
-                            p2 = d if t >= s else b
-                            return draw_scoreboard(
-                                get_frame(t),
-                                pd.get("match_date",""), pd.get("tournament_name",""),
-                                pd.get("level",""), pd.get("match_name",""),
-                                pd.get("player1_name","1팀"), p1,
-                                pd.get("player2_name","2팀"), p2,
-                                scale=pd.get("scoreboard_scale", 1.0),
-                                theme=pd.get("scoreboard_theme", "dark"),
-                            )
-                        return fn
-
-                    clips.append(sub.fl(make_overlay()))
-                    pct = 10 + int((i + 1) / total * 70)
-                    _publish(export_id, pct, f"랠리 {i+1}/{total} 처리 중...", eta=_calc_eta(pct, _start))
-
-                _publish(export_id, 82, "클립 합치는 중...", eta=_calc_eta(82, _start))
-                final = concatenate_videoclips(clips)
-                _publish(export_id, 88, "영상 저장 중...", eta=_calc_eta(88, _start))
-
-                # write_videofile 진행률 콜백
-                try:
-                    import proglog
-                    class _WriteLogger(proglog.ProgressBarLogger):
-                        def bars_callback(self, bar, attr, value, old_value=None):
-                            if attr == "index":
-                                t = self.bars.get(bar, {}).get("total") or 1
-                                frac = min(1.0, value / t)
-                                pct = int(88 + frac * 11)  # 88→99
-                                _publish(export_id, pct, "영상 저장 중...", eta=_calc_eta(pct, _start))
-                    _write_logger = _WriteLogger()
-                except Exception:
-                    _write_logger = None
-
-                final.write_videofile(out, codec="libx264", audio_codec="aac",
-                                      preset="ultrafast", threads=4, logger=_write_logger)
-                final.close(); video.close()
-
-                # 타임라인 txt
-                txt_path = out.replace(".mp4", ".txt")
-                txt = generate_timeline_txt(
-                    rallies, pd["fps"],
-                    pd.get("match_date",""), pd.get("tournament_name",""),
-                    pd.get("level",""), pd.get("match_name",""),
-                    pd.get("player1_name","1팀"), pd.get("player2_name","2팀"),
-                )
-                with open(txt_path, "w", encoding="utf-8") as f:
-                    f.write(txt)
-
         _publish(export_id, 10, "영상 처리 시작...", eta=None)
-        ProgressExporter()
+        _run_ffmpeg_export(export_id, rallies, project_data, output_path, _start)
 
         export.status = "done"
         export.output_path = output_path
