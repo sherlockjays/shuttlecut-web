@@ -80,7 +80,7 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
                 "-i", before_path, "-i", after_path,
                 "-filter_complex", fc,
                 "-map", "[vout]", "-map", "0:a:0?",
-                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "20",
                 "-c:a", "aac", "-threads", "0",
                 clip_path,
             ]
