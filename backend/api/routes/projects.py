@@ -33,7 +33,7 @@ class ProjectBody(BaseModel):
 def list_projects(user: User = Depends(current_user), db: Session = Depends(get_db)):
     projects = db.query(Project).filter(Project.user_id == user.id)\
                  .order_by(Project.updated_at.desc()).all()
-    return [{"id": p.id, "title": p.title, "updated_at": p.updated_at} for p in projects]
+    return [{"id": p.id, "title": p.title, "updated_at": (p.updated_at.isoformat() + "+00:00") if p.updated_at else None} for p in projects]
 
 
 @router.post("/")

@@ -33,7 +33,7 @@ def list_exports(user: User = Depends(current_user), db: Session = Depends(get_d
             "status": e.status,
             "youtube_url": e.youtube_url,
             "error_msg": e.error_msg,
-            "created_at": e.created_at.isoformat() if e.created_at else None,
+            "created_at": (e.created_at.isoformat() + "+00:00") if e.created_at else None,
         }
         for e in result
     ]
