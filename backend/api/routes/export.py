@@ -74,6 +74,8 @@ def start_export(
         "player1_score": project.player1_score,
         "player2_score": project.player2_score,
         "rallies": project.rallies,
+        "scoreboard_scale": project.scoreboard_scale,
+        "scoreboard_theme": project.scoreboard_theme,
     }
     run_export.delay(export.id, project_data)
 

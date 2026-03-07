@@ -90,6 +90,8 @@ def run_export(export_id: int, project_data: dict):
                                 pd.get("level",""), pd.get("match_name",""),
                                 pd.get("player1_name","1팀"), p1,
                                 pd.get("player2_name","2팀"), p2,
+                                scale=pd.get("scoreboard_scale", 1.0),
+                                theme=pd.get("scoreboard_theme", "dark"),
                             )
                         return fn
 

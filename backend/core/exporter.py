@@ -20,6 +20,14 @@ if not Path(FONT_PATH).exists():
     FONT_PATH = None  # PIL 기본 폰트 사용
 TAIL_SECONDS = 1.5   # 랠리 끝점 이후 추가 시간
 
+THEMES = {
+    "dark":  {"header_bg": (30,30,30),    "row_bg": (0,0,0),       "header_text": (220,220,220), "name_text": (255,220,0),  "score_text": (255,220,0),  "border": (255,255,255), "divider": (180,180,180), "row_div": (200,200,200)},
+    "light": {"header_bg": (240,240,240), "row_bg": (255,255,255), "header_text": (50,50,50),    "name_text": (30,80,200),  "score_text": (30,80,200),  "border": (50,50,50),    "divider": (150,150,150), "row_div": (150,150,150)},
+    "blue":  {"header_bg": (0,40,120),    "row_bg": (0,20,80),     "header_text": (200,220,255), "name_text": (255,220,0),  "score_text": (255,220,0),  "border": (100,160,255), "divider": (80,120,200),  "row_div": (80,130,210)},
+    "red":   {"header_bg": (120,20,20),   "row_bg": (80,0,0),      "header_text": (255,220,220), "name_text": (255,220,0),  "score_text": (255,220,0),  "border": (255,100,100), "divider": (200,80,80),   "row_div": (200,80,80)},
+    "green": {"header_bg": (10,60,20),    "row_bg": (5,40,10),     "header_text": (200,255,210), "name_text": (180,255,100),"score_text": (180,255,100),"border": (80,200,100),  "divider": (60,160,80),   "row_div": (60,160,80)},
+}
+
 
 def _get_font(size: int) -> ImageFont.FreeTypeFont:
     if FONT_PATH:
@@ -39,52 +47,52 @@ def _fmt(seconds: float) -> str:
 def draw_scoreboard(frame_rgb: np.ndarray,
                     date: str, tournament: str, level: str, match_name: str,
                     p1_name: str, p1_score: int,
-                    p2_name: str, p2_score: int) -> np.ndarray:
+                    p2_name: str, p2_score: int,
+                    scale: float = 1.0, theme: str = "dark") -> np.ndarray:
     """좌상단 점수판 오버레이 (RGB ndarray → RGB ndarray)"""
     img = Image.fromarray(frame_rgb)
     draw = ImageDraw.Draw(img)
 
-    font_sm    = _get_font(22)
-    font_md    = _get_font(28)
-    font_score = _get_font(48)
+    t = THEMES.get(theme, THEMES["dark"])
 
-    x      = 20
-    y      = 20
-    bw     = 420
-    pad    = 10
-    row_h  = 66
-    line_h = 30
+    s = max(0.5, min(2.0, scale))
+    font_sm    = _get_font(int(13 * s))
+    font_md    = _get_font(int(16 * s))
+    font_score = _get_font(int(27 * s))
 
-    # ── 헤더: 1행 = 날짜 / 대회명, 2행 = 급수 / 경기명 ──
-    header_lines = []
+    x      = int(11 * s)
+    y      = int(11 * s)
+    bw     = int(236 * s)
+    pad    = int(6 * s)
+    row_h  = int(38 * s)
+    line_h = int(17 * s)
+
+    # ── 헤더: 항상 2줄 고정 높이 (비율 일정 유지) ──
     line1 = "  /  ".join(p for p in [date, tournament] if p)
     line2 = "  /  ".join(p for p in [level, match_name] if p)
-    if line1:
-        header_lines.append(line1)
-    if line2:
-        header_lines.append(line2)
+    # 둘 다 비어 있으면 ShuttleCut 브랜드 문구 1줄
+    if not line1 and not line2:
+        header_lines = ["ShuttleCut", ""]
+    else:
+        header_lines = [line1, line2]
+    header_h = line_h * 2 + pad
 
-    header_h = line_h * len(header_lines) + pad if header_lines else 0
-
-    if header_lines:
-        draw.rectangle([(x, y), (x + bw, y + header_h)], fill=(30, 30, 30))
-        for i, line in enumerate(header_lines):
-            draw.text((x + pad, y + pad // 2 + i * line_h), line, font=font_sm, fill=(220, 220, 220))
+    draw.rectangle([(x, y), (x + bw, y + header_h)], fill=t["header_bg"])
+    for i, line in enumerate(header_lines):
+        if line:
+            draw.text((x + pad, y + pad // 2 + i * line_h), line, font=font_sm, fill=t["header_text"])
 
     # ── 선수 행 ──
     y0 = y + header_h
 
-    for name, score, color in [
-        (p1_name, p1_score, (255, 220, 0)),
-        (p2_name, p2_score, (255, 220, 0)),
-    ]:
-        draw.rectangle([(x, y0), (x + bw, y0 + row_h)], fill=(0, 0, 0))
+    for name, score in [(p1_name, p1_score), (p2_name, p2_score)]:
+        draw.rectangle([(x, y0), (x + bw, y0 + row_h)], fill=t["row_bg"])
 
         # 팀명 수직 중앙 정렬
         name_bbox = draw.textbbox((0, 0), name[:18], font=font_md)
         name_h = name_bbox[3] - name_bbox[1]
         name_y = y0 + (row_h - name_h) // 2 - name_bbox[1]
-        draw.text((x + pad, name_y), name[:18], font=font_md, fill=color)
+        draw.text((x + pad, name_y), name[:18], font=font_md, fill=t["name_text"])
 
         # 점수 수직 중앙 정렬
         score_txt = str(score)
@@ -92,19 +100,18 @@ def draw_scoreboard(frame_rgb: np.ndarray,
         sw = score_bbox[2] - score_bbox[0]
         sh = score_bbox[3] - score_bbox[1]
         score_y = y0 + (row_h - sh) // 2 - score_bbox[1]
-        draw.text((x + bw - sw - pad, score_y), score_txt, font=font_score, fill=color)
+        draw.text((x + bw - sw - pad, score_y), score_txt, font=font_score, fill=t["score_text"])
 
         y0 += row_h
 
     total_h = header_h + row_h * 2
 
     # ── 테두리 / 구분선 ──
-    draw.rectangle([(x, y), (x + bw, y + total_h)], outline=(255, 255, 255), width=2)
-    if header_lines:
-        draw.line([(x, y + header_h), (x + bw, y + header_h)], fill=(180, 180, 180), width=1)
+    draw.rectangle([(x, y), (x + bw, y + total_h)], outline=t["border"], width=2)
+    draw.line([(x, y + header_h), (x + bw, y + header_h)], fill=t["divider"], width=1)
     draw.line(
         [(x + 1, y + header_h + row_h), (x + bw - 1, y + header_h + row_h)],
-        fill=(200, 200, 200), width=3,
+        fill=t["row_div"], width=3,
     )
 
     return np.array(img)

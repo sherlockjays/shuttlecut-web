@@ -26,6 +26,10 @@ export const auth = {
       .then(r => r.json())
   },
   me: () => apiFetch("/api/auth/me"),
+  forgotPassword: (email: string) =>
+    apiFetch("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+  resetPassword: (token: string, new_password: string) =>
+    apiFetch("/api/auth/reset-password", { method: "POST", body: JSON.stringify({ token, new_password }) }),
 }
 
 export const projects = {

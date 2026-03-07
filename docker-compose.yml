@@ -12,6 +12,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      TZ: Asia/Seoul
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       SECRET_KEY: ${SECRET_KEY}
@@ -20,6 +21,10 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       APP_BASE_URL: ${APP_BASE_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
     volumes:
       - video_data:/data/videos
     depends_on:
@@ -30,6 +35,7 @@ services:
     build: ./backend
     command: celery -A workers.tasks.celery worker --loglevel=info --concurrency=2
     environment:
+      TZ: Asia/Seoul
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       STORAGE_PATH: ${STORAGE_PATH}

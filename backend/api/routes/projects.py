@@ -24,7 +24,9 @@ class ProjectBody(BaseModel):
     player2_name:    Optional[str] = "2팀"
     player1_score:   Optional[int] = 0
     player2_score:   Optional[int] = 0
-    rallies:         Optional[List] = []
+    rallies:          Optional[List] = []
+    scoreboard_scale: Optional[float] = 1.0
+    scoreboard_theme: Optional[str] = "dark"
 
 
 @router.get("/")

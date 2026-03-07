@@ -17,11 +17,18 @@ def startup():
     # youtube_refresh_token 컬럼 마이그레이션
     from sqlalchemy import text
     with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE users ADD COLUMN youtube_refresh_token VARCHAR"))
-            conn.commit()
-        except Exception:
-            pass  # 이미 존재하면 무시
+        for stmt in [
+            "ALTER TABLE users ADD COLUMN youtube_refresh_token VARCHAR",
+            # DEFAULT TRUE → 기존 유저는 자동으로 인증된 상태, 신규 유저는 ORM이 FALSE로 삽입
+            "ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE projects ADD COLUMN scoreboard_scale FLOAT DEFAULT 1.0",
+            "ALTER TABLE projects ADD COLUMN scoreboard_theme VARCHAR DEFAULT 'dark'",
+        ]:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # 이미 존재하면 무시
 
 app.add_middleware(
     CORSMiddleware,

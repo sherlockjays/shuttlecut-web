@@ -20,6 +20,7 @@ class User(Base):
     plan                    = Column(String, default="free")  # free / standard / club
     export_count            = Column(Integer, default=0)      # 이번 달 내보내기 횟수
     youtube_refresh_token   = Column(String, nullable=True)   # YouTube OAuth 토큰
+    is_verified             = Column(Boolean, default=False)  # 이메일 인증 여부
     created_at              = Column(DateTime, default=datetime.utcnow)
     projects                = relationship("Project", back_populates="user")
 
@@ -40,7 +41,9 @@ class Project(Base):
     player2_name    = Column(String, default="2팀")
     player1_score   = Column(Integer, default=0)
     player2_score   = Column(Integer, default=0)
-    rallies         = Column(JSON, default=list)    # [[start, end, p1, p2, winner], ...]
+    rallies             = Column(JSON, default=list)    # [[start, end, p1, p2, winner], ...]
+    scoreboard_scale    = Column(Float, default=1.0)
+    scoreboard_theme    = Column(String, default="dark")
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user            = relationship("User", back_populates="projects")
