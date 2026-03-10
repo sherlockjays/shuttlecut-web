@@ -1,0 +1,25 @@
+FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    python3.11 python3.11-dev python3-pip \
+    ffmpeg libgl1 libglib2.0-0 fonts-nanum \
+    && rm -rf /var/lib/apt/lists/*
+
+# NVENC 라이브러리 (호스트 드라이버 570 버전에서 복사)
+COPY libnvidia-encode.so.570.211.01 /usr/lib/x86_64-linux-gnu/libnvidia-encode.so.570.211.01
+COPY libnvcuvid.so.570.211.01 /usr/lib/x86_64-linux-gnu/libnvcuvid.so.570.211.01
+RUN ln -s libnvidia-encode.so.570.211.01 /usr/lib/x86_64-linux-gnu/libnvidia-encode.so.1 \
+    && ln -s libnvidia-encode.so.1 /usr/lib/x86_64-linux-gnu/libnvidia-encode.so \
+    && ln -s libnvcuvid.so.570.211.01 /usr/lib/x86_64-linux-gnu/libnvcuvid.so.1 \
+    && ln -s libnvcuvid.so.1 /usr/lib/x86_64-linux-gnu/libnvcuvid.so \
+    && ldconfig
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["celery", "-A", "workers.tasks.celery", "worker", "--loglevel=info", "--concurrency=1"]

@@ -117,6 +117,63 @@ def draw_scoreboard(frame_rgb: np.ndarray,
     return np.array(img)
 
 
+def make_scoreboard_image(date: str, tournament: str, level: str, match_name: str,
+                          p1_name: str, p1_score: int,
+                          p2_name: str, p2_score: int,
+                          scale: float = 1.0, theme: str = "dark") -> Image.Image:
+    """점수판만 RGBA 이미지로 반환 (ffmpeg overlay용, 투명 배경)"""
+    t = THEMES.get(theme, THEMES["dark"])
+    s = max(0.5, min(2.0, scale))
+
+    font_sm    = _get_font(int(13 * s))
+    font_md    = _get_font(int(16 * s))
+    font_score = _get_font(int(27 * s))
+
+    pad    = int(6 * s)
+    row_h  = int(38 * s)
+    line_h = int(17 * s)
+    bw     = int(236 * s)
+
+    line1 = "  /  ".join(p for p in [date, tournament] if p)
+    line2 = "  /  ".join(p for p in [level, match_name] if p)
+    if not line1 and not line2:
+        header_lines = ["ShuttleCut", ""]
+    else:
+        header_lines = [line1, line2]
+    header_h = line_h * 2 + pad
+    total_h  = header_h + row_h * 2
+
+    img  = Image.new("RGBA", (bw + 2, total_h + 2), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    x, y = 0, 0
+    draw.rectangle([(x, y), (x + bw, y + header_h)], fill=(*t["header_bg"], 230))
+    for i, line in enumerate(header_lines):
+        if line:
+            draw.text((x + pad, y + pad // 2 + i * line_h), line, font=font_sm, fill=(*t["header_text"], 255))
+
+    y0 = y + header_h
+    for name, score in [(p1_name, p1_score), (p2_name, p2_score)]:
+        draw.rectangle([(x, y0), (x + bw, y0 + row_h)], fill=(*t["row_bg"], 230))
+        name_bbox = draw.textbbox((0, 0), name[:18], font=font_md)
+        name_h    = name_bbox[3] - name_bbox[1]
+        name_y    = y0 + (row_h - name_h) // 2 - name_bbox[1]
+        draw.text((x + pad, name_y), name[:18], font=font_md, fill=(*t["name_text"], 255))
+        score_txt  = str(score)
+        score_bbox = draw.textbbox((0, 0), score_txt, font=font_score)
+        sw = score_bbox[2] - score_bbox[0]
+        sh = score_bbox[3] - score_bbox[1]
+        score_y = y0 + (row_h - sh) // 2 - score_bbox[1]
+        draw.text((x + bw - sw - pad, score_y), score_txt, font=font_score, fill=(*t["score_text"], 255))
+        y0 += row_h
+
+    draw.rectangle([(x, 0), (x + bw, total_h)], outline=(*t["border"], 255), width=2)
+    draw.line([(x, y + header_h), (x + bw, y + header_h)], fill=(*t["divider"], 255), width=1)
+    draw.line([(x + 1, y + header_h + row_h), (x + bw - 1, y + header_h + row_h)], fill=(*t["row_div"], 255), width=3)
+
+    return img
+
+
 def generate_timeline_txt(rallies: list[Rally], fps: float,
                            date: str, tournament: str, level: str, match_name: str,
                            p1_name: str, p2_name: str) -> str:

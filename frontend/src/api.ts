@@ -42,7 +42,7 @@ export const projects = {
 
 export const videos = {
   upload: (file: File, onProgress?: (pct: number) => void) => {
-    return new Promise<{ video_id: string; path: string }>((resolve, reject) => {
+    return new Promise<{ video_id: string; path: string; fps: number; total_frames: number }>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       xhr.open("POST", `${BASE}/api/videos/upload`)
       xhr.setRequestHeader("Authorization", `Bearer ${localStorage.getItem("token")}`)

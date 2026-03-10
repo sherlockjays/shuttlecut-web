@@ -98,7 +98,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
     try {
       const res = await videos.upload(file, setUploadPct)
       setVideoId(res.video_id)
-      update({ video_path: res.path })
+      update({ video_path: res.path, fps: res.fps ?? 30, total_frames: res.total_frames ?? 0 })
     } finally {
       setUploading(false)
     }
@@ -326,7 +326,9 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
         <div className="flex-1 flex flex-col p-4 gap-3">
           {/* 영상 업로드 or 플레이어 */}
           {!streamUrl ? (
-            <label className="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors">
+            <label className="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors"
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}>
               <p className="text-4xl mb-2">🎬</p>
               <p className="text-gray-400">{uploading ? `업로드 중... ${uploadPct}%` : "영상 파일을 클릭하거나 드래그하여 업로드"}</p>
               <input type="file" accept="video/*" className="hidden" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />

@@ -1,70 +1,127 @@
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useSearchParams, useParams } from "react-router-dom"
 import LoginPage from "./pages/LoginPage"
 import DashboardPage from "./pages/DashboardPage"
 import EditorPage from "./pages/EditorPage"
-import ExportHistoryPage from "./pages/ExportHistoryPage"
 import ForgotPasswordPage from "./pages/ForgotPasswordPage"
 import ResetPasswordPage from "./pages/ResetPasswordPage"
+import PricingPage from "./pages/PricingPage"
+import GuidePage from "./pages/GuidePage"
+import MyPage from "./pages/MyPage"
+import AppLayout from "./components/AppLayout"
 
-export type Page = "login" | "dashboard" | "editor" | "history" | "forgot-password" | "reset-password"
-
-export default function App() {
-  const [page, setPage] = useState<Page>("login")
-  const [projectId, setProjectId] = useState<number | null>(null)
-  const [resetToken, setResetToken] = useState<string | null>(null)
-  const [verifyBanner, setVerifyBanner] = useState<"success" | "fail" | "google_error" | null>(null)
+// 루트 경로: OAuth 콜백 처리 및 리다이렉트
+function RootHandler() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-
-    // 비밀번호 재설정 링크
-    const rt = params.get("reset_token")
-    if (rt) {
-      setResetToken(rt)
-      setPage("reset-password")
-      window.history.replaceState({}, "", "/")
+    const resetToken = searchParams.get("reset_token")
+    if (resetToken) {
+      navigate(`/reset-password?token=${resetToken}`, { replace: true })
       return
     }
-
-    // Google 로그인 결과
-    const gt = params.get("google_token")
-    if (gt) {
-      localStorage.setItem("token", gt)
-      window.history.replaceState({}, "", "/")
-      setPage("dashboard")
+    const googleToken = searchParams.get("google_token")
+    if (googleToken) {
+      localStorage.setItem("token", googleToken)
+      navigate("/projects", { replace: true })
       return
     }
-    if (params.get("google_error") === "1") {
-      setVerifyBanner("google_error")
-      window.history.replaceState({}, "", "/")
+    if (searchParams.get("youtube_connected") === "1") {
+      navigate("/projects?youtube_connected=1", { replace: true })
+      return
     }
-
-    // 이메일 인증 결과
-    if (params.get("email_verified") === "1") {
-      setVerifyBanner("success")
-      window.history.replaceState({}, "", "/")
-    } else if (params.get("email_verify") === "fail") {
-      setVerifyBanner("fail")
-      window.history.replaceState({}, "", "/")
+    if (searchParams.get("email_verified") === "1") {
+      navigate("/login?email_verified=1", { replace: true })
+      return
     }
-
-    if (localStorage.getItem("token")) setPage("dashboard")
+    if (searchParams.get("email_verify") === "fail") {
+      navigate("/login?email_verify=fail", { replace: true })
+      return
+    }
+    if (searchParams.get("google_error") === "1") {
+      navigate("/login?google_error=1", { replace: true })
+      return
+    }
+    navigate(localStorage.getItem("token") ? "/projects" : "/login", { replace: true })
   }, [])
 
-  const openEditor = (id: number) => { setProjectId(id); setPage("editor") }
-  const logout = () => { localStorage.removeItem("token"); setPage("login") }
-
-  if (page === "reset-password" && resetToken)
-    return <ResetPasswordPage token={resetToken} onDone={() => { setResetToken(null); setPage("login") }} />
-  if (page === "forgot-password")
-    return <ForgotPasswordPage onBack={() => setPage("login")} />
-  if (page === "login")
-    return <LoginPage onLogin={() => setPage("dashboard")} onForgotPassword={() => setPage("forgot-password")} verifyBanner={verifyBanner} onClearBanner={() => setVerifyBanner(null)} />
-  if (page === "dashboard")
-    return <DashboardPage onOpenEditor={openEditor} onLogout={logout} onOpenHistory={() => setPage("history")} />
-  if (page === "editor" && projectId)
-    return <EditorPage projectId={projectId} onBack={() => setPage("dashboard")} />
-  if (page === "history")
-    return <ExportHistoryPage onBack={() => setPage("dashboard")} />
   return null
+}
+
+function LoginRoute() {
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  if (localStorage.getItem("token")) return <Navigate to="/projects" replace />
+
+  const verifyBanner = searchParams.get("email_verified") === "1" ? "success"
+    : searchParams.get("email_verify") === "fail" ? "fail"
+    : searchParams.get("google_error") === "1" ? "google_error"
+    : null
+
+  return (
+    <LoginPage
+      onLogin={() => navigate("/projects")}
+      onForgotPassword={() => navigate("/forgot-password")}
+      verifyBanner={verifyBanner as "success" | "fail" | "google_error" | null}
+      onClearBanner={() => setSearchParams({}, { replace: true })}
+    />
+  )
+}
+
+function ForgotPasswordRoute() {
+  const navigate = useNavigate()
+  return <ForgotPasswordPage onBack={() => navigate("/login")} />
+}
+
+function ResetPasswordRoute() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const token = searchParams.get("token")
+  if (!token) return <Navigate to="/login" replace />
+  return <ResetPasswordPage token={token} onDone={() => navigate("/login")} />
+}
+
+function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate()
+  if (!localStorage.getItem("token")) return <Navigate to="/login" replace />
+  const logout = () => { localStorage.removeItem("token"); navigate("/login") }
+  return <AppLayout onLogout={logout}>{children}</AppLayout>
+}
+
+function ProjectsRoute() {
+  const navigate = useNavigate()
+  return (
+    <ProtectedLayout>
+      <DashboardPage onOpenEditor={(id) => navigate(`/editor/${id}`)} />
+    </ProtectedLayout>
+  )
+}
+
+function EditorRoute() {
+  const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
+  if (!localStorage.getItem("token")) return <Navigate to="/login" replace />
+  if (!projectId) return <Navigate to="/projects" replace />
+  return <EditorPage projectId={parseInt(projectId)} onBack={() => navigate("/projects")} />
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<RootHandler />} />
+        <Route path="/login" element={<LoginRoute />} />
+        <Route path="/forgot-password" element={<ForgotPasswordRoute />} />
+        <Route path="/reset-password" element={<ResetPasswordRoute />} />
+        <Route path="/editor/:projectId" element={<EditorRoute />} />
+        <Route path="/projects" element={<ProjectsRoute />} />
+        <Route path="/pricing" element={<ProtectedLayout><PricingPage /></ProtectedLayout>} />
+        <Route path="/guide" element={<ProtectedLayout><GuidePage /></ProtectedLayout>} />
+        <Route path="/mypage" element={<ProtectedLayout><MyPage /></ProtectedLayout>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }

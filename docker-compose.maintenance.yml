@@ -1,0 +1,9 @@
+services:
+  maintenance:
+    image: nginx:alpine
+    container_name: shuttlecut-maintenance
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    volumes:
+      - /volume1/docker/shuttlecut-web/maintenance:/usr/share/nginx/html:ro

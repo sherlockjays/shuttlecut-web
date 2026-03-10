@@ -1,8 +1,8 @@
 """영상 업로드 & 스트리밍"""
-import os, uuid, aiofiles
+import os, uuid, aiofiles, subprocess, json, tempfile
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from models.database import get_db, User
@@ -10,7 +10,47 @@ from api.routes.auth import current_user
 
 router = APIRouter()
 STORAGE = Path(os.getenv("STORAGE_PATH", "/data/videos"))
+GCS_BUCKET = os.getenv("GCS_BUCKET", "")
 CHUNK = 1024 * 1024  # 1MB
+
+
+def _probe_video(path: str) -> dict:
+    """ffprobe로 fps, total_frames 감지"""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", path],
+            capture_output=True, text=True, timeout=30,
+        )
+        video = next(
+            (s for s in json.loads(result.stdout).get("streams", []) if s.get("codec_type") == "video"),
+            None,
+        )
+        if not video:
+            return {"fps": 30.0, "total_frames": 0}
+        num, den = video.get("r_frame_rate", "30/1").split("/")
+        fps = round(float(num) / max(float(den), 1), 3)
+        frames = int(video.get("nb_frames") or 0)
+        return {"fps": fps, "total_frames": frames}
+    except Exception:
+        return {"fps": 30.0, "total_frames": 0}
+
+
+def _gcs_client():
+    from google.cloud import storage as gcs_storage
+    key_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if key_file:
+        return gcs_storage.Client.from_service_account_json(key_file)
+    return gcs_storage.Client()
+
+
+def _gcs_signed_url(blob_name: str) -> str:
+    from google.oauth2 import service_account
+    from google.cloud import storage as gcs_storage
+    key_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    creds = service_account.Credentials.from_service_account_file(key_file)
+    client = gcs_storage.Client(credentials=creds)
+    blob = client.bucket(GCS_BUCKET).blob(blob_name)
+    return blob.generate_signed_url(expiration=3600, method="GET", version="v4")
 
 
 @router.post("/upload")
@@ -22,16 +62,33 @@ async def upload_video(
     if ext not in {".mp4", ".avi", ".mov", ".mkv"}:
         raise HTTPException(400, "지원하지 않는 파일 형식입니다.")
 
-    user_dir = STORAGE / str(user.id)
-    user_dir.mkdir(parents=True, exist_ok=True)
     video_id = uuid.uuid4().hex
-    dest = user_dir / f"{video_id}{ext}"
 
-    async with aiofiles.open(dest, "wb") as f:
-        while chunk := await file.read(CHUNK * 4):
-            await f.write(chunk)
+    if GCS_BUCKET:
+        blob_name = f"{user.id}/{video_id}{ext}"
+        content = await file.read()
+        # GCS 업로드 전 임시 파일로 ffprobe 실행
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        probe = _probe_video(tmp_path)
+        Path(tmp_path).unlink(missing_ok=True)
+        client = _gcs_client()
+        blob = client.bucket(GCS_BUCKET).blob(blob_name)
+        blob.upload_from_string(content, content_type=file.content_type or "video/mp4")
+        path = f"gs://{GCS_BUCKET}/{blob_name}"
+    else:
+        user_dir = STORAGE / str(user.id)
+        user_dir.mkdir(parents=True, exist_ok=True)
+        dest = user_dir / f"{video_id}{ext}"
+        async with aiofiles.open(dest, "wb") as f:
+            while chunk := await file.read(CHUNK * 4):
+                await f.write(chunk)
+        path = str(dest)
+        probe = _probe_video(path)
 
-    return {"video_id": video_id, "path": str(dest), "filename": file.filename}
+    return {"video_id": video_id, "path": path, "filename": file.filename,
+            "fps": probe["fps"], "total_frames": probe["total_frames"]}
 
 
 def stream_user(token: str = None, db: Session = Depends(get_db)) -> User:
@@ -51,7 +108,15 @@ def stream_user(token: str = None, db: Session = Depends(get_db)) -> User:
 
 @router.get("/stream/{video_id}")
 async def stream_video(video_id: str, request: Request, user: User = Depends(stream_user)):
-    # 파일 탐색
+    # GCS 우선 탐색
+    if GCS_BUCKET:
+        client = _gcs_client()
+        blobs = list(client.bucket(GCS_BUCKET).list_blobs(prefix=f"{user.id}/{video_id}"))
+        if blobs:
+            signed_url = _gcs_signed_url(blobs[0].name)
+            return RedirectResponse(signed_url)
+
+    # 로컬 파일 탐색 (기존 영상 호환)
     user_dir = STORAGE / str(user.id)
     matches = list(user_dir.glob(f"{video_id}.*"))
     if not matches:
@@ -59,7 +124,6 @@ async def stream_video(video_id: str, request: Request, user: User = Depends(str
     path = matches[0]
     size = path.stat().st_size
 
-    # Range 헤더 처리 (브라우저 시킹 지원)
     range_header = request.headers.get("range")
     if range_header:
         start, end = range_header.replace("bytes=", "").split("-")
