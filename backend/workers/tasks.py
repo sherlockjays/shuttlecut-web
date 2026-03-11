@@ -28,12 +28,12 @@ def _stop_vm_if_idle():
         project = _req.get(f"{meta}/project/project-id",  headers=headers, timeout=5).text
         zone    = _req.get(f"{meta}/instance/zone",        headers=headers, timeout=5).text.split("/")[-1]
         name    = _req.get(f"{meta}/instance/name",        headers=headers, timeout=5).text
-        _req.post(
+        resp = _req.post(
             f"https://compute.googleapis.com/compute/v1/projects/{project}/zones/{zone}/instances/{name}/stop",
             headers={"Authorization": f"Bearer {token}"},
             timeout=10,
         )
-        log.info("VM self-stop 요청 완료")
+        log.info(f"VM self-stop 요청: HTTP {resp.status_code} / {resp.text[:200]}")
     except Exception as e:
         log.warning(f"VM self-stop 실패: {e}")
 
