@@ -5,7 +5,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     python3.11 python3.11-dev python3-pip \
     ffmpeg libgl1 libglib2.0-0 fonts-nanum \
+    ocl-icd-libopencl1 \
     && rm -rf /var/lib/apt/lists/*
+
+# NVIDIA OpenCL ICD: --gpus all 로 마운트된 libnvidia-opencl.so.1 사용
+RUN mkdir -p /etc/OpenCL/vendors && \
+    echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
 
 # NVENC 라이브러리 (호스트 드라이버 570 버전에서 복사)
 COPY libnvidia-encode.so.570.211.01 /usr/lib/x86_64-linux-gnu/libnvidia-encode.so.570.211.01

@@ -117,14 +117,28 @@ def _build_step1_cmd(i, rally, fps, duration, video_path, is_hlg, is_hdr, use_gp
     raw_path = f"{tmpdir}/raw{i:04d}.mp4"
 
     if is_hlg:
-        enc = (["-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18"] if use_gpu
-               else ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "18"])
-        cmd = (["ffmpeg", "-y", "-threads", "1",
-                "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
-                "-map", "0:v:0", "-map", "0:a:0?",
-                "-vf", _HLG_TONEMAP_VF]
-               + enc + _SDR_COLOR_FLAGS
-               + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path])
+        if use_gpu:
+            # OpenCL tonemap: GPU에서 HLG→SDR 변환 (CPU tonemap 대비 대폭 단축)
+            # -init_hw_device opencl=gpu:0.0 → OpenCL 디바이스 초기화
+            # hwupload → tonemap_opencl → hwdownload → h264_nvenc
+            cmd = ["ffmpeg", "-y",
+                   "-init_hw_device", "opencl=gpu:0.0",
+                   "-filter_hw_device", "gpu",
+                   "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
+                   "-map", "0:v:0", "-map", "0:a:0?",
+                   "-vf", ("hwupload,tonemap_opencl=tonemap=hable:desat=0"
+                           ":transfer=bt709:matrix=bt709:primaries=bt709:range=tv"
+                           ",hwdownload,format=yuv420p"),
+                   "-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18"]
+            cmd += _SDR_COLOR_FLAGS + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path]
+        else:
+            cmd = (["ffmpeg", "-y", "-threads", "1",
+                    "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
+                    "-map", "0:v:0", "-map", "0:a:0?",
+                    "-vf", _HLG_TONEMAP_VF,
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18"]
+                   + _SDR_COLOR_FLAGS
+                   + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path])
     elif is_hdr:
         enc = (["-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18"] if use_gpu
                else ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "18"])
@@ -203,8 +217,8 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
             hlg_chain = ""
 
         # ── 1단계: 클립 추출 (병렬, 로컬 파일 기반) ──
-        # HLG=4 (-threads 1), SDR=8 (로컬 I/O 병목 없으므로 증가)
-        max_workers = 4 if is_hlg else 8
+        # HLG+GPU=8 (OpenCL tonemap → GPU 처리, CPU 병목 해소), SDR=8
+        max_workers = 8
 
         jobs = []
         for i, rally in enumerate(rallies):
