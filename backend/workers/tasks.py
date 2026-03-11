@@ -123,6 +123,8 @@ def _build_step1_cmd(i, rally, fps, duration, video_path, is_hlg, is_hdr, use_gp
             # hwupload → tonemap_opencl → hwdownload → h264_nvenc
             # Jellyfin 표준 OpenCL tonemap 파이프라인:
             # format=p010le → hwupload → tonemap_opencl(format=nv12) → hwdownload → format=yuv420p
+            # format=yuv420p를 필터 체인에서 제거 → hwdownload는 NV12 출력
+            # h264_nvenc가 NV12를 직접 받아 -pix_fmt yuv420p로 인코딩
             cmd = ["ffmpeg", "-y",
                    "-init_hw_device", "opencl=gpu:0.0",
                    "-filter_hw_device", "gpu",
@@ -130,8 +132,8 @@ def _build_step1_cmd(i, rally, fps, duration, video_path, is_hlg, is_hdr, use_gp
                    "-map", "0:v:0", "-map", "0:a:0?",
                    "-vf", ("format=p010le,hwupload"
                            ",tonemap_opencl=tonemap=hable:format=nv12:desat=0"
-                           ",hwdownload,format=yuv420p"),
-                   "-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18"]
+                           ",hwdownload"),
+                   "-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18", "-pix_fmt", "yuv420p"]
             cmd += _SDR_COLOR_FLAGS + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path]
         else:
             cmd = (["ffmpeg", "-y", "-threads", "1",
