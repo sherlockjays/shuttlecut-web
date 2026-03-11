@@ -1,4 +1,4 @@
-"""Celery 작업 - 영상 내보내기 (Single-pass: GCS 1회 다운로드 → trim/concat/overlay/인코딩 1회)"""
+"""Celery 작업 - 영상 내보내기"""
 import os, json, redis, sys, time, subprocess, tempfile, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -20,9 +20,8 @@ def _stop_vm_if_idle():
         return
     try:
         import requests as _req
-        # Redis 큐 직접 확인 (inspect.active는 현재 태스크 자신을 포함해 부정확)
         if r.llen("celery") > 0:
-            return  # 대기 중인 태스크 있음
+            return
         meta    = "http://metadata.google.internal/computeMetadata/v1"
         headers = {"Metadata-Flavor": "Google"}
         token   = _req.get(f"{meta}/instance/service-accounts/default/token", headers=headers, timeout=5).json()["access_token"]
@@ -89,7 +88,7 @@ def _download_gcs_video(gcs_uri: str, tmpdir: str) -> str:
         client = gcs_storage.Client.from_service_account_json(key_file)
     else:
         client = gcs_storage.Client()
-    without_prefix = gcs_uri[5:]  # strip "gs://"
+    without_prefix = gcs_uri[5:]
     bucket_name, blob_name = without_prefix.split("/", 1)
     ext = Path(blob_name).suffix
     local_path = f"{tmpdir}/source{ext}"
@@ -106,11 +105,55 @@ _HLG_TONEMAP_VF = (
     "zscale=t=bt709:m=bt709:r=tv,"
     "format=yuv420p"
 )
+_SDR_COLOR_FLAGS = ["-color_range", "tv", "-colorspace", "bt709",
+                    "-color_primaries", "bt709", "-color_trc", "bt709"]
+
+
+def _build_step1_cmd(i, rally, fps, duration, video_path, is_hlg, is_hdr, use_gpu, tmpdir, tail):
+    """Step 1: 랠리 클립 추출 ffmpeg 명령 빌드 (로컬 파일 기반)"""
+    start_t  = rally.start_frame / fps
+    end_t    = min(rally.end_frame / fps + tail, duration)
+    clip_dur = end_t - start_t
+    raw_path = f"{tmpdir}/raw{i:04d}.mp4"
+
+    if is_hlg:
+        enc = (["-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18"] if use_gpu
+               else ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "18"])
+        cmd = (["ffmpeg", "-y", "-threads", "1",
+                "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
+                "-map", "0:v:0", "-map", "0:a:0?",
+                "-vf", _HLG_TONEMAP_VF]
+               + enc + _SDR_COLOR_FLAGS
+               + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path])
+    elif is_hdr:
+        enc = (["-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18"] if use_gpu
+               else ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "18"])
+        cmd = (["ffmpeg", "-y",
+                "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
+                "-map", "0:v:0", "-map", "0:a:0?",
+                "-vf", "colorspace=bt709:iall=bt2020:fast=1,format=yuv420p"]
+               + enc
+               + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path])
+    else:  # SDR
+        if use_gpu:
+            cmd = ["ffmpeg", "-y",
+                   "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
+                   "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
+                   "-map", "0:v:0", "-map", "0:a:0?",
+                   "-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18",
+                   "-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path]
+        else:
+            cmd = ["ffmpeg", "-y",
+                   "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
+                   "-map", "0:v:0", "-map", "0:a:0?",
+                   "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+                   "-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path]
+
+    return cmd, raw_path
 
 
 def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: float):
-    """Single-pass: GCS 1회 다운로드 → trim/concat/overlay/인코딩 1회.
-    Step1(클립 개별 추출+인코딩) 완전 제거 → 처리 시간 5-7x 단축."""
+    """두 단계 처리: GCS 1회 다운로드 → 병렬 클립 추출 → 오버레이+인코딩 1회"""
     from core.exporter import make_scoreboard_image, generate_timeline_txt
 
     video_path = pd["video_path"]
@@ -129,7 +172,7 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
     p2n        = pd.get("player2_name", "2팀")
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # ── 영상 준비: GCS이면 로컬 다운로드 1회 ──
+        # ── GCS이면 로컬 다운로드 1회 (병렬 스트리밍 경합 제거) ──
         if video_path.startswith("gs://"):
             _publish(export_id, 12, "영상 다운로드 중...", eta=None)
             t0 = time.time()
@@ -140,33 +183,92 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
         duration = _probe_duration(video_path)
         log.warning(f"[TIMING] ffprobe duration: {time.time()-t0:.1f}s")
 
-        # ── 색공간 + 오디오 감지 ──
+        # 소스 색공간 확인
         probe_cs = subprocess.run(
             ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", video_path],
             capture_output=True, text=True,
         )
-        streams   = json.loads(probe_cs.stdout).get("streams", [])
-        vid_st    = next((s for s in streams if s.get("codec_type") == "video"), {})
-        color_trc = vid_st.get("color_transfer", "")
-        color_primaries = vid_st.get("color_primaries", "")
-        is_hlg    = color_trc == "arib-std-b67"
-        is_hdr    = color_primaries in ("bt2020", "bt2020nc") or is_hlg
-        has_audio = any(s.get("codec_type") == "audio" for s in streams)
+        cs_streams = json.loads(probe_cs.stdout).get("streams", [])
+        cs_video = next((s for s in cs_streams if s.get("codec_type") == "video"), {})
+        color_trc = cs_video.get("color_transfer", "")
+        color_primaries = cs_video.get("color_primaries", "")
+        is_hlg = color_trc == "arib-std-b67"
+        is_hdr = color_primaries in ("bt2020", "bt2020nc") or is_hlg
 
-        # ── 구간 타이밍 계산 (frame 기반, 클립별 ffprobe 불필요) ──
-        # timings: (src_start, src_end, rally_dur, abs_start, abs_sct, abs_end)
-        timings = []
-        cum = 0.0
-        for rally in rallies:
-            s   = rally.start_frame / fps
-            e   = min(rally.end_frame / fps + TAIL, duration)
-            sct = (rally.end_frame - rally.start_frame) / fps
-            seg = e - s
-            timings.append((s, e, sct, cum, cum + sct, cum + seg))
-            cum += seg
+        if is_hlg:
+            hlg_chain = ""  # Step1에서 SDR 변환 완료 → Step2 불필요
+        elif is_hdr:
+            hlg_chain = "colorspace=bt709:iall=bt2020:fast=1,format=yuv420p,"
+        else:
+            hlg_chain = ""
+
+        # ── 1단계: 클립 추출 (병렬, 로컬 파일 기반) ──
+        # HLG=4 (-threads 1), SDR=8 (로컬 I/O 병목 없으므로 증가)
+        max_workers = 4 if is_hlg else 8
+
+        jobs = []
+        for i, rally in enumerate(rallies):
+            cmd, raw_path = _build_step1_cmd(
+                i, rally, fps, duration, video_path, is_hlg, is_hdr, USE_GPU, tmpdir, TAIL
+            )
+            sct = rally.end_frame / fps - rally.start_frame / fps
+            jobs.append((i, cmd, raw_path, sct))
+
+        raw_clips = [None] * total
+        clip_scts = [None] * total
+        done_count = 0
+
+        def _run_clip(job):
+            idx, cmd, raw_path, sct = job
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            if res.returncode != 0:
+                raise RuntimeError(f"클립 {idx} 추출 실패:\n{res.stderr[-1000:]}")
+            return idx, raw_path, sct
+
+        t0 = time.time()
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_run_clip, job): job[0] for job in jobs}
+            for fut in as_completed(futures):
+                idx, raw_path, sct = fut.result()
+                raw_clips[idx] = raw_path
+                clip_scts[idx] = sct
+                done_count += 1
+                pct = 20 + int(done_count / total * 40)
+                _publish(export_id, pct, f"클립 {done_count}/{total} 추출 중...", eta=_calc_eta(pct, start_time))
+        log.warning(f"[TIMING] Step1 클립추출 ({total}개, workers={max_workers}): {time.time()-t0:.1f}s")
+
+        if is_hlg:
+            hlg_chain = ""
+
+        # ── 클립 연결 (스트림 복사) ──
+        _publish(export_id, 62, "클립 연결 중...", eta=_calc_eta(62, start_time))
+        concat_txt = f"{tmpdir}/concat.txt"
+        with open(concat_txt, "w") as f:
+            for rp in raw_clips:
+                f.write(f"file '{rp}'\n")
+
+        t0 = time.time()
+        raw_concat = f"{tmpdir}/raw_concat.mp4"
+        result = subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", concat_txt, "-c", "copy", raw_concat,
+        ], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"클립 연결 실패:\n{result.stderr[-1000:]}")
+        log.warning(f"[TIMING] Concat: {time.time()-t0:.1f}s")
+
+        # 클립별 실제 구간 계산
+        t0 = time.time()
+        abs_timings = []
+        t = 0.0
+        for i, sct in enumerate(clip_scts):
+            clip_dur = _probe_duration(raw_clips[i])
+            abs_timings.append((t, t + sct, t + clip_dur))
+            t += clip_dur
+        log.warning(f"[TIMING] 클립 ffprobe ({total}개): {time.time()-t0:.1f}s")
 
         # ── 점수판 PNG 생성 ──
-        _publish(export_id, 20, "점수판 생성 중...", eta=None)
+        _publish(export_id, 68, "점수판 생성 중...", eta=_calc_eta(68, start_time))
         t0 = time.time()
         for i, rally in enumerate(rallies):
             p1a, p2a = rally.p1_score, rally.p2_score
@@ -176,67 +278,47 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
             make_scoreboard_image(date, tournament, level, match_name, p1n, p1b, p2n, p2b, scale, theme).save(f"{tmpdir}/r{i}_after.png")
         log.warning(f"[TIMING] 점수판 PNG 생성 ({total}개): {time.time()-t0:.1f}s")
 
-        # ── filter_complex 구성 ──
-        parts = []
+        # ── 2단계: 오버레이 + 인코딩 1회 ──
+        _publish(export_id, 72, "영상 인코딩 중...", eta=_calc_eta(72, start_time))
 
-        # 구간 트림 (랠리 순서대로 forward seek)
-        for i, (s, e, *_) in enumerate(timings):
-            parts.append(f"[0:v]trim=start={s:.3f}:end={e:.3f},setpts=PTS-STARTPTS[v{i}]")
-            if has_audio:
-                parts.append(f"[0:a]atrim=start={s:.3f}:end={e:.3f},asetpts=PTS-STARTPTS[a{i}]")
+        step2_hw = ["-hwaccel", "cuda"] if USE_GPU else []
+        cmd = ["ffmpeg", "-y"] + step2_hw + ["-i", raw_concat]
+        for i in range(total):
+            cmd += ["-i", f"{tmpdir}/r{i}_before.png", "-i", f"{tmpdir}/r{i}_after.png"]
 
-        # concat
-        if has_audio:
-            ins = "".join(f"[v{i}][a{i}]" for i in range(total))
-            parts.append(f"{ins}concat=n={total}:v=1:a=1[outv][outa]")
-        else:
-            ins = "".join(f"[v{i}]" for i in range(total))
-            parts.append(f"{ins}concat=n={total}:v=1:a=0[outv]")
-
-        # 색변환 + 1080p 스케일
-        if is_hlg:
-            color_chain = _HLG_TONEMAP_VF + ","
-        elif is_hdr:
-            color_chain = "colorspace=bt709:iall=bt2020:fast=1,format=yuv420p,"
-        else:
-            color_chain = ""
-        parts.append(f"[outv]{color_chain}scale=w=-2:h=min(ih\\,1080)[sv]")
-
-        # 오버레이 체인 (before PNG → after PNG)
+        parts = [f"[0:v]{hlg_chain}scale=w=-2:h=min(ih\\,1080)[sv]"]
         cur = "sv"
-        for i, (_, _, _, abs_s, abs_sct, abs_e) in enumerate(timings):
-            bi, ai = 1 + i * 2, 2 + i * 2
-            ob, oa = f"ob{i}", f"oa{i}"
-            parts.append(f"[{cur}][{bi}:v]overlay=x={ox}:y={oy}:enable='between(t,{abs_s:.3f},{abs_sct:.3f})'[{ob}]")
-            parts.append(f"[{ob}][{ai}:v]overlay=x={ox}:y={oy}:enable='between(t,{abs_sct:.3f},{abs_e:.3f})'[{oa}]")
+        for i, (abs_start, abs_sct, abs_end) in enumerate(abs_timings):
+            bi = 1 + i * 2
+            ai = 2 + i * 2
+            ob = f"ob{i}"
+            oa = f"oa{i}"
+            parts.append(f"[{cur}][{bi}:v]overlay=x={ox}:y={oy}:enable='between(t,{abs_start:.3f},{abs_sct:.3f})'[{ob}]")
+            parts.append(f"[{ob}][{ai}:v]overlay=x={ox}:y={oy}:enable='between(t,{abs_sct:.3f},{abs_end:.3f})'[{oa}]")
             cur = oa
 
         fc = ";".join(parts)
 
-        # ── ffmpeg 명령 ──
-        cmd = ["ffmpeg", "-y", "-i", video_path]
-        for i in range(total):
-            cmd += ["-i", f"{tmpdir}/r{i}_before.png", "-i", f"{tmpdir}/r{i}_after.png"]
+        probe_audio = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", raw_concat],
+            capture_output=True, text=True, check=True,
+        )
+        has_audio = any(s.get("codec_type") == "audio" for s in json.loads(probe_audio.stdout)["streams"])
 
         cmd += ["-filter_complex", fc, "-map", f"[{cur}]"]
         if has_audio:
-            cmd += ["-map", "[outa]", "-c:a", "aac"]
-
-        color_flags = ["-color_range", "tv", "-colorspace", "bt709",
-                       "-color_primaries", "bt709", "-color_trc", "bt709"]
+            cmd += ["-map", "0:a:0?", "-c:a", "aac"]
+        color_flags = ["-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
         if USE_GPU:
-            cmd += ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "22",
-                    "-r", "60", "-pix_fmt", "yuv420p"] + color_flags + [out]
+            cmd += ["-c:v", "h264_nvenc", "-preset", "p1", "-cq", "22", "-r", "60", "-pix_fmt", "yuv420p"] + color_flags + [out]
         else:
-            cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "20",
-                    "-r", "60", "-pix_fmt", "yuv420p"] + color_flags + [out]
+            cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "20", "-r", "60", "-pix_fmt", "yuv420p"] + color_flags + [out]
 
-        _publish(export_id, 40, "영상 인코딩 중...", eta=_calc_eta(40, start_time))
         t0 = time.time()
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"ffmpeg 인코딩 실패:\n{result.stderr[-3000:]}")
-        log.warning(f"[TIMING] Single-pass 인코딩: {time.time()-t0:.1f}s")
+        log.warning(f"[TIMING] Step2 인코딩: {time.time()-t0:.1f}s")
 
     txt_path = out.replace(".mp4", ".txt")
     txt = generate_timeline_txt(rallies, fps, date, tournament, level, match_name, p1n, p2n)
@@ -270,7 +352,6 @@ def run_export(export_id: int, project_data: dict):
         _publish(export_id, 10, "영상 처리 시작...", eta=None)
         _run_ffmpeg_export(export_id, rallies, project_data, output_path, _start)
 
-        # GCS_BUCKET 설정 시 결과물 GCS 업로드
         if os.getenv("GCS_BUCKET"):
             _publish(export_id, 98, "GCS 업로드 중...", eta=None)
             output_path = _upload_export_to_gcs(output_path, export_id)
@@ -279,7 +360,6 @@ def run_export(export_id: int, project_data: dict):
         export.output_path = output_path
         db.commit()
 
-        # 내보내기 횟수 증가
         project = db.query(Project).get(export.project_id)
         if project:
             user = db.query(User).get(project.user_id)
@@ -347,7 +427,7 @@ def upload_to_youtube(export_id: int):
         db.commit()
 
     except Exception as e:
-        export.youtube_url = None  # 재시도 가능하도록 초기화
+        export.youtube_url = None
         db.commit()
         raise e
     finally:
