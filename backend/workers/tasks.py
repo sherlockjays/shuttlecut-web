@@ -20,11 +20,9 @@ def _stop_vm_if_idle():
         return
     try:
         import requests as _req
-        inspect = celery.control.inspect(timeout=3)
-        active   = inspect.active()   or {}
-        reserved = inspect.reserved() or {}
-        if any(active.values()) or any(reserved.values()):
-            return  # 아직 처리할 태스크 있음
+        # Redis 큐 직접 확인 (inspect.active는 현재 태스크 자신을 포함해 부정확)
+        if r.llen("celery") > 0:
+            return  # 대기 중인 태스크 있음
         meta    = "http://metadata.google.internal/computeMetadata/v1"
         headers = {"Metadata-Flavor": "Google"}
         token   = _req.get(f"{meta}/instance/service-accounts/default/token", headers=headers, timeout=5).json()["access_token"]
@@ -36,9 +34,9 @@ def _stop_vm_if_idle():
             headers={"Authorization": f"Bearer {token}"},
             timeout=10,
         )
+        log.info("VM self-stop 요청 완료")
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"VM self-stop 실패: {e}")
+        log.warning(f"VM self-stop 실패: {e}")
 
 
 def _publish(export_id: int, pct: int, msg: str, status: str = "processing", eta: int | None = None):
