@@ -121,13 +121,15 @@ def _build_step1_cmd(i, rally, fps, duration, video_path, is_hlg, is_hdr, use_gp
             # OpenCL tonemap: GPU에서 HLG→SDR 변환 (CPU tonemap 대비 대폭 단축)
             # -init_hw_device opencl=gpu:0.0 → OpenCL 디바이스 초기화
             # hwupload → tonemap_opencl → hwdownload → h264_nvenc
+            # Jellyfin 표준 OpenCL tonemap 파이프라인:
+            # format=p010le → hwupload → tonemap_opencl(format=nv12) → hwdownload → format=yuv420p
             cmd = ["ffmpeg", "-y",
                    "-init_hw_device", "opencl=gpu:0.0",
                    "-filter_hw_device", "gpu",
                    "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
                    "-map", "0:v:0", "-map", "0:a:0?",
-                   "-vf", ("hwupload,tonemap_opencl=tonemap=hable:desat=0"
-                           ":transfer=bt709:matrix=bt709:primaries=bt709:range=tv"
+                   "-vf", ("format=p010le,hwupload"
+                           ",tonemap_opencl=tonemap=hable:format=nv12:desat=0"
                            ",hwdownload,format=yuv420p"),
                    "-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18"]
             cmd += _SDR_COLOR_FLAGS + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path]
