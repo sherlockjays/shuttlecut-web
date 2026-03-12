@@ -8,6 +8,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage"
 import PricingPage from "./pages/PricingPage"
 import GuidePage from "./pages/GuidePage"
 import MyPage from "./pages/MyPage"
+import AdminPage from "./pages/AdminPage"
 import AppLayout from "./components/AppLayout"
 
 // 루트 경로: OAuth 콜백 처리 및 리다이렉트
@@ -120,6 +121,7 @@ export default function App() {
         <Route path="/pricing" element={<ProtectedLayout><PricingPage /></ProtectedLayout>} />
         <Route path="/guide" element={<ProtectedLayout><GuidePage /></ProtectedLayout>} />
         <Route path="/mypage" element={<ProtectedLayout><MyPage /></ProtectedLayout>} />
+        <Route path="/admin" element={<ProtectedLayout><AdminPage /></ProtectedLayout>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

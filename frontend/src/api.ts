@@ -69,6 +69,13 @@ export const exports = {
   delete: (exportId: number) => apiFetch(`/api/export/${exportId}`, { method: "DELETE" }),
 }
 
+export const admin = {
+  users: () => apiFetch("/api/admin/users"),
+  stats: () => apiFetch("/api/admin/stats"),
+  updateUser: (uid: number, data: { plan?: string; export_count?: number }) =>
+    apiFetch(`/api/admin/users/${uid}`, { method: "PATCH", body: JSON.stringify(data) }),
+}
+
 export const youtube = {
   status: () => apiFetch("/api/youtube/status"),
   authUrl: () => `${BASE}/api/youtube/auth?token=${localStorage.getItem("token") || ""}`,

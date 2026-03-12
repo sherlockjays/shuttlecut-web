@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom"
-import { youtube as youtubeApi } from "../api"
+import { youtube as youtubeApi, auth as authApi } from "../api"
 
-export type AppPage = "projects" | "pricing" | "guide" | "mypage"
+export type AppPage = "projects" | "pricing" | "guide" | "mypage" | "admin"
 
 export default function AppLayout({
   onLogout,
@@ -15,11 +15,13 @@ export default function AppLayout({
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const [ytConnected, setYtConnected] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const activePage = (location.pathname.slice(1) as AppPage) || "projects"
 
   useEffect(() => {
     youtubeApi.status().then((s: { connected: boolean }) => setYtConnected(s.connected)).catch(() => {})
+    authApi.me().then((u: { plan: string }) => setIsAdmin(u.plan === "admin")).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -55,6 +57,16 @@ export default function AppLayout({
                 {label}
               </button>
             ))}
+            {isAdmin && (
+              <button
+                onClick={() => navigate("/admin")}
+                className={`text-sm font-medium transition-colors ${
+                  activePage === "admin" ? "text-yellow-300" : "text-yellow-600 hover:text-yellow-400"
+                }`}
+              >
+                관리자
+              </button>
+            )}
           </nav>
         </div>
         <div className="flex items-center gap-4">

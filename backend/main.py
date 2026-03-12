@@ -5,7 +5,7 @@ import os
 
 load_dotenv()
 
-from api.routes import videos, projects, export, auth
+from api.routes import videos, projects, export, auth, admin as admin_route
 from api.routes import youtube as youtube_route
 from models.database import init_db, engine
 
@@ -43,6 +43,7 @@ app.include_router(videos.router,            prefix="/api/videos",   tags=["vide
 app.include_router(projects.router,          prefix="/api/projects", tags=["projects"])
 app.include_router(export.router,            prefix="/api/export",   tags=["export"])
 app.include_router(youtube_route.router,     prefix="/api/youtube",  tags=["youtube"])
+app.include_router(admin_route.router,       prefix="/api/admin",    tags=["admin"])
 
 @app.get("/api/health")
 def health():
