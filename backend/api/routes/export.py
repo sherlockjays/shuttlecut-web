@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from fastapi import APIRouter, Depends, WebSocket, HTTPException
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from models.database import get_db, User, Project, Export
