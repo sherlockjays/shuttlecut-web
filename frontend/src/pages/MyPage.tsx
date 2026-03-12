@@ -44,6 +44,7 @@ function ExportsTab() {
   const [loading, setLoading] = useState(true);
   const [ytConnected, setYtConnected] = useState(false);
   const [uploadingIds, setUploadingIds] = useState<Set<number>>(new Set());
+  const [ytPostComment, setYtPostComment] = useState(true);
 
   useEffect(() => {
     exportsApi
@@ -65,7 +66,7 @@ function ExportsTab() {
   const handleYoutubeUpload = async (id: number) => {
     setUploadingIds((prev) => new Set(prev).add(id));
     try {
-      await exportsApi.uploadToYoutube(id);
+      await exportsApi.uploadToYoutube(id, ytPostComment);
       const poll = setInterval(async () => {
         const s = await exportsApi.status(id);
         if (s.youtube_url && s.youtube_url !== "uploading") {
@@ -110,6 +111,17 @@ function ExportsTab() {
 
   return (
     <div className="grid gap-3">
+      <div className="flex justify-end">
+        <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={ytPostComment}
+            onChange={(e) => setYtPostComment(e.target.checked)}
+            className="accent-red-500 w-3.5 h-3.5"
+          />
+          타임라인 댓글 자동 게시
+        </label>
+      </div>
       {list.map((item) => (
         <div
           key={item.id}

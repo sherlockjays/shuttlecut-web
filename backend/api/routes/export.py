@@ -52,7 +52,7 @@ def _build_timeline_comment(rallies: list, fps: float, player1_name: str, player
         m, s = divmod(total_sec, 60)
         h, m = divmod(m, 60)
         ts = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-        lines.append(f"{ts}  랠리 {i}  ({p1_score} - {p2_score})")
+        lines.append(f"{ts}  ({p1_score} - {p2_score})")
         cumulative += duration
     return "\n".join(lines)
 
