@@ -437,9 +437,6 @@ def upload_to_youtube(export_id: int):
 
         youtube_url = upload_video(youtube, video_path, title, description)
 
-        if tmp_download:
-            Path(tmp_download.name).unlink(missing_ok=True)
-
         export.youtube_url = youtube_url
         db.commit()
 
@@ -448,5 +445,7 @@ def upload_to_youtube(export_id: int):
         db.commit()
         raise e
     finally:
+        if tmp_download:
+            Path(tmp_download.name).unlink(missing_ok=True)
         db.close()
         _stop_vm_if_idle()
