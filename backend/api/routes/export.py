@@ -40,17 +40,20 @@ def _start_gpu_vm_if_needed():
 
 
 def _build_timeline_comment(rallies: list, fps: float, player1_name: str, player2_name: str) -> str:
-    """랠리 데이터로 YouTube 타임라인 댓글 생성"""
+    """랠리 데이터로 YouTube 타임라인 댓글 생성 (내보낸 영상 기준 누적 시간)"""
     lines = [f"📋 랠리 타임라인  {player1_name} vs {player2_name}"]
+    cumulative_frames = 0
     for rally in rallies:
         start_f = rally[0]
+        end_f = rally[1]
         p1_score = rally[2] if len(rally) > 2 else 0
         p2_score = rally[3] if len(rally) > 3 else 0
-        total_sec = int(start_f / fps) if fps else 0
+        total_sec = int(cumulative_frames / fps) if fps else 0
         m, s = divmod(total_sec, 60)
         h, m = divmod(m, 60)
         ts = f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
         lines.append(f"{ts} {p1_score}-{p2_score}")
+        cumulative_frames += (end_f - start_f)
     return "\n".join(lines)
 
 
