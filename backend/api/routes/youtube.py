@@ -14,7 +14,10 @@ from models.database import User, get_db
 
 router = APIRouter()
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.force-ssl",
+]
 _r = _redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
 
 

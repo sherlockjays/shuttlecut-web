@@ -65,7 +65,8 @@ export const exports = {
     return `${proto}//${window.location.host}/api/export/ws/${exportId}`
   },
   downloadUrl: (exportId: number) => `${BASE}/api/export/${exportId}/download?token=${localStorage.getItem("token") || ""}`,
-  uploadToYoutube: (exportId: number) => apiFetch(`/api/export/${exportId}/youtube`, { method: "POST" }),
+  uploadToYoutube: (exportId: number, postComment = true) =>
+    apiFetch(`/api/export/${exportId}/youtube`, { method: "POST", body: JSON.stringify({ post_comment: postComment }) }),
   delete: (exportId: number) => apiFetch(`/api/export/${exportId}`, { method: "DELETE" }),
 }
 

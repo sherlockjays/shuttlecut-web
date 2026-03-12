@@ -4,7 +4,10 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.force-ssl",
+]
 
 
 def get_youtube_service(refresh_token: str):
@@ -42,3 +45,18 @@ def upload_video(youtube, file_path: str, title: str, description: str, privacy:
     while response is None:
         _, response = request.next_chunk()
     return f"https://youtu.be/{response['id']}"
+
+
+def post_timeline_comment(youtube, video_id: str, comment_text: str):
+    """YouTube 영상에 타임라인 댓글 게시"""
+    youtube.commentThreads().insert(
+        part="snippet",
+        body={
+            "snippet": {
+                "videoId": video_id,
+                "topLevelComment": {
+                    "snippet": {"textOriginal": comment_text}
+                },
+            }
+        },
+    ).execute()

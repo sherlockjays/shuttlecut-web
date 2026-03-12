@@ -57,6 +57,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   const [ytConnected, setYtConnected] = useState(false)
   const [ytUploading, setYtUploading] = useState(false)
   const [ytUrl, setYtUrl] = useState<string | null>(null)
+  const [ytPostComment, setYtPostComment] = useState(true)
   const [saved, setSaved] = useState(false)
   const [videoDuration, setVideoDuration] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -157,7 +158,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
     if (!exportDoneId) return
     setYtUploading(true)
     try {
-      await exportsApi.uploadToYoutube(exportDoneId)
+      await exportsApi.uploadToYoutube(exportDoneId, ytPostComment)
       // 3초마다 폴링해서 youtube_url 확인
       const poll = setInterval(async () => {
         const s = await exportsApi.status(exportDoneId)
@@ -519,11 +520,22 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
                 ) : ytUploading ? (
                   <div className="text-center text-xs text-gray-400 py-2">YouTube 업로드 중...</div>
                 ) : (
-                  <button onClick={startYoutubeUpload} disabled={!ytConnected}
-                    title={ytConnected ? "YouTube에 업로드" : "대시보드에서 YouTube 계정을 먼저 연결해주세요"}
-                    className="w-full bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2 rounded-xl text-sm font-medium transition-colors">
-                    YouTube 업로드
-                  </button>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none px-1">
+                      <input
+                        type="checkbox"
+                        checked={ytPostComment}
+                        onChange={e => setYtPostComment(e.target.checked)}
+                        className="accent-red-500 w-3.5 h-3.5"
+                      />
+                      타임라인 댓글 자동 게시
+                    </label>
+                    <button onClick={startYoutubeUpload} disabled={!ytConnected}
+                      title={ytConnected ? "YouTube에 업로드" : "대시보드에서 YouTube 계정을 먼저 연결해주세요"}
+                      className="w-full bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2 rounded-xl text-sm font-medium transition-colors">
+                      YouTube 업로드
+                    </button>
+                  </div>
                 )}
               </div>
             ) : (

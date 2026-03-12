@@ -38,11 +38,29 @@ def _start_gpu_vm_if_needed():
         logging.getLogger(__name__).warning(f"GPU VM start failed: {e}")
 
 
-def _run_youtube_upload(export_id: int):
+def _build_timeline_comment(rallies: list, fps: float, player1_name: str, player2_name: str) -> str:
+    """랠리 데이터로 YouTube 타임라인 댓글 생성"""
+    lines = [f"📋 랠리 타임라인  {player1_name} vs {player2_name}"]
+    cumulative = 0.0
+    for i, rally in enumerate(rallies, 1):
+        start_f, end_f = rally[0], rally[1]
+        p1_score = rally[2] if len(rally) > 2 else 0
+        p2_score = rally[3] if len(rally) > 3 else 0
+        duration = max(0, (end_f - start_f) / fps) if fps else 0
+        total_sec = int(cumulative)
+        m, s = divmod(total_sec, 60)
+        h, m = divmod(m, 60)
+        ts = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+        lines.append(f"{ts}  랠리 {i}  ({p1_score} - {p2_score})")
+        cumulative += duration
+    return "\n".join(lines)
+
+
+def _run_youtube_upload(export_id: int, post_comment: bool = True):
     """NAS 백엔드에서 직접 YouTube 업로드 실행 (백그라운드 스레드)"""
     import tempfile, logging
     from models.database import SessionLocal, Export, Project, User
-    from core.youtube_uploader import get_youtube_service, upload_video
+    from core.youtube_uploader import get_youtube_service, upload_video, post_timeline_comment
 
     log = logging.getLogger(__name__)
     db = SessionLocal()
@@ -80,6 +98,18 @@ def _run_youtube_upload(export_id: int):
         youtube_url = upload_video(youtube, video_path, title, description)
         export.youtube_url = youtube_url
         db.commit()
+
+        # 타임라인 댓글 게시
+        if post_comment and project.rallies:
+            try:
+                video_id = youtube_url.split("/")[-1]
+                comment = _build_timeline_comment(
+                    project.rallies, project.fps or 30.0,
+                    project.player1_name or "1팀", project.player2_name or "2팀",
+                )
+                post_timeline_comment(youtube, video_id, comment)
+            except Exception as ce:
+                log.warning(f"타임라인 댓글 게시 실패 (무시): {ce}")
 
     except Exception as e:
         log.error(f"YouTube 업로드 실패 (export {export_id}): {e}")
@@ -226,9 +256,14 @@ def download_export(export_id: int, token: str | None = None, db: Session = Depe
     return FileResponse(export.output_path, media_type="video/mp4", filename=filename)
 
 
+class YoutubeUploadBody(BaseModel):
+    post_comment: bool = True
+
+
 @router.post("/{export_id}/youtube")
 def start_youtube_upload(
     export_id: int,
+    body: YoutubeUploadBody = YoutubeUploadBody(),
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
@@ -250,7 +285,7 @@ def start_youtube_upload(
     db.commit()
 
     import threading
-    threading.Thread(target=_run_youtube_upload, args=(export_id,), daemon=True).start()
+    threading.Thread(target=_run_youtube_upload, args=(export_id, body.post_comment), daemon=True).start()
 
     return {"message": "YouTube 업로드를 시작했습니다.", "export_id": export_id}
 
