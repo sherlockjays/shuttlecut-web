@@ -191,6 +191,10 @@ def start_youtube_upload(
     export.youtube_url = "uploading"
     db.commit()
 
+    # GPU VM 켜기 (꺼져 있으면, non-blocking)
+    import threading
+    threading.Thread(target=_start_gpu_vm_if_needed, daemon=True).start()
+
     upload_to_youtube.delay(export_id)
     return {"message": "YouTube 업로드를 시작했습니다.", "export_id": export_id}
 
