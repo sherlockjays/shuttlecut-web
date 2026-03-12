@@ -449,3 +449,4 @@ def upload_to_youtube(export_id: int):
         raise e
     finally:
         db.close()
+        _stop_vm_if_idle()
