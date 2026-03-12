@@ -65,8 +65,20 @@ def update_project(pid: int, body: ProjectBody, user: User = Depends(current_use
 
 @router.delete("/{pid}")
 def delete_project(pid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    import os
     p = db.query(Project).filter(Project.id == pid, Project.user_id == user.id).first()
     if not p:
         raise HTTPException(404)
+    # GCS 원본 영상 삭제
+    if p.video_path and p.video_path.startswith("gs://"):
+        try:
+            from google.cloud import storage as gcs_storage
+            key_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            client = gcs_storage.Client.from_service_account_json(key_file) if key_file else gcs_storage.Client()
+            without_prefix = p.video_path[5:]
+            bucket_name, blob_name = without_prefix.split("/", 1)
+            client.bucket(bucket_name).blob(blob_name).delete()
+        except Exception:
+            pass
     db.delete(p); db.commit()
     return {"ok": True}
