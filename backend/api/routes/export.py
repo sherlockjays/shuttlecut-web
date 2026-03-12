@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from models.database import get_db, User, Project, Export
 from api.routes.auth import current_user
-from workers.tasks import run_export, upload_to_youtube
+from workers.tasks import run_export
 
 router = APIRouter()
 
@@ -36,6 +36,64 @@ def _start_gpu_vm_if_needed():
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"GPU VM start failed: {e}")
+
+
+def _run_youtube_upload(export_id: int):
+    """NAS 백엔드에서 직접 YouTube 업로드 실행 (백그라운드 스레드)"""
+    import tempfile, logging
+    from models.database import SessionLocal, Export, Project, User
+    from core.youtube_uploader import get_youtube_service, upload_video
+
+    log = logging.getLogger(__name__)
+    db = SessionLocal()
+    tmp_path = None
+    try:
+        export = db.query(Export).get(export_id)
+        project = db.query(Project).get(export.project_id)
+        user = db.query(User).get(project.user_id)
+
+        title_parts = [p for p in [
+            project.match_date, project.tournament_name, project.level, project.match_name
+        ] if p]
+        title = " ".join(title_parts) or project.title or "ShuttleCut 내보내기"
+
+        description = f"{project.player1_name} vs {project.player2_name}\n"
+        if project.level:
+            description += f"급수: {project.level}\n"
+        description += "\n#배드민턴 #ShuttleCut #badminton"
+
+        youtube = get_youtube_service(user.youtube_refresh_token)
+
+        video_path = export.output_path
+        if video_path.startswith("gs://"):
+            from google.cloud import storage as gcs_storage
+            key_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+            tmp.close()
+            tmp_path = tmp.name
+            without_prefix = video_path[5:]
+            bucket_name, blob_name = without_prefix.split("/", 1)
+            client = gcs_storage.Client.from_service_account_json(key_file) if key_file else gcs_storage.Client()
+            client.bucket(bucket_name).blob(blob_name).download_to_filename(tmp_path)
+            video_path = tmp_path
+
+        youtube_url = upload_video(youtube, video_path, title, description)
+        export.youtube_url = youtube_url
+        db.commit()
+
+    except Exception as e:
+        log.error(f"YouTube 업로드 실패 (export {export_id}): {e}")
+        try:
+            export = db.query(Export).get(export_id)
+            if export:
+                export.youtube_url = None
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        if tmp_path:
+            Path(tmp_path).unlink(missing_ok=True)
+        db.close()
 
 
 @router.get("/")
@@ -191,11 +249,9 @@ def start_youtube_upload(
     export.youtube_url = "uploading"
     db.commit()
 
-    # GPU VM 켜기 (꺼져 있으면, non-blocking)
     import threading
-    threading.Thread(target=_start_gpu_vm_if_needed, daemon=True).start()
+    threading.Thread(target=_run_youtube_upload, args=(export_id,), daemon=True).start()
 
-    upload_to_youtube.delay(export_id)
     return {"message": "YouTube 업로드를 시작했습니다.", "export_id": export_id}
 
 
