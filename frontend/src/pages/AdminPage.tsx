@@ -21,6 +21,16 @@ type Stats = {
   total_projects: number
 }
 
+type AdminExport = {
+  id: number
+  status: "pending" | "processing" | "done" | "error"
+  youtube_url: string | null
+  error_msg: string | null
+  created_at: string | null
+  project_title: string
+  user_email: string
+}
+
 const PLANS = ["free", "basic", "standard", "premium", "unlimited", "club", "admin"]
 
 const PLAN_BADGE: Record<string, string> = {
@@ -33,10 +43,25 @@ const PLAN_BADGE: Record<string, string> = {
   admin: "bg-yellow-600 text-yellow-100",
 }
 
+const STATUS_CLASS: Record<AdminExport["status"], string> = {
+  pending: "bg-gray-600 text-gray-200",
+  processing: "bg-blue-600 text-white",
+  done: "bg-green-600 text-white",
+  error: "bg-red-600 text-white",
+}
+
+const STATUS_LABEL: Record<AdminExport["status"], string> = {
+  pending: "대기",
+  processing: "처리중",
+  done: "완료",
+  error: "오류",
+}
+
 export default function AdminPage() {
-  const [tab, setTab] = useState<"users" | "stats">("users")
+  const [tab, setTab] = useState<"users" | "stats" | "tasks">("users")
   const [users, setUsers] = useState<AdminUser[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
+  const [taskExports, setTaskExports] = useState<AdminExport[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [saving, setSaving] = useState<number | null>(null)
@@ -60,6 +85,12 @@ export default function AdminPage() {
   async function loadStats() {
     try {
       setStats(await adminApi.stats())
+    } catch {}
+  }
+
+  async function loadTasks() {
+    try {
+      setTaskExports(await adminApi.exports(50))
     } catch {}
   }
 
@@ -94,15 +125,18 @@ export default function AdminPage() {
 
       {/* 탭 */}
       <div className="flex gap-4 border-b border-gray-700 mb-6">
-        {(["users", "stats"] as const).map(t => (
+        {(["users", "stats", "tasks"] as const).map(t => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => {
+              setTab(t)
+              if (t === "tasks") loadTasks()
+            }}
             className={`pb-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               tab === t ? "border-yellow-400 text-white" : "border-transparent text-gray-400 hover:text-white"
             }`}
           >
-            {t === "users" ? "사용자 관리" : "통계"}
+            {t === "users" ? "사용자 관리" : t === "stats" ? "통계" : "작업현황"}
           </button>
         ))}
       </div>
@@ -206,6 +240,55 @@ export default function AdminPage() {
             <h2 className="text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">프로젝트</h2>
             <p className="text-3xl font-bold text-white">{stats.total_projects}</p>
           </div>
+        </div>
+      )}
+      {/* 작업현황 탭 */}
+      {tab === "tasks" && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-gray-400 text-left border-b border-gray-700">
+                <th className="pb-3 pr-3">ID</th>
+                <th className="pb-3 pr-3">상태</th>
+                <th className="pb-3 pr-3">유저</th>
+                <th className="pb-3 pr-3">프로젝트</th>
+                <th className="pb-3 pr-3">YouTube</th>
+                <th className="pb-3">일시</th>
+              </tr>
+            </thead>
+            <tbody>
+              {taskExports.map(e => (
+                <tr key={e.id} className="border-b border-gray-800 hover:bg-gray-800/40">
+                  <td className="py-2 pr-3 text-gray-500 text-xs">{e.id}</td>
+                  <td className="py-2 pr-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLASS[e.status]}`}>
+                      {STATUS_LABEL[e.status]}
+                    </span>
+                    {e.status === "error" && e.error_msg && (
+                      <p className="text-red-400 text-xs mt-0.5 max-w-xs truncate">{e.error_msg}</p>
+                    )}
+                  </td>
+                  <td className="py-2 pr-3 text-gray-300 text-xs">{e.user_email}</td>
+                  <td className="py-2 pr-3 text-gray-300 text-xs max-w-xs truncate">{e.project_title}</td>
+                  <td className="py-2 pr-3 text-xs">
+                    {e.youtube_url && e.youtube_url !== "uploading" ? (
+                      <a href={e.youtube_url} target="_blank" rel="noopener noreferrer" className="text-red-400 hover:text-red-300">↗ YT</a>
+                    ) : e.youtube_url === "uploading" ? (
+                      <span className="text-blue-400">업로드중</span>
+                    ) : (
+                      <span className="text-gray-600">-</span>
+                    )}
+                  </td>
+                  <td className="py-2 text-gray-500 text-xs whitespace-nowrap">
+                    {e.created_at ? new Date(e.created_at).toLocaleString("ko-KR") : "-"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {taskExports.length === 0 && (
+            <p className="text-gray-500 text-sm text-center py-8">작업 기록이 없습니다.</p>
+          )}
         </div>
       )}
     </div>

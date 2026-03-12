@@ -73,6 +73,7 @@ export const exports = {
 export const admin = {
   users: () => apiFetch("/api/admin/users"),
   stats: () => apiFetch("/api/admin/stats"),
+  exports: (limit = 50) => apiFetch(`/api/admin/exports?limit=${limit}`),
   updateUser: (uid: number, data: { plan?: string; export_count?: number }) =>
     apiFetch(`/api/admin/users/${uid}`, { method: "PATCH", body: JSON.stringify(data) }),
 }

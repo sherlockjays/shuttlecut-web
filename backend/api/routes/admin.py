@@ -62,6 +62,35 @@ def update_user(
     return {"ok": True}
 
 
+@router.get("/exports")
+def list_exports(
+    limit: int = 50,
+    user: User = Depends(admin_required),
+    db: Session = Depends(get_db),
+):
+    """최근 내보내기 작업 현황"""
+    exports = (
+        db.query(Export)
+        .order_by(Export.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    result = []
+    for e in exports:
+        project = db.query(Project).filter(Project.id == e.project_id).first()
+        owner = db.query(User).filter(User.id == project.user_id).first() if project else None
+        result.append({
+            "id": e.id,
+            "status": e.status,
+            "youtube_url": e.youtube_url,
+            "error_msg": e.error_msg,
+            "created_at": (e.created_at.isoformat() + "+00:00") if e.created_at else None,
+            "project_title": project.title if project else "-",
+            "user_email": owner.email if owner else "-",
+        })
+    return result
+
+
 @router.get("/stats")
 def get_stats(user: User = Depends(admin_required), db: Session = Depends(get_db)):
     from sqlalchemy import func
