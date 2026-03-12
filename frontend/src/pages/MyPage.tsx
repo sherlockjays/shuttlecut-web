@@ -33,8 +33,11 @@ const STATUS_CLASS: Record<ExportItem["status"], string> = {
 };
 
 const PLAN_LIMITS: Record<string, string> = {
-  free: "월 3회",
-  standard: "월 30회",
+  free: "월 2회",
+  basic: "월 5회",
+  standard: "월 10회",
+  premium: "월 30회",
+  unlimited: "무제한",
   club: "무제한",
   admin: "무제한",
 };

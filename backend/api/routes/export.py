@@ -13,7 +13,7 @@ from workers.tasks import run_export
 
 router = APIRouter()
 
-PLAN_LIMITS = {"free": 3, "standard": 30, "club": 99999, "admin": 999999999}
+PLAN_LIMITS = {"free": 2, "basic": 5, "standard": 10, "premium": 30, "unlimited": 999999, "club": 999999, "admin": 999999999}
 
 GCP_PROJECT = os.getenv("GCP_PROJECT", "shuttlecut")
 GCP_ZONE    = os.getenv("GCP_ZONE", "asia-northeast3-a")
@@ -79,7 +79,7 @@ def _run_youtube_upload(export_id: int, post_comment: bool = True):
         description = f"{project.player1_name} vs {project.player2_name}\n"
         if project.level:
             description += f"급수: {project.level}\n"
-        description += "\n#배드민턴 #ShuttleCut #badminton"
+        description += "\n#배드민턴 #ShuttleCut #badminton\n\n🏸 ShuttleCut으로 제작된 영상입니다.\nhttps://shuttlecut.kr"
 
         youtube = get_youtube_service(user.youtube_refresh_token)
 

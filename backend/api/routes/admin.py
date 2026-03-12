@@ -9,7 +9,7 @@ from api.routes.auth import current_user
 
 router = APIRouter()
 
-VALID_PLANS = {"free", "standard", "club", "admin"}
+VALID_PLANS = {"free", "basic", "standard", "premium", "unlimited", "club", "admin"}
 
 
 def admin_required(user: User = Depends(current_user)) -> User:

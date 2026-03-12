@@ -21,11 +21,14 @@ type Stats = {
   total_projects: number
 }
 
-const PLANS = ["free", "standard", "club", "admin"]
+const PLANS = ["free", "basic", "standard", "premium", "unlimited", "club", "admin"]
 
 const PLAN_BADGE: Record<string, string> = {
   free: "bg-gray-600 text-gray-200",
+  basic: "bg-gray-500 text-gray-100",
   standard: "bg-blue-700 text-blue-100",
+  premium: "bg-purple-700 text-purple-100",
+  unlimited: "bg-yellow-700 text-yellow-100",
   club: "bg-purple-700 text-purple-100",
   admin: "bg-yellow-600 text-yellow-100",
 }
