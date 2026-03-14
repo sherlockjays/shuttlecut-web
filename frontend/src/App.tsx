@@ -22,10 +22,15 @@ function RootHandler() {
       navigate(`/reset-password?token=${resetToken}`, { replace: true })
       return
     }
-    const googleToken = searchParams.get("google_token")
-    if (googleToken) {
-      localStorage.setItem("token", googleToken)
-      navigate("/projects", { replace: true })
+    const googleCode = searchParams.get("google_code")
+    if (googleCode) {
+      fetch(`/api/auth/google/exchange?code=${googleCode}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.access_token) localStorage.setItem("token", data.access_token)
+          navigate("/projects", { replace: true })
+        })
+        .catch(() => navigate("/login?google_error=1", { replace: true }))
       return
     }
     if (searchParams.get("youtube_connected") === "1") {

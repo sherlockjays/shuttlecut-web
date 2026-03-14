@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import secrets
 import hashlib
@@ -20,6 +21,8 @@ from models.database import get_db, User
 
 router = APIRouter()
 pwd_ctx = CryptContext(schemes=["bcrypt"])
+
+EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 _r = _redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
 
@@ -77,8 +80,14 @@ class RegisterBody(BaseModel):
 
 @router.post("/register")
 def register(body: RegisterBody, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == body.email).first():
+    email = body.email.strip().lower()
+    if not EMAIL_RE.match(email):
+        raise HTTPException(status_code=400, detail="유효하지 않은 이메일 형식입니다.")
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="비밀번호는 8자 이상이어야 합니다.")
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="이미 사용 중인 이메일입니다.")
+    body.email = email
     user = User(email=body.email, hashed_pw=pwd_ctx.hash(body.password), is_verified=False)
     db.add(user); db.commit(); db.refresh(user)
 
@@ -190,8 +199,10 @@ def google_callback(
         db.commit()
     db.refresh(user)
 
-    token = make_token(user.id)
-    return RedirectResponse(f"{APP_BASE_URL}/?google_token={token}")
+    # JWT를 URL에 직접 노출하지 않고 30초짜리 one-time code 경유
+    code = secrets.token_urlsafe(32)
+    _r.setex(f"google_auth_code:{code}", 30, make_token(user.id))
+    return RedirectResponse(f"{APP_BASE_URL}/?google_code={code}")
 
 
 # ── 이메일 인증 ──
@@ -207,6 +218,17 @@ def verify_email(token: str, db: Session = Depends(get_db)):
         db.commit()
     _r.delete(f"email_verify:{token}")
     return RedirectResponse(f"{APP_BASE_URL}/?email_verified=1")
+
+
+# ── Google OAuth one-time code 교환 ──
+
+@router.get("/google/exchange")
+def google_exchange(code: str, db: Session = Depends(get_db)):
+    token = _r.get(f"google_auth_code:{code}")
+    if not token:
+        raise HTTPException(status_code=400, detail="유효하지 않거나 만료된 코드입니다.")
+    _r.delete(f"google_auth_code:{code}")
+    return {"access_token": token.decode(), "token_type": "bearer"}
 
 
 # ── 비밀번호 찾기 ──
@@ -246,8 +268,8 @@ def reset_password(body: ResetPasswordBody, db: Session = Depends(get_db)):
     user = db.query(User).get(int(user_id))
     if not user:
         raise HTTPException(status_code=404)
-    if len(body.new_password) < 6:
-        raise HTTPException(status_code=400, detail="비밀번호는 6자 이상이어야 합니다.")
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="비밀번호는 8자 이상이어야 합니다.")
     user.hashed_pw = pwd_ctx.hash(body.new_password)
     db.commit()
     _r.delete(f"pw_reset:{body.token}")

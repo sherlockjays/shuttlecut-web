@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from models.database import get_db, User, Project, Export
 from api.routes.auth import current_user
+from core.crypto import decrypt_token
 from workers.tasks import run_export
 
 router = APIRouter()
@@ -83,7 +84,7 @@ def _run_youtube_upload(export_id: int, post_comment: bool = True):
             description += f"급수: {project.level}\n"
         description += "\n#배드민턴 #ShuttleCut #badminton\n\n🏸 ShuttleCut으로 제작된 영상입니다.\nhttps://shuttlecut.kr"
 
-        youtube = get_youtube_service(user.youtube_refresh_token)
+        youtube = get_youtube_service(decrypt_token(user.youtube_refresh_token))
 
         video_path = export.output_path
         if video_path.startswith("gs://"):

@@ -10,6 +10,7 @@ from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
 from api.routes.auth import current_user, SECRET_KEY, ALGORITHM
+from core.crypto import encrypt_token
 from models.database import User, get_db
 
 router = APIRouter()
@@ -102,7 +103,8 @@ def youtube_callback(
     user = db.query(User).get(int(user_id_bytes))
     if not user:
         raise HTTPException(404)
-    user.youtube_refresh_token = flow.credentials.refresh_token
+    raw_token = flow.credentials.refresh_token
+    user.youtube_refresh_token = encrypt_token(raw_token) if raw_token else None
     db.commit()
 
     return RedirectResponse(f"{base_url}/?youtube_connected=1")
