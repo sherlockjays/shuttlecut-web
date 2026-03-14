@@ -15,6 +15,8 @@ export default function LoginPage({ onLogin, onForgotPassword, verifyBanner, onC
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [registered, setRegistered] = useState(false)
+  const [agreedTerms, setAgreedTerms] = useState(false)
+  const [agreedPrivacy, setAgreedPrivacy] = useState(false)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -96,11 +98,34 @@ export default function LoginPage({ onLogin, onForgotPassword, verifyBanner, onC
             <form onSubmit={submit} className="space-y-4">
               <input type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)}
                 className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" required />
-              <input type="password" placeholder="비밀번호" value={pw} onChange={e => setPw(e.target.value)}
+              <input type="password" placeholder="비밀번호 (8자 이상)" value={pw} onChange={e => setPw(e.target.value)}
                 className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" required />
+
+              {mode === "register" && (
+                <div className="space-y-2 pt-1">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" checked={agreedTerms} onChange={e => setAgreedTerms(e.target.checked)}
+                      className="mt-0.5 accent-blue-500" />
+                    <span className="text-xs text-gray-400">
+                      (필수){" "}
+                      <a href="/terms" target="_blank" className="text-blue-400 hover:underline">이용약관</a>에 동의합니다.
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" checked={agreedPrivacy} onChange={e => setAgreedPrivacy(e.target.checked)}
+                      className="mt-0.5 accent-blue-500" />
+                    <span className="text-xs text-gray-400">
+                      (필수){" "}
+                      <a href="/privacy" target="_blank" className="text-blue-400 hover:underline">개인정보처리방침</a>에 동의합니다.
+                    </span>
+                  </label>
+                </div>
+              )}
+
               {error && <p className="text-red-400 text-sm">{error}</p>}
-              <button type="submit" disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg py-3 font-medium transition-colors">
+              <button type="submit"
+                disabled={loading || (mode === "register" && (!agreedTerms || !agreedPrivacy))}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg py-3 font-medium transition-colors">
                 {loading ? "처리 중..." : mode === "login" ? "로그인" : "회원가입"}
               </button>
             </form>
@@ -114,6 +139,11 @@ export default function LoginPage({ onLogin, onForgotPassword, verifyBanner, onC
               </div>
             </div>
 
+            {mode === "register" && (!agreedTerms || !agreedPrivacy) ? (
+              <div className="text-xs text-gray-500 text-center py-3 border border-gray-700 rounded-lg">
+                약관에 동의하면 Google 로그인을 이용할 수 있습니다.
+              </div>
+            ) : (
             <a href="/api/auth/google"
               className="flex items-center justify-center gap-3 w-full bg-white hover:bg-gray-100 text-gray-800 rounded-lg py-3 font-medium transition-colors text-sm">
               <svg viewBox="0 0 24 24" className="w-5 h-5" xmlns="http://www.w3.org/2000/svg">
@@ -124,6 +154,7 @@ export default function LoginPage({ onLogin, onForgotPassword, verifyBanner, onC
               </svg>
               Google로 로그인
             </a>
+            )}
 
             {mode === "login" && (
               <button onClick={onForgotPassword}
