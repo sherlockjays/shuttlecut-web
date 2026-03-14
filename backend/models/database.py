@@ -19,6 +19,7 @@ class User(Base):
     google_id               = Column(String, nullable=True)
     plan                    = Column(String, default="free")  # free / standard / club
     export_count            = Column(Integer, default=0)      # 이번 달 내보내기 횟수
+    export_month            = Column(String, default="")      # 마지막 리셋 기준 월 (e.g. "2026-03")
     youtube_refresh_token   = Column(String, nullable=True)   # YouTube OAuth 토큰
     is_verified             = Column(Boolean, default=False)  # 이메일 인증 여부
     created_at              = Column(DateTime, default=datetime.utcnow)

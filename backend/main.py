@@ -23,6 +23,7 @@ def startup():
             "ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT TRUE",
             "ALTER TABLE projects ADD COLUMN scoreboard_scale FLOAT DEFAULT 1.0",
             "ALTER TABLE projects ADD COLUMN scoreboard_theme VARCHAR DEFAULT 'dark'",
+            "ALTER TABLE users ADD COLUMN export_month VARCHAR DEFAULT ''",
         ]:
             try:
                 conn.execute(text(stmt))

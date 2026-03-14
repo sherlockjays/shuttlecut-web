@@ -1,6 +1,7 @@
 """내보내기 - Celery 비동기 + WebSocket 진행률"""
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from fastapi import APIRouter, Depends, WebSocket, HTTPException
 from fastapi.responses import FileResponse
@@ -158,6 +159,13 @@ def start_export(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    # 월별 리셋
+    current_month = datetime.now().strftime("%Y-%m")
+    if user.export_month != current_month:
+        user.export_count = 0
+        user.export_month = current_month
+        db.commit()
+
     # 요금제 제한 확인
     limit = PLAN_LIMITS.get(user.plan, 3)
     if user.export_count >= limit:
