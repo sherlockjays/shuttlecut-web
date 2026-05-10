@@ -152,6 +152,13 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
     historyRef.current = historyRef.current.slice(0, -1)
     setCanUndo(historyRef.current.length > 0)
     setCanRedo(true)
+    // 랠리가 추가된 것을 되돌리는 경우 → 이전 랠리의 끝 지점으로 이동
+    if (data.rallies.length > prev.rallies.length && videoRef.current) {
+      const prevLastRally = prev.rallies[prev.rallies.length - 1]
+      if (prevLastRally) {
+        videoRef.current.currentTime = prevLastRally[1] / data.fps
+      }
+    }
     setData(prev); save(prev)
   }
 
