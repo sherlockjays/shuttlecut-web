@@ -60,8 +60,12 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   const [ytPostComment, setYtPostComment] = useState(true)
   const [saved, setSaved] = useState(false)
   const [videoDuration, setVideoDuration] = useState(0)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const historyRef = useRef<ProjectData[]>([])
+  const futureRef = useRef<ProjectData[]>([])
 
   useEffect(() => {
     projects.get(projectId).then((p: any) => {
@@ -89,6 +93,10 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   }
 
   const update = (patch: Partial<ProjectData>) => {
+    historyRef.current = [...historyRef.current.slice(-49), data]
+    futureRef.current = []
+    setCanUndo(true)
+    setCanRedo(false)
     const next = { ...data, ...patch }
     setData(next); save(next)
   }
@@ -136,15 +144,25 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
     }
   }
 
-  // 되돌리기
+  // 되돌리기 / 다시하기
   const undo = () => {
-    if (data.rallies.length === 0) return
-    const last = data.rallies[data.rallies.length - 1]
-    update({
-      rallies: data.rallies.slice(0, -1),
-      player1_score: last[2],
-      player2_score: last[3],
-    })
+    if (historyRef.current.length === 0) return
+    futureRef.current = [data, ...futureRef.current]
+    const prev = historyRef.current[historyRef.current.length - 1]
+    historyRef.current = historyRef.current.slice(0, -1)
+    setCanUndo(historyRef.current.length > 0)
+    setCanRedo(true)
+    setData(prev); save(prev)
+  }
+
+  const redo = () => {
+    if (futureRef.current.length === 0) return
+    historyRef.current = [...historyRef.current, data]
+    const next = futureRef.current[0]
+    futureRef.current = futureRef.current.slice(1)
+    setCanUndo(true)
+    setCanRedo(futureRef.current.length > 0)
+    setData(next); save(next)
   }
 
   // 내보내기
@@ -217,7 +235,8 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
       if (e.code === "KeyR") toggleMark()
       if (e.code === "Digit1") addScore(1)
       if (e.code === "Digit2") addScore(2)
-      if (e.code === "KeyZ" && e.ctrlKey) undo()
+      if (e.code === "KeyZ" && e.ctrlKey && !e.shiftKey) undo()
+      if ((e.code === "KeyZ" && e.ctrlKey && e.shiftKey) || (e.code === "KeyY" && e.ctrlKey)) redo()
       if (e.code === "ArrowLeft") { if (videoRef.current) videoRef.current.currentTime -= (e.shiftKey ? 10 : 5) }
       if (e.code === "ArrowRight") { if (videoRef.current) videoRef.current.currentTime += (e.shiftKey ? 10 : 5) }
     }
@@ -374,7 +393,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
 
           {/* 단축키 안내 */}
           <p className="text-gray-500 text-xs text-center">
-            [Space] 재생/정지 | [R] 랠리 마킹 | [1] 1팀 득점 | [2] 2팀 득점 | [Ctrl+Z] 되돌리기 | [←→] 이동
+            [Space] 재생/정지 | [R] 랠리 마킹 | [1] 1팀 득점 | [2] 2팀 득점 | [Ctrl+Z] 되돌리기 | [Ctrl+Y] 다시하기 | [←→] 이동
           </p>
         </div>
 
@@ -449,13 +468,21 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
                 </button>
               </div>
               <div className="flex gap-2 mt-2">
-                <button onClick={undo}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-1.5 rounded-lg text-xs transition-colors">
+                <button onClick={undo} disabled={!canUndo}
+                  title="되돌리기 (Ctrl+Z)"
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 py-1.5 rounded-lg text-xs transition-colors">
                   ↩ 되돌리기
                 </button>
+                <button onClick={redo} disabled={!canRedo}
+                  title="다시하기 (Ctrl+Y)"
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 py-1.5 rounded-lg text-xs transition-colors">
+                  ↪ 다시하기
+                </button>
+              </div>
+              <div className="flex gap-2 mt-1">
                 <button onClick={() => update({ player1_score: 0, player2_score: 0 })}
                   className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-1.5 rounded-lg text-xs transition-colors">
-                  리셋
+                  점수 리셋
                 </button>
               </div>
             </div>
