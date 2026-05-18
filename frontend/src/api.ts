@@ -41,17 +41,35 @@ export const projects = {
 }
 
 export const videos = {
-  upload: (file: File, onProgress?: (pct: number) => void) => {
-    return new Promise<{ video_id: string; path: string; fps: number; total_frames: number }>((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      xhr.open("POST", `${BASE}/api/videos/upload`)
-      xhr.setRequestHeader("Authorization", `Bearer ${localStorage.getItem("token")}`)
-      xhr.upload.onprogress = e => onProgress?.(Math.round(e.loaded / e.total * 100))
-      xhr.onload = () => xhr.status < 300 ? resolve(JSON.parse(xhr.response)) : reject(new Error(JSON.parse(xhr.response).detail))
-      xhr.onerror = () => reject(new Error("업로드 실패"))
-      const fd = new FormData(); fd.append("file", file)
-      xhr.send(fd)
+  upload: async (file: File, onProgress?: (pct: number) => void) => {
+    const token = localStorage.getItem("token") || ""
+
+    // 1. Signed URL 발급 + VM 사전 시작
+    const urlRes = await fetch(`${BASE}/api/videos/upload-url?filename=${encodeURIComponent(file.name)}`, {
+      headers: { Authorization: `Bearer ${token}` },
     })
+    if (!urlRes.ok) throw new Error("업로드 준비 실패")
+    const { upload_url, blob_name, video_id, content_type } = await urlRes.json()
+
+    // 2. GCS 직접 업로드 (NAS 거치지 않음)
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open("PUT", upload_url)
+      xhr.setRequestHeader("Content-Type", content_type)
+      xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress?.(Math.round(e.loaded / e.total * 100)) }
+      xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error("업로드 실패"))
+      xhr.onerror = () => reject(new Error("업로드 실패"))
+      xhr.send(file)
+    })
+
+    // 3. 확인 + 메타데이터 수신
+    const confirmRes = await fetch(`${BASE}/api/videos/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ blob_name, video_id, filename: file.name }),
+    })
+    if (!confirmRes.ok) throw new Error("업로드 확인 실패")
+    return confirmRes.json()
   },
   streamUrl: (videoId: string) => `${BASE}/api/videos/stream/${videoId}?token=${localStorage.getItem("token") || ""}`,
 }
