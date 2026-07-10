@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { auth } from "../api"
+import { auth } from "@/api"
 
 export default function ForgotPasswordPage({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState("")

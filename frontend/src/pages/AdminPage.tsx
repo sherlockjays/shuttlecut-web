@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { admin as adminApi } from "../api"
+import { admin as adminApi } from "@/api"
 
 type AdminUser = {
   id: number

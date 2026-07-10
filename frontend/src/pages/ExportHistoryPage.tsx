@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { exports as exportsApi, youtube as youtubeApi } from "../api"
+import { exports as exportsApi, youtube as youtubeApi } from "@/api"
 
 type ExportItem = {
   id: number

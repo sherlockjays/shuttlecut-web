@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { projects } from "../api"
+import { projects } from "@/api"
 
 type Project = { id: number; title: string; updated_at: string }
 

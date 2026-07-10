@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { auth, exports as exportsApi, youtube as youtubeApi } from "../api";
+import { auth, exports as exportsApi, youtube as youtubeApi } from "@/api"
 
 type Tab = "exports" | "usage" | "settings";
 

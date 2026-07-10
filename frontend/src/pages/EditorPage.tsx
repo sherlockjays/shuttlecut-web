@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { projects, videos, exports as exportsApi, youtube as youtubeApi } from "../api"
+import { projects, videos, exports as exportsApi, youtube as youtubeApi } from "@/api"
 
 type Rally = [number, number, number, number, number] // [start, end, p1, p2, winner]
 

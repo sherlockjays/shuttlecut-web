@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { auth } from "../api"
+import { auth } from "@/api"
 
 export default function ResetPasswordPage({ token, onDone }: { token: string; onDone: () => void }) {
   const [pw, setPw] = useState("")
