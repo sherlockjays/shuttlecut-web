@@ -1,14 +1,9 @@
 import { useState, useEffect } from "react";
 import { auth, exports as exportsApi, youtube as youtubeApi } from "@/api"
 import type { ExportItem } from "@/types/export"
+import type { UserInfo } from "@/types/user"
 
 type Tab = "exports" | "usage" | "settings";
-
-type UserInfo = {
-  email: string;
-  plan: string;
-  export_count: number;
-};
 
 const STATUS_LABEL: Record<ExportItem["status"], string> = {
   pending: "대기 중",
