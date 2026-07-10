@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { admin as adminApi } from "@/api"
+import type { AdminExport } from "@/types/export"
 
 type AdminUser = {
   id: number
@@ -19,16 +20,6 @@ type Stats = {
   total_exports: number
   exports_by_status: Record<string, number>
   total_projects: number
-}
-
-type AdminExport = {
-  id: number
-  status: "pending" | "processing" | "done" | "error"
-  youtube_url: string | null
-  error_msg: string | null
-  created_at: string | null
-  project_title: string
-  user_email: string
 }
 
 const PLANS = ["free", "basic", "standard", "premium", "unlimited", "club", "admin"]

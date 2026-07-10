@@ -1,16 +1,8 @@
 import { useState, useEffect } from "react";
 import { auth, exports as exportsApi, youtube as youtubeApi } from "@/api"
+import type { ExportItem } from "@/types/export"
 
 type Tab = "exports" | "usage" | "settings";
-
-type ExportItem = {
-  id: number;
-  project_title: string;
-  status: "pending" | "processing" | "done" | "error";
-  youtube_url: string | null;
-  error_msg: string | null;
-  created_at: string | null;
-};
 
 type UserInfo = {
   email: string;

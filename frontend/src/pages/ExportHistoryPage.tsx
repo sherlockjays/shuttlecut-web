@@ -1,15 +1,6 @@
 import { useState, useEffect } from "react"
 import { exports as exportsApi, youtube as youtubeApi } from "@/api"
-
-type ExportItem = {
-  id: number
-  project_id: number
-  project_title: string
-  status: "pending" | "processing" | "done" | "error"
-  youtube_url: string | null
-  error_msg: string | null
-  created_at: string | null
-}
+import type { ExportItem } from "@/types/export"
 
 const STATUS_LABEL: Record<ExportItem["status"], string> = {
   pending: "대기 중",
