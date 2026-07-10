@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { admin as adminApi } from "@/api"
 import type { AdminExport } from "@/types/export"
 import type { AdminUser, Stats } from "@/types/user"
+import { STATUS_LABEL, STATUS_CLASS } from "@/constants/export"
 
 const PLANS = ["free", "basic", "standard", "premium", "unlimited", "club", "admin"]
 
@@ -13,20 +14,6 @@ const PLAN_BADGE: Record<string, string> = {
   unlimited: "bg-yellow-700 text-yellow-100",
   club: "bg-purple-700 text-purple-100",
   admin: "bg-yellow-600 text-yellow-100",
-}
-
-const STATUS_CLASS: Record<AdminExport["status"], string> = {
-  pending: "bg-gray-600 text-gray-200",
-  processing: "bg-blue-600 text-white",
-  done: "bg-green-600 text-white",
-  error: "bg-red-600 text-white",
-}
-
-const STATUS_LABEL: Record<AdminExport["status"], string> = {
-  pending: "대기",
-  processing: "처리중",
-  done: "완료",
-  error: "오류",
 }
 
 export default function AdminPage() {
