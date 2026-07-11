@@ -3,8 +3,7 @@ import { admin as adminApi } from "@/api"
 import type { AdminExport } from "@/types/export"
 import type { AdminUser, Stats } from "@/types/user"
 import { STATUS_LABEL, STATUS_CLASS } from "@/constants/export"
-
-const PLANS = ["free", "basic", "standard", "premium", "unlimited", "club", "admin"]
+import { PLANS } from "@/constants/user"
 
 const PLAN_BADGE: Record<string, string> = {
   free: "bg-gray-600 text-gray-200",

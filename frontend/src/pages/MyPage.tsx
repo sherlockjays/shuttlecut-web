@@ -3,18 +3,9 @@ import { auth, exports as exportsApi, youtube as youtubeApi } from "@/api"
 import type { ExportItem } from "@/types/export"
 import type { UserInfo } from "@/types/user"
 import { STATUS_LABEL, STATUS_CLASS } from "@/constants/export"
+import { PLAN_LIMITS } from "@/constants/user"
 
 type Tab = "exports" | "usage" | "settings";
-
-const PLAN_LIMITS: Record<string, string> = {
-  free: "월 2회",
-  basic: "월 5회",
-  standard: "월 10회",
-  premium: "월 30회",
-  unlimited: "무제한",
-  club: "무제한",
-  admin: "무제한",
-};
 
 function ExportsTab() {
   const [list, setList] = useState<ExportItem[]>([]);
