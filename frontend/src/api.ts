@@ -1,3 +1,7 @@
+import type { ExportItem, AdminExport } from "@/types/export"
+import type { UserInfo, AdminUser, Stats } from "@/types/user"
+import type { Project } from "@/types/project"
+
 const BASE = import.meta.env.VITE_API_URL || ""
 
 function headers() {
@@ -8,13 +12,13 @@ function headers() {
   }
 }
 
-export async function apiFetch(path: string, opts: RequestInit = {}) {
+export async function apiFetch<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...opts, headers: { ...headers(), ...(opts.headers || {}) } })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || "오류가 발생했습니다.")
   }
-  return res.json()
+  return res.json() as T
 }
 
 export const auth = {
@@ -25,7 +29,8 @@ export const auth = {
     return fetch(`${BASE}/api/auth/login`, { method: "POST", body: form })
       .then(r => r.json())
   },
-  me: () => apiFetch("/api/auth/me"),
+  me: (): Promise<UserInfo> =>
+    apiFetch<UserInfo>("/api/auth/me"),
   forgotPassword: (email: string) =>
     apiFetch("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
   resetPassword: (token: string, new_password: string) =>
@@ -33,9 +38,11 @@ export const auth = {
 }
 
 export const projects = {
-  list: () => apiFetch("/api/projects/"),
+  list: (): Promise<Project[]> =>
+    apiFetch<Project[]>("/api/projects/"),
   get: (id: number) => apiFetch(`/api/projects/${id}`),
-  create: (data: object) => apiFetch("/api/projects/", { method: "POST", body: JSON.stringify(data) }),
+  create: (data: object): Promise<{ id: number }> =>
+    apiFetch<{ id: number }>("/api/projects/", { method: "POST", body: JSON.stringify(data) }),
   update: (id: number, data: object) => apiFetch(`/api/projects/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   delete: (id: number) => apiFetch(`/api/projects/${id}`, { method: "DELETE" }),
 }
@@ -75,9 +82,12 @@ export const videos = {
 }
 
 export const exports = {
-  list: () => apiFetch("/api/export/"),
-  start: (projectId: number) => apiFetch(`/api/export/${projectId}`, { method: "POST" }),
-  status: (exportId: number) => apiFetch(`/api/export/${exportId}/status`),
+  list: (): Promise<ExportItem[]> =>
+    apiFetch<ExportItem[]>("/api/export/"),
+  start: (projectId: number): Promise<{ export_id: number }> =>
+    apiFetch<{ export_id: number }>(`/api/export/${projectId}`, { method: "POST" }),
+  status: (exportId: number): Promise<ExportItem> =>
+    apiFetch<ExportItem>(`/api/export/${exportId}/status`),
   wsUrl: (exportId: number) => {
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:"
     return `${proto}//${window.location.host}/api/export/ws/${exportId}`
@@ -85,19 +95,24 @@ export const exports = {
   downloadUrl: (exportId: number) => `${BASE}/api/export/${exportId}/download?token=${localStorage.getItem("token") || ""}`,
   uploadToYoutube: (exportId: number, postComment = true) =>
     apiFetch(`/api/export/${exportId}/youtube`, { method: "POST", body: JSON.stringify({ post_comment: postComment }) }),
-  delete: (exportId: number) => apiFetch(`/api/export/${exportId}`, { method: "DELETE" }),
+  delete: (exportId: number) =>
+    apiFetch(`/api/export/${exportId}`, { method: "DELETE" }),
 }
 
 export const admin = {
-  users: () => apiFetch("/api/admin/users"),
-  stats: () => apiFetch("/api/admin/stats"),
-  exports: (limit = 50) => apiFetch(`/api/admin/exports?limit=${limit}`),
+  users: (): Promise<AdminUser[]> =>
+    apiFetch<AdminUser[]>("/api/admin/users"),
+  stats: (): Promise<Stats> =>
+    apiFetch<Stats>("/api/admin/stats"),
+  exports: (limit = 50): Promise<AdminExport[]> =>
+    apiFetch<AdminExport[]>(`/api/admin/exports?limit=${limit}`),
   updateUser: (uid: number, data: { plan?: string; export_count?: number }) =>
     apiFetch(`/api/admin/users/${uid}`, { method: "PATCH", body: JSON.stringify(data) }),
 }
 
 export const youtube = {
-  status: () => apiFetch("/api/youtube/status"),
+  status: (): Promise<{ connected: boolean }> =>
+    apiFetch<{ connected: boolean }>("/api/youtube/status"),
   authUrl: () => `${BASE}/api/youtube/auth?token=${localStorage.getItem("token") || ""}`,
   disconnect: () => apiFetch("/api/youtube/disconnect", { method: "DELETE" }),
 }
