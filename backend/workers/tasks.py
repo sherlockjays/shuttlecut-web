@@ -8,34 +8,47 @@ from pathlib import Path
 from celery import Celery
 from sqlalchemy.orm import Session
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
-USE_GPU   = os.getenv("ENABLE_GPU", "0") == "1"
+REDIS_URL      = os.getenv("REDIS_URL", "redis://redis:6379/0")
+USE_GPU        = os.getenv("ENABLE_GPU", "0") == "1"
+ENABLE_OPENCL  = os.getenv("ENABLE_OPENCL", "1") == "1"
+ENABLE_NVDEC   = os.getenv("ENABLE_NVDEC", "1") == "1"
+NAS_BACKEND_URL = os.getenv("NAS_BACKEND_URL", "")
+WORKER_SECRET  = os.getenv("WORKER_SECRET", "")
+
 celery = Celery("shuttlecut", broker=REDIS_URL, backend=REDIS_URL)
 r = redis.from_url(REDIS_URL)
 
 
-def _stop_vm_if_idle():
-    """큐가 비면 GCP 메타데이터 API로 VM self-stop (GPU VM에서만 동작)"""
-    if not USE_GPU:
-        return
-    try:
-        import requests as _req
-        if r.llen("celery") > 0:
-            return
-        meta    = "http://metadata.google.internal/computeMetadata/v1"
-        headers = {"Metadata-Flavor": "Google"}
-        token   = _req.get(f"{meta}/instance/service-accounts/default/token", headers=headers, timeout=5).json()["access_token"]
-        project = _req.get(f"{meta}/project/project-id",  headers=headers, timeout=5).text
-        zone    = _req.get(f"{meta}/instance/zone",        headers=headers, timeout=5).text.split("/")[-1]
-        name    = _req.get(f"{meta}/instance/name",        headers=headers, timeout=5).text
-        resp = _req.post(
-            f"https://compute.googleapis.com/compute/v1/projects/{project}/zones/{zone}/instances/{name}/stop",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10,
+def _download_remote_video(video_path: str, tmpdir: str) -> str:
+    """NAS 백엔드에서 영상 파일 HTTP 다운로드"""
+    import httpx
+    ext = Path(video_path).suffix or ".mp4"
+    local_path = f"{tmpdir}/source{ext}"
+    with httpx.stream(
+        "GET", f"{NAS_BACKEND_URL}/api/internal/video",
+        params={"path": video_path},
+        headers={"X-Worker-Secret": WORKER_SECRET},
+        timeout=300,
+    ) as resp:
+        resp.raise_for_status()
+        with open(local_path, "wb") as f:
+            for chunk in resp.iter_bytes(1024 * 1024 * 4):
+                f.write(chunk)
+    return local_path
+
+
+def _upload_export_remote(local_path: str, export_id: int) -> str:
+    """결과 mp4를 NAS 백엔드로 HTTP 업로드"""
+    import httpx
+    with open(local_path, "rb") as f:
+        resp = httpx.post(
+            f"{NAS_BACKEND_URL}/api/internal/export/{export_id}",
+            headers={"X-Worker-Secret": WORKER_SECRET},
+            files={"file": (f"export_{export_id}.mp4", f, "video/mp4")},
+            timeout=600,
         )
-        log.info(f"VM self-stop 요청: HTTP {resp.status_code} / {resp.text[:200]}")
-    except Exception as e:
-        log.warning(f"VM self-stop 실패: {e}")
+    resp.raise_for_status()
+    return resp.json()["path"]
 
 
 def _publish(export_id: int, pct: int, msg: str, status: str = "processing", eta: int | None = None):
@@ -61,42 +74,7 @@ def _probe_duration(path: str) -> float:
     return float(json.loads(result.stdout)["format"]["duration"])
 
 
-def _gcs_client_from_env():
-    from google.cloud import storage as gcs_storage
-    key_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    if key_file:
-        return gcs_storage.Client.from_service_account_json(key_file)
-    return gcs_storage.Client()
-
-
-def _upload_export_to_gcs(local_path: str, export_id: int) -> str:
-    """로컬 mp4를 GCS에 업로드하고 gs:// URI 반환"""
-    bucket_name = os.getenv("GCS_BUCKET", "")
-    if not bucket_name:
-        return local_path
-    blob_name = f"exports/export_{export_id}.mp4"
-    client = _gcs_client_from_env()
-    client.bucket(bucket_name).blob(blob_name).upload_from_filename(local_path)
-    return f"gs://{bucket_name}/{blob_name}"
-
-
-def _download_gcs_video(gcs_uri: str, tmpdir: str) -> str:
-    """gs://bucket/blob_name 을 tmpdir에 다운로드하고 로컬 경로 반환"""
-    from google.cloud import storage as gcs_storage
-    key_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    if key_file:
-        client = gcs_storage.Client.from_service_account_json(key_file)
-    else:
-        client = gcs_storage.Client()
-    without_prefix = gcs_uri[5:]
-    bucket_name, blob_name = without_prefix.split("/", 1)
-    ext = Path(blob_name).suffix
-    local_path = f"{tmpdir}/source{ext}"
-    client.bucket(bucket_name).blob(blob_name).download_to_filename(local_path)
-    return local_path
-
-
-# HLG→SDR tonemap 필터 체인
+# HLG→SDR tonemap 필터 체인 (CPU fallback)
 _HLG_TONEMAP_VF = (
     "zscale=tin=arib-std-b67:min=bt2020nc:pin=bt2020:rin=tv:t=linear:npl=100,"
     "format=gbrpf32le,"
@@ -110,20 +88,15 @@ _SDR_COLOR_FLAGS = ["-color_range", "tv", "-colorspace", "bt709",
 
 
 def _build_step1_cmd(i, rally, fps, duration, video_path, is_hlg, is_hdr, use_gpu, tmpdir, tail):
-    """Step 1: 랠리 클립 추출 ffmpeg 명령 빌드 (로컬 파일 기반)"""
+    """Step 1: 랠리 클립 추출 ffmpeg 명령 빌드"""
     start_t  = rally.start_frame / fps
     end_t    = min(rally.end_frame / fps + tail, duration)
     clip_dur = end_t - start_t
     raw_path = f"{tmpdir}/raw{i:04d}.mp4"
 
     if is_hlg:
-        if use_gpu:
-            # OpenCL tonemap: GPU에서 HLG→SDR 변환 (CPU tonemap 대비 대폭 단축)
-            # -init_hw_device opencl=gpu:0.0 → OpenCL 디바이스 초기화
-            # format=p010le → hwupload → tonemap_opencl(nv12) → hwdownload → format=nv12 → h264_nvenc
-            # -pix_fmt yuv420p를 encoder에 지정하면 backward negotiation으로
-            # hwdownload가 yuv420p 출력 시도 → 실패. 대신 hwdownload 뒤 format=nv12 명시.
-            # h264_nvenc는 NV12 입력 네이티브 지원 (4:2:0 동일 품질)
+        if use_gpu and ENABLE_OPENCL:
+            # OpenCL tonemap: GPU에서 HLG→SDR 변환
             cmd = ["ffmpeg", "-y",
                    "-init_hw_device", "opencl=gpu:0.0",
                    "-filter_hw_device", "gpu",
@@ -135,11 +108,14 @@ def _build_step1_cmd(i, rally, fps, duration, video_path, is_hlg, is_hdr, use_gp
                    "-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18"]
             cmd += _SDR_COLOR_FLAGS + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path]
         else:
+            # CPU tonemap (WSL2 등 OpenCL 미지원 환경)
+            enc = (["-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18"] if use_gpu
+                   else ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "18"])
             cmd = (["ffmpeg", "-y", "-threads", "1",
                     "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
                     "-map", "0:v:0", "-map", "0:a:0?",
-                    "-vf", _HLG_TONEMAP_VF,
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18"]
+                    "-vf", _HLG_TONEMAP_VF]
+                   + enc
                    + _SDR_COLOR_FLAGS
                    + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path])
     elif is_hdr:
@@ -152,9 +128,9 @@ def _build_step1_cmd(i, rally, fps, duration, video_path, is_hlg, is_hdr, use_gp
                + enc
                + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path])
     else:  # SDR
+        hwaccel = ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"] if (use_gpu and ENABLE_NVDEC) else []
         if use_gpu:
-            cmd = ["ffmpeg", "-y",
-                   "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
+            cmd = ["ffmpeg", "-y"] + hwaccel + [
                    "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
                    "-map", "0:v:0", "-map", "0:a:0?",
                    "-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18",
@@ -170,7 +146,7 @@ def _build_step1_cmd(i, rally, fps, duration, video_path, is_hlg, is_hdr, use_gp
 
 
 def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: float):
-    """두 단계 처리: GCS 1회 다운로드 → 병렬 클립 추출 → 오버레이+인코딩 1회"""
+    """두 단계 처리: NAS 1회 다운로드 → 병렬 클립 추출 → 오버레이+인코딩 1회"""
     from core.exporter import make_scoreboard_image, generate_timeline_txt
 
     video_path = pd["video_path"]
@@ -189,12 +165,12 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
     p2n        = pd.get("player2_name", "2팀")
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # ── GCS이면 로컬 다운로드 1회 (병렬 스트리밍 경합 제거) ──
-        if video_path.startswith("gs://"):
+        # NAS HTTP 다운로드 (워커 로컬에 캐시)
+        if NAS_BACKEND_URL:
             _publish(export_id, 12, "영상 다운로드 중...", eta=None)
             t0 = time.time()
-            video_path = _download_gcs_video(video_path, tmpdir)
-            log.warning(f"[TIMING] GCS 다운로드: {time.time()-t0:.1f}s")
+            video_path = _download_remote_video(video_path, tmpdir)
+            log.warning(f"[TIMING] NAS 다운로드: {time.time()-t0:.1f}s")
 
         t0 = time.time()
         duration = _probe_duration(video_path)
@@ -213,14 +189,12 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
         is_hdr = color_primaries in ("bt2020", "bt2020nc") or is_hlg
 
         if is_hlg:
-            hlg_chain = ""  # Step1에서 SDR 변환 완료 → Step2 불필요
+            hlg_chain = ""  # Step1에서 SDR 변환 완료
         elif is_hdr:
             hlg_chain = "colorspace=bt709:iall=bt2020:fast=1,format=yuv420p,"
         else:
             hlg_chain = ""
 
-        # ── 1단계: 클립 추출 (병렬, 로컬 파일 기반) ──
-        # HLG+GPU=8 (OpenCL tonemap → GPU 처리, CPU 병목 해소), SDR=8
         max_workers = 8
 
         jobs = []
@@ -274,7 +248,6 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
             raise RuntimeError(f"클립 연결 실패:\n{result.stderr[-1000:]}")
         log.warning(f"[TIMING] Concat: {time.time()-t0:.1f}s")
 
-        # 클립별 실제 구간 계산
         t0 = time.time()
         abs_timings = []
         t = 0.0
@@ -298,7 +271,7 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
         # ── 2단계: 오버레이 + 인코딩 1회 ──
         _publish(export_id, 72, "영상 인코딩 중...", eta=_calc_eta(72, start_time))
 
-        step2_hw = ["-hwaccel", "cuda"] if USE_GPU else []
+        step2_hw = ["-hwaccel", "cuda"] if (USE_GPU and ENABLE_NVDEC) else []
         cmd = ["ffmpeg", "-y"] + step2_hw + ["-i", raw_concat]
         for i in range(total):
             cmd += ["-i", f"{tmpdir}/r{i}_before.png", "-i", f"{tmpdir}/r{i}_after.png"]
@@ -369,9 +342,9 @@ def run_export(export_id: int, project_data: dict):
         _publish(export_id, 10, "영상 처리 시작...", eta=None)
         _run_ffmpeg_export(export_id, rallies, project_data, output_path, _start)
 
-        if os.getenv("GCS_BUCKET"):
-            _publish(export_id, 98, "GCS 업로드 중...", eta=None)
-            output_path = _upload_export_to_gcs(output_path, export_id)
+        if NAS_BACKEND_URL:
+            _publish(export_id, 98, "NAS 업로드 중...", eta=None)
+            output_path = _upload_export_remote(output_path, export_id)
 
         export.status = "done"
         export.output_path = output_path
@@ -385,7 +358,6 @@ def run_export(export_id: int, project_data: dict):
                 db.commit()
 
         _publish(export_id, 100, "완료!", status="done")
-        _stop_vm_if_idle()
 
     except Exception as e:
         export.status = "error"
@@ -394,58 +366,3 @@ def run_export(export_id: int, project_data: dict):
         _publish(export_id, 0, str(e), status="error")
     finally:
         db.close()
-
-
-@celery.task
-def upload_to_youtube(export_id: int):
-    """완료된 내보내기를 YouTube에 업로드"""
-    from models.database import SessionLocal, Export, Project, User
-    from core.youtube_uploader import get_youtube_service, upload_video
-
-    db: Session = SessionLocal()
-    export = db.query(Export).get(export_id)
-
-    try:
-        project = db.query(Project).get(export.project_id)
-        user = db.query(User).get(project.user_id)
-
-        if not user.youtube_refresh_token:
-            raise Exception("YouTube 계정이 연결되지 않았습니다.")
-
-        youtube = get_youtube_service(user.youtube_refresh_token)
-
-        title_parts = [p for p in [
-            project.match_date, project.tournament_name, project.level, project.match_name
-        ] if p]
-        title = " ".join(title_parts) or project.title or "ShuttleCut 내보내기"
-
-        description = f"{project.player1_name} vs {project.player2_name}\n"
-        if project.level:
-            description += f"급수: {project.level}\n"
-        description += "\n#배드민턴 #ShuttleCut #badminton"
-
-        video_path = export.output_path
-        tmp_download = None
-        if video_path.startswith("gs://"):
-            import tempfile
-            tmp_download = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-            tmp_download.close()
-            without_prefix = video_path[5:]
-            bucket_name, blob_name = without_prefix.split("/", 1)
-            _gcs_client_from_env().bucket(bucket_name).blob(blob_name).download_to_filename(tmp_download.name)
-            video_path = tmp_download.name
-
-        youtube_url = upload_video(youtube, video_path, title, description)
-
-        export.youtube_url = youtube_url
-        db.commit()
-
-    except Exception as e:
-        export.youtube_url = None
-        db.commit()
-        raise e
-    finally:
-        if tmp_download:
-            Path(tmp_download.name).unlink(missing_ok=True)
-        db.close()
-        _stop_vm_if_idle()

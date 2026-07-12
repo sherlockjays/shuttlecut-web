@@ -335,11 +335,21 @@ def delete_export(export_id: int, user: User = Depends(current_user), db: Sessio
 
 
 @router.websocket("/ws/{export_id}")
-async def export_ws(websocket: WebSocket, export_id: int):
+async def export_ws(websocket: WebSocket, export_id: int, db: Session = Depends(get_db)):
     """내보내기 진행률 실시간 WebSocket"""
     await websocket.accept()
     import redis.asyncio as aioredis
-    import os, asyncio
+
+    # WS 연결 시점에 이미 완료된 경우 즉시 응답 (pub/sub 메시지 놓침 방지)
+    export = db.query(Export).filter(Export.id == export_id).first()
+    if export and export.status == "done":
+        await websocket.send_json({"status": "done", "pct": 100, "msg": "완료"})
+        await websocket.close()
+        return
+    if export and export.status == "error":
+        await websocket.send_json({"status": "error", "pct": 0, "msg": export.error_msg or "오류"})
+        await websocket.close()
+        return
 
     r = aioredis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
     channel = f"export_progress:{export_id}"
