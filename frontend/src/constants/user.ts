@@ -1,4 +1,4 @@
-export const PLAN_LIMITS: Record<string, string> = {
+export const PLAN_LIMITS: Record<Plan, string> = {
   free: "월 2회",
   basic: "월 5회",
   standard: "월 10회",
@@ -6,7 +6,15 @@ export const PLAN_LIMITS: Record<string, string> = {
   unlimited: "무제한",
   club: "무제한",
   admin: "무제한",
-}
+};
 
-export const PLANS = ["free", "basic", "standard", "premium", "unlimited", "club", "admin"] as const
-export type Plan = typeof PLANS[number]
+export const PLANS = [
+  "free",
+  "basic",
+  "standard",
+  "premium",
+  "unlimited",
+  "club",
+  "admin",
+] as const;
+export type Plan = (typeof PLANS)[number];

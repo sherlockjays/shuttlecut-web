@@ -17,7 +17,7 @@ export interface ProjectData {
   player2_score: number
   rallies: Rally[]
   scoreboard_scale: number
-  scoreboard_theme: string
+  scoreboard_theme: ThemeId
 }
 
 export const THEMES = [
@@ -27,6 +27,8 @@ export const THEMES = [
   { id: "red",   label: "레드",  bg: "#780000", accent: "#ffdc00" },
   { id: "green", label: "그린",  bg: "#0a3c14", accent: "#b4ff64" },
 ] as const
+
+export type ThemeId = (typeof THEMES)[number]["id"]
 
 export const SIZES = [
   { label: "소", value: 1.0 },

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { projects, videos, exports as exportsApi, youtube as youtubeApi } from "@/api"
-import type { Rally, ProjectData } from "@/types/project"
+import type { Rally, ProjectData, ThemeId } from "@/types/project"
 import { THEMES, SIZES } from "@/types/project"
 
 const EMPTY: ProjectData = {
@@ -12,7 +12,7 @@ const EMPTY: ProjectData = {
   scoreboard_theme: "dark",
 }
 
-const CANVAS_THEMES: Record<string, Record<string, string>> = {
+const CANVAS_THEMES: Record<ThemeId, Record<string, string>> = {
   dark:  { header_bg: "#1e1e1e", row_bg: "#000000", header_text: "#dcdcdc", name_text: "#ffdc00", score_text: "#ffdc00", border: "#ffffff", divider: "#b4b4b4", row_div: "#c8c8c8" },
   light: { header_bg: "#f0f0f0", row_bg: "#ffffff", header_text: "#323232", name_text: "#1e50c8", score_text: "#1e50c8", border: "#323232", divider: "#969696", row_div: "#969696" },
   blue:  { header_bg: "#002878", row_bg: "#001450", header_text: "#c8dcff", name_text: "#ffdc00", score_text: "#ffdc00", border: "#64a0ff", divider: "#5078c8", row_div: "#5082d2" },
@@ -45,7 +45,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   const futureRef = useRef<ProjectData[]>([])
 
   useEffect(() => {
-    projects.get(projectId).then((p: any) => {
+    projects.get(projectId).then(p => {
       setData({ ...EMPTY, ...p,
         scoreboard_scale: p.scoreboard_scale ?? 1.0,
         scoreboard_theme: p.scoreboard_theme ?? "dark",

@@ -2,10 +2,10 @@ import { useState, useEffect } from "react"
 import { admin as adminApi } from "@/api"
 import type { AdminExport } from "@/types/export"
 import type { AdminUser, Stats } from "@/types/user"
-import { STATUS_LABEL, STATUS_CLASS } from "@/constants/export"
-import { PLANS } from "@/constants/user"
+import { STATUS_LABEL, STATUS_CLASS, STATUSES } from "@/constants/export"
+import { PLANS, type Plan } from "@/constants/user"
 
-const PLAN_BADGE: Record<string, string> = {
+const PLAN_BADGE: Record<Plan, string> = {
   free: "bg-gray-600 text-gray-200",
   basic: "bg-gray-500 text-gray-100",
   standard: "bg-blue-700 text-blue-100",
@@ -52,7 +52,7 @@ export default function AdminPage() {
     } catch {}
   }
 
-  async function handlePlanChange(uid: number, plan: string) {
+  async function handlePlanChange(uid: number, plan: Plan) {
     setSaving(uid)
     try {
       await adminApi.updateUser(uid, { plan })
@@ -128,7 +128,7 @@ export default function AdminPage() {
                       <select
                         value={u.plan}
                         disabled={saving === u.id}
-                        onChange={e => handlePlanChange(u.id, e.target.value)}
+                        onChange={e => handlePlanChange(u.id, e.target.value as Plan)}
                         className={`text-xs font-semibold px-2 py-1 rounded cursor-pointer border-0 outline-none ${PLAN_BADGE[u.plan] ?? "bg-gray-600 text-gray-200"}`}
                       >
                         {PLANS.map(p => (
@@ -174,10 +174,10 @@ export default function AdminPage() {
             <h2 className="text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">사용자</h2>
             <p className="text-3xl font-bold text-white mb-3">{stats.total_users}</p>
             <div className="space-y-1">
-              {Object.entries(stats.users_by_plan).map(([plan, count]) => (
+              {PLANS.map(plan => (
                 <div key={plan} className="flex justify-between text-sm">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${PLAN_BADGE[plan] ?? "bg-gray-600 text-gray-200"}`}>{plan}</span>
-                  <span className="text-gray-300">{count}명</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${PLAN_BADGE[plan]}`}>{plan}</span>
+                  <span className="text-gray-300">{stats.users_by_plan[plan] ?? 0}명</span>
                 </div>
               ))}
             </div>
@@ -186,10 +186,10 @@ export default function AdminPage() {
             <h2 className="text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">내보내기</h2>
             <p className="text-3xl font-bold text-white mb-3">{stats.total_exports}</p>
             <div className="space-y-1">
-              {Object.entries(stats.exports_by_status).map(([status, count]) => (
+              {STATUSES.map(status => (
                 <div key={status} className="flex justify-between text-sm">
                   <span className="text-gray-400">{status}</span>
-                  <span className="text-gray-300">{count}건</span>
+                  <span className="text-gray-300">{stats.exports_by_status[status] ?? 0}건</span>
                 </div>
               ))}
             </div>

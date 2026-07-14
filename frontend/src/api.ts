@@ -1,6 +1,6 @@
 import type { ExportItem, AdminExport } from "@/types/export"
 import type { UserInfo, AdminUser, Stats } from "@/types/user"
-import type { Project } from "@/types/project"
+import type { Project, ProjectData } from "@/types/project"
 
 const BASE = import.meta.env.VITE_API_URL || ""
 
@@ -40,7 +40,8 @@ export const auth = {
 export const projects = {
   list: (): Promise<Project[]> =>
     apiFetch<Project[]>("/api/projects/"),
-  get: (id: number) => apiFetch(`/api/projects/${id}`),
+  get: (id: number): Promise<Partial<ProjectData>> =>
+    apiFetch<Partial<ProjectData>>(`/api/projects/${id}`),
   create: (data: object): Promise<{ id: number }> =>
     apiFetch<{ id: number }>("/api/projects/", { method: "POST", body: JSON.stringify(data) }),
   update: (id: number, data: object) => apiFetch(`/api/projects/${id}`, { method: "PUT", body: JSON.stringify(data) }),
