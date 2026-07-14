@@ -2,7 +2,7 @@ export type Project = { id: number; title: string; updated_at: string }
 
 export type Rally = [number, number, number, number, number] // [start, end, p1, p2, winner]
 
-export interface ProjectData {
+export type ProjectData = {
   title: string
   video_path: string
   fps: number

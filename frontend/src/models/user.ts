@@ -1,5 +1,5 @@
-import type { Plan } from "@/constants/user"
-import type { ExportStatus } from "@/types/export"
+import type { Plan } from "@/models/plan"
+import type { ExportStatus } from "@/models/export"
 
 export type UserInfo = {
   email: string

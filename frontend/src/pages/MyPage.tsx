@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { auth, exports as exportsApi, youtube as youtubeApi } from "@/api"
-import type { ExportItem } from "@/types/export"
-import type { UserInfo } from "@/types/user"
-import { STATUS_LABEL, STATUS_CLASS } from "@/constants/export"
-import { PLAN_LIMITS } from "@/constants/user"
+import type { UserInfo } from "@/models/user"
+import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export"
+import { PLAN_LIMITS } from "@/models/plan"
 
 type Tab = "exports" | "usage" | "settings";
 

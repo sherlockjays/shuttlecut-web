@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { projects, videos, exports as exportsApi, youtube as youtubeApi } from "@/api"
-import type { Rally, ProjectData, ThemeId } from "@/types/project"
-import { THEMES, SIZES } from "@/types/project"
+import { THEMES, SIZES, type Rally, type ProjectData, type ThemeId } from "@/models/project"
 
 const EMPTY: ProjectData = {
   title: "", video_path: "", fps: 30, total_frames: 0,

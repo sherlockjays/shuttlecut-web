@@ -1,6 +1,6 @@
-import type { ExportItem, AdminExport } from "@/types/export"
-import type { UserInfo, AdminUser, Stats } from "@/types/user"
-import type { Project, ProjectData } from "@/types/project"
+import type { ExportItem, AdminExport } from "@/models/export"
+import type { UserInfo, AdminUser, Stats } from "@/models/user"
+import type { Project, ProjectData } from "@/models/project"
 
 const BASE = import.meta.env.VITE_API_URL || ""
 

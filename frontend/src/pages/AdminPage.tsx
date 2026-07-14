@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react"
 import { admin as adminApi } from "@/api"
-import type { AdminExport } from "@/types/export"
-import type { AdminUser, Stats } from "@/types/user"
-import { STATUS_LABEL, STATUS_CLASS, STATUSES } from "@/constants/export"
-import { PLANS, type Plan } from "@/constants/user"
+import type { AdminUser, Stats } from "@/models/user"
+import { STATUS_LABEL, STATUS_CLASS, STATUSES, type AdminExport } from "@/models/export"
+import { PLANS, type Plan } from "@/models/plan"
 
 const PLAN_BADGE: Record<Plan, string> = {
   free: "bg-gray-600 text-gray-200",

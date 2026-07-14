@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
 import { exports as exportsApi, youtube as youtubeApi } from "@/api"
-import type { ExportItem } from "@/types/export"
-import { STATUS_LABEL, STATUS_CLASS } from "@/constants/export"
+import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export"
 
 export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
   const [list, setList] = useState<ExportItem[]>([])
