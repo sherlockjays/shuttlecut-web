@@ -1,46 +1,10 @@
 import { useState, useEffect } from "react";
-import { auth, exports as exportsApi, youtube as youtubeApi } from "../api";
+import { auth, exports as exportsApi, youtube as youtubeApi } from "@/api"
+import type { UserInfo } from "@/models/user"
+import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export"
+import { PLAN_LIMITS } from "@/models/plan"
 
 type Tab = "exports" | "usage" | "settings";
-
-type ExportItem = {
-  id: number;
-  project_title: string;
-  status: "pending" | "processing" | "done" | "error";
-  youtube_url: string | null;
-  error_msg: string | null;
-  created_at: string | null;
-};
-
-type UserInfo = {
-  email: string;
-  plan: string;
-  export_count: number;
-};
-
-const STATUS_LABEL: Record<ExportItem["status"], string> = {
-  pending: "대기 중",
-  processing: "처리 중",
-  done: "완료",
-  error: "오류",
-};
-
-const STATUS_CLASS: Record<ExportItem["status"], string> = {
-  pending: "bg-gray-600 text-gray-200",
-  processing: "bg-blue-600 text-white",
-  done: "bg-green-600 text-white",
-  error: "bg-red-600 text-white",
-};
-
-const PLAN_LIMITS: Record<string, string> = {
-  free: "월 2회",
-  basic: "월 5회",
-  standard: "월 10회",
-  premium: "월 30회",
-  unlimited: "무제한",
-  club: "무제한",
-  admin: "무제한",
-};
 
 function ExportsTab() {
   const [list, setList] = useState<ExportItem[]>([]);

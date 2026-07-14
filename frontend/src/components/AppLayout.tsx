@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom"
-import { youtube as youtubeApi, auth as authApi } from "../api"
+import { youtube as youtubeApi, auth as authApi } from "@/api"
 
 export type AppPage = "projects" | "pricing" | "guide" | "mypage" | "admin"
 

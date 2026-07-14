@@ -1,16 +1,7 @@
 import { useState, useEffect, useRef } from "react"
-import { projects, videos, exports as exportsApi, youtube as youtubeApi } from "../api"
-
-type Rally = [number, number, number, number, number] // [start, end, p1, p2, winner]
-
-interface ProjectData {
-  title: string; video_path: string; fps: number; total_frames: number
-  match_date: string; tournament_name: string; level: string; match_name: string
-  player1_name: string; player2_name: string; player1_score: number; player2_score: number
-  rallies: Rally[]
-  scoreboard_scale: number
-  scoreboard_theme: string
-}
+import { projects, videos, exports as exportsApi, youtube as youtubeApi } from "@/api"
+import { type Rally, type ProjectData } from "@/models/project"
+import { THEMES, SIZES, type ThemeId } from "@/models/theme"
 
 const EMPTY: ProjectData = {
   title: "", video_path: "", fps: 30, total_frames: 0,
@@ -21,21 +12,7 @@ const EMPTY: ProjectData = {
   scoreboard_theme: "dark",
 }
 
-const THEMES = [
-  { id: "dark",  label: "다크",  bg: "#1e1e1e", accent: "#ffdc00" },
-  { id: "light", label: "라이트", bg: "#f0f0f0", accent: "#1e50c8" },
-  { id: "blue",  label: "블루",  bg: "#002878", accent: "#ffdc00" },
-  { id: "red",   label: "레드",  bg: "#780000", accent: "#ffdc00" },
-  { id: "green", label: "그린",  bg: "#0a3c14", accent: "#b4ff64" },
-]
-
-const SIZES = [
-  { label: "소", value: 1.0 },
-  { label: "중", value: 1.33 },
-  { label: "대", value: 1.67 },
-]
-
-const CANVAS_THEMES: Record<string, Record<string, string>> = {
+const CANVAS_THEMES: Record<ThemeId, Record<string, string>> = {
   dark:  { header_bg: "#1e1e1e", row_bg: "#000000", header_text: "#dcdcdc", name_text: "#ffdc00", score_text: "#ffdc00", border: "#ffffff", divider: "#b4b4b4", row_div: "#c8c8c8" },
   light: { header_bg: "#f0f0f0", row_bg: "#ffffff", header_text: "#323232", name_text: "#1e50c8", score_text: "#1e50c8", border: "#323232", divider: "#969696", row_div: "#969696" },
   blue:  { header_bg: "#002878", row_bg: "#001450", header_text: "#c8dcff", name_text: "#ffdc00", score_text: "#ffdc00", border: "#64a0ff", divider: "#5078c8", row_div: "#5082d2" },
@@ -68,7 +45,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   const futureRef = useRef<ProjectData[]>([])
 
   useEffect(() => {
-    projects.get(projectId).then((p: any) => {
+    projects.get(projectId).then(p => {
       setData({ ...EMPTY, ...p,
         scoreboard_scale: p.scoreboard_scale ?? 1.0,
         scoreboard_theme: p.scoreboard_theme ?? "dark",

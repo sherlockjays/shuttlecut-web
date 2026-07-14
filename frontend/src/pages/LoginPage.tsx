@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { auth } from "../api"
+import { auth } from "@/api"
 
 interface Props {
   onLogin: () => void

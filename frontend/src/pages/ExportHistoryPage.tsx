@@ -1,29 +1,6 @@
 import { useState, useEffect } from "react"
-import { exports as exportsApi, youtube as youtubeApi } from "../api"
-
-type ExportItem = {
-  id: number
-  project_id: number
-  project_title: string
-  status: "pending" | "processing" | "done" | "error"
-  youtube_url: string | null
-  error_msg: string | null
-  created_at: string | null
-}
-
-const STATUS_LABEL: Record<ExportItem["status"], string> = {
-  pending: "대기 중",
-  processing: "처리 중",
-  done: "완료",
-  error: "오류",
-}
-
-const STATUS_CLASS: Record<ExportItem["status"], string> = {
-  pending: "bg-gray-600 text-gray-200",
-  processing: "bg-blue-600 text-white",
-  done: "bg-green-600 text-white",
-  error: "bg-red-600 text-white",
-}
+import { exports as exportsApi, youtube as youtubeApi } from "@/api"
+import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export"
 
 export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
   const [list, setList] = useState<ExportItem[]>([])
