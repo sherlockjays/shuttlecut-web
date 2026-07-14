@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
 import { projects } from "@/api"
-
-type Project = { id: number; title: string; updated_at: string }
+import type { Project } from "@/models/project"
 
 export default function DashboardPage({ onOpenEditor }: { onOpenEditor: (id: number) => void }) {
   const [list, setList] = useState<Project[]>([])
