@@ -1,70 +1,48 @@
 import { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import { auth, exports as exportsApi, youtube as youtubeApi } from "@/api"
 import { meOptions } from "@/queries/auth"
 import { youtubeStatusOptions } from "@/queries/youtube"
+import { exportsOptions } from "@/queries/exports"
 import type { UserInfo } from "@/models/user"
-import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export"
+import { STATUS_LABEL, STATUS_CLASS } from "@/models/export"
 import { PLAN_LIMITS } from "@/models/plan"
 
 type Tab = "exports" | "usage" | "settings";
 
 function ExportsTab() {
-  const [list, setList] = useState<ExportItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploadingIds, setUploadingIds] = useState<Set<number>>(new Set());
   const [ytPostComment, setYtPostComment] = useState(true);
   const { data: yt } = useQuery(youtubeStatusOptions);
   const ytConnected = yt?.connected ?? false;
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    exportsApi
-      .list()
-      .then(setList)
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: list = [], isLoading: loading } = useQuery({
+    ...exportsOptions,
+    refetchInterval: (query) => {
+      const anyUploading = query.state.data?.some((item) => item.youtube_url === "uploading");
+      return anyUploading ? 3000 : false;
+    },
+  });
 
-  const handleDelete = async (id: number) => {
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => exportsApi.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: ({ id, postComment }: { id: number; postComment: boolean }) =>
+      exportsApi.uploadToYoutube(id, postComment),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
+    onError: (e: unknown) => alert(e instanceof Error ? e.message : "YouTube 업로드 실패"),
+  });
+
+  const handleDelete = (id: number) => {
     if (!confirm("이 내보내기 기록과 파일을 삭제하시겠습니까?")) return;
-    await exportsApi.delete(id);
-    setList((prev) => prev.filter((item) => item.id !== id));
+    deleteMutation.mutate(id);
   };
 
-  const handleYoutubeUpload = async (id: number) => {
-    setUploadingIds((prev) => new Set(prev).add(id));
-    try {
-      await exportsApi.uploadToYoutube(id, ytPostComment);
-      const poll = setInterval(async () => {
-        const s = await exportsApi.status(id);
-        if (s.youtube_url && s.youtube_url !== "uploading") {
-          setList((prev) =>
-            prev.map((item) =>
-              item.id === id ? { ...item, youtube_url: s.youtube_url } : item,
-            ),
-          );
-          setUploadingIds((prev) => {
-            const next = new Set(prev);
-            next.delete(id);
-            return next;
-          });
-          clearInterval(poll);
-        } else if (!s.youtube_url) {
-          setUploadingIds((prev) => {
-            const next = new Set(prev);
-            next.delete(id);
-            return next;
-          });
-          clearInterval(poll);
-        }
-      }, 3000);
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "YouTube 업로드 실패");
-      setUploadingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
+  const handleYoutubeUpload = (id: number) => {
+    uploadMutation.mutate({ id, postComment: ytPostComment });
   };
 
   if (loading) return <p className="text-gray-400 py-8">불러오는 중...</p>;
@@ -134,7 +112,7 @@ function ExportsTab() {
                   YouTube ↗
                 </a>
               ) : item.youtube_url === "uploading" ||
-                uploadingIds.has(item.id) ? (
+                (uploadMutation.isPending && uploadMutation.variables?.id === item.id) ? (
                 <span className="text-gray-400 text-xs px-2 py-1.5">
                   업로드 중...
                 </span>

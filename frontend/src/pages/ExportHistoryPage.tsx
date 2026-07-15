@@ -1,45 +1,40 @@
-import { useState, useEffect } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import { exports as exportsApi } from "@/api"
 import { youtubeStatusOptions } from "@/queries/youtube"
-import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export"
+import { exportsOptions } from "@/queries/exports"
+import { STATUS_LABEL, STATUS_CLASS } from "@/models/export"
 
 export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
-  const [list, setList] = useState<ExportItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [uploadingIds, setUploadingIds] = useState<Set<number>>(new Set())
   const { data: yt } = useQuery(youtubeStatusOptions)
   const ytConnected = yt?.connected ?? false
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    exportsApi.list().then(setList).finally(() => setLoading(false))
-  }, [])
+  const { data: list = [], isLoading: loading } = useQuery({
+    ...exportsOptions,
+    refetchInterval: (query) => {
+      const anyUploading = query.state.data?.some(item => item.youtube_url === "uploading")
+      return anyUploading ? 3000 : false
+    },
+  })
 
-  const handleDelete = async (id: number) => {
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => exportsApi.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
+  })
+
+  const uploadMutation = useMutation({
+    mutationFn: (id: number) => exportsApi.uploadToYoutube(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
+    onError: (e: unknown) => alert(e instanceof Error ? e.message : "YouTube 업로드 실패"),
+  })
+
+  const handleDelete = (id: number) => {
     if (!confirm("이 내보내기 기록과 파일을 삭제하시겠습니까?")) return
-    await exportsApi.delete(id)
-    setList(prev => prev.filter(item => item.id !== id))
+    deleteMutation.mutate(id)
   }
 
-  const handleYoutubeUpload = async (id: number) => {
-    setUploadingIds(prev => new Set(prev).add(id))
-    try {
-      await exportsApi.uploadToYoutube(id)
-      const poll = setInterval(async () => {
-        const s = await exportsApi.status(id)
-        if (s.youtube_url && s.youtube_url !== "uploading") {
-          setList(prev => prev.map(item => item.id === id ? { ...item, youtube_url: s.youtube_url } : item))
-          setUploadingIds(prev => { const next = new Set(prev); next.delete(id); return next })
-          clearInterval(poll)
-        } else if (!s.youtube_url) {
-          setUploadingIds(prev => { const next = new Set(prev); next.delete(id); return next })
-          clearInterval(poll)
-        }
-      }, 3000)
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "YouTube 업로드 실패")
-      setUploadingIds(prev => { const next = new Set(prev); next.delete(id); return next })
-    }
+  const handleYoutubeUpload = (id: number) => {
+    uploadMutation.mutate(id)
   }
 
   return (
@@ -92,7 +87,8 @@ export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
                         className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors">
                         YouTube ↗
                       </a>
-                    ) : item.youtube_url === "uploading" || uploadingIds.has(item.id) ? (
+                    ) : item.youtube_url === "uploading" ||
+                      (uploadMutation.isPending && uploadMutation.variables === item.id) ? (
                       <span className="text-gray-400 text-xs px-2 py-1.5">업로드 중...</span>
                     ) : (
                       <button onClick={() => handleYoutubeUpload(item.id)} disabled={!ytConnected}
