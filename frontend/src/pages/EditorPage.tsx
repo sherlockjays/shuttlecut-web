@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react"
-import { projects, videos, exports as exportsApi, youtube as youtubeApi } from "@/api"
+import { useQuery } from "@tanstack/react-query"
+import { projects, videos, exports as exportsApi } from "@/api"
+import { youtubeStatusOptions } from "@/queries/youtube"
 import { type Rally, type ProjectData } from "@/models/project"
 import { THEMES, SIZES, type ThemeId } from "@/models/theme"
 
@@ -31,7 +33,8 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   const [exportMsg, setExportMsg] = useState("")
   const [exportEta, setExportEta] = useState<number | null>(null)
   const [exportDoneId, setExportDoneId] = useState<number | null>(null)
-  const [ytConnected, setYtConnected] = useState(false)
+  const { data: yt } = useQuery(youtubeStatusOptions)
+  const ytConnected = yt?.connected ?? false
   const [ytUploading, setYtUploading] = useState(false)
   const [ytUrl, setYtUrl] = useState<string | null>(null)
   const [ytPostComment, setYtPostComment] = useState(true)
@@ -55,7 +58,6 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
         setVideoId(vid)
       }
     })
-    youtubeApi.status().then((s: { connected: boolean }) => setYtConnected(s.connected)).catch(() => {})
   }, [projectId])
 
   // 자동 저장 (3초 debounce)

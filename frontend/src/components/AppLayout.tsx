@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom"
-import { youtube as youtubeApi, auth as authApi } from "@/api"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { auth as authApi } from "@/api"
+import { youtubeStatusOptions } from "@/queries/youtube"
 
 export type AppPage = "projects" | "pricing" | "guide" | "mypage" | "admin"
 
@@ -14,22 +16,23 @@ export default function AppLayout({
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [ytConnected, setYtConnected] = useState(false)
+  const queryClient = useQueryClient()
+  const { data: yt } = useQuery(youtubeStatusOptions)
+  const ytConnected = yt?.connected ?? false
   const [isAdmin, setIsAdmin] = useState(false)
 
   const activePage = (location.pathname.slice(1) as AppPage) || "projects"
 
   useEffect(() => {
-    youtubeApi.status().then((s: { connected: boolean }) => setYtConnected(s.connected)).catch(() => {})
     authApi.me().then((u: { plan: string }) => setIsAdmin(u.plan === "admin")).catch(() => {})
   }, [])
 
   useEffect(() => {
     if (searchParams.get("youtube_connected") === "1") {
-      setYtConnected(true)
+      queryClient.invalidateQueries({ queryKey: youtubeStatusOptions.queryKey })
       setSearchParams({}, { replace: true })
     }
-  }, [searchParams])
+  }, [searchParams, queryClient, setSearchParams])
 
   const nav: { key: AppPage; label: string }[] = [
     { key: "projects", label: "프로젝트" },

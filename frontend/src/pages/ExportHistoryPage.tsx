@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react"
-import { exports as exportsApi, youtube as youtubeApi } from "@/api"
+import { useQuery } from "@tanstack/react-query"
+import { exports as exportsApi } from "@/api"
+import { youtubeStatusOptions } from "@/queries/youtube"
 import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export"
 
 export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
   const [list, setList] = useState<ExportItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [ytConnected, setYtConnected] = useState(false)
   const [uploadingIds, setUploadingIds] = useState<Set<number>>(new Set())
+  const { data: yt } = useQuery(youtubeStatusOptions)
+  const ytConnected = yt?.connected ?? false
 
   useEffect(() => {
     exportsApi.list().then(setList).finally(() => setLoading(false))
-    youtubeApi.status().then((s: { connected: boolean }) => setYtConnected(s.connected)).catch(() => {})
   }, [])
 
   const handleDelete = async (id: number) => {

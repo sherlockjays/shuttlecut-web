@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { auth, exports as exportsApi, youtube as youtubeApi } from "@/api"
 import { meOptions } from "@/queries/auth"
+import { youtubeStatusOptions } from "@/queries/youtube"
 import type { UserInfo } from "@/models/user"
 import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export"
 import { PLAN_LIMITS } from "@/models/plan"
@@ -11,19 +12,16 @@ type Tab = "exports" | "usage" | "settings";
 function ExportsTab() {
   const [list, setList] = useState<ExportItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [ytConnected, setYtConnected] = useState(false);
   const [uploadingIds, setUploadingIds] = useState<Set<number>>(new Set());
   const [ytPostComment, setYtPostComment] = useState(true);
+  const { data: yt } = useQuery(youtubeStatusOptions);
+  const ytConnected = yt?.connected ?? false;
 
   useEffect(() => {
     exportsApi
       .list()
       .then(setList)
       .finally(() => setLoading(false));
-    youtubeApi
-      .status()
-      .then((s: { connected: boolean }) => setYtConnected(s.connected))
-      .catch(() => {});
   }, []);
 
   const handleDelete = async (id: number) => {
@@ -198,23 +196,19 @@ function UsageTab() {
 
 function SettingsTab() {
   const [user, setUser] = useState<UserInfo | null>(null);
-  const [ytConnected, setYtConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: yt } = useQuery(youtubeStatusOptions);
+  const ytConnected = yt?.connected ?? false;
 
   useEffect(() => {
-    Promise.all([
-      auth.me().then(setUser),
-      youtubeApi
-        .status()
-        .then((s: { connected: boolean }) => setYtConnected(s.connected))
-        .catch(() => {}),
-    ]).finally(() => setLoading(false));
+    auth.me().then(setUser).finally(() => setLoading(false));
   }, []);
 
   const handleYtDisconnect = async () => {
     if (!confirm("YouTube 계정 연결을 해제하시겠습니까?")) return;
     await youtubeApi.disconnect();
-    setYtConnected(false);
+    queryClient.invalidateQueries({ queryKey: youtubeStatusOptions.queryKey });
   };
 
   if (loading) return <p className="text-gray-400 py-8">불러오는 중...</p>;
