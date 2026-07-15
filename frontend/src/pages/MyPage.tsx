@@ -5,8 +5,8 @@ import { meOptions } from "@/queries/auth"
 import { youtubeStatusOptions } from "@/queries/youtube"
 import { exportsOptions } from "@/queries/exports"
 import type { UserInfo } from "@/models/user"
-import { STATUS_LABEL, STATUS_CLASS } from "@/models/export"
 import { PLAN_LIMITS } from "@/models/plan"
+import ExportRow from "@/pages/ExportRow"
 
 type Tab = "exports" | "usage" | "settings";
 
@@ -68,76 +68,15 @@ function ExportsTab() {
         </label>
       </div>
       {list.map((item) => (
-        <div
+        <ExportRow
           key={item.id}
-          className="bg-gray-800 rounded-xl p-4 flex items-center justify-between"
-        >
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLASS[item.status]}`}
-              >
-                {STATUS_LABEL[item.status]}
-              </span>
-              <span className="font-medium truncate">{item.project_title}</span>
-            </div>
-            <p className="text-gray-400 text-xs">
-              {item.created_at
-                ? new Date(item.created_at).toLocaleString("ko-KR")
-                : "-"}
-            </p>
-            {item.status === "error" && item.error_msg && (
-              <p className="text-red-400 text-xs mt-1 truncate">
-                {item.error_msg}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2 ml-4 shrink-0">
-            {item.status === "done" && (
-              <a
-                href={exportsApi.downloadUrl(item.id)}
-                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
-              >
-                다운로드
-              </a>
-            )}
-            {item.status === "done" &&
-              (item.youtube_url && item.youtube_url !== "uploading" ? (
-                <a
-                  href={item.youtube_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
-                >
-                  YouTube ↗
-                </a>
-              ) : item.youtube_url === "uploading" ||
-                (uploadMutation.isPending && uploadMutation.variables?.id === item.id) ? (
-                <span className="text-gray-400 text-xs px-2 py-1.5">
-                  업로드 중...
-                </span>
-              ) : (
-                <button
-                  onClick={() => handleYoutubeUpload(item.id)}
-                  disabled={!ytConnected}
-                  title={
-                    ytConnected
-                      ? "YouTube에 업로드"
-                      : "설정에서 YouTube 계정을 먼저 연결하세요"
-                  }
-                  className="bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
-                >
-                  YouTube
-                </button>
-              ))}
-            <button
-              onClick={() => handleDelete(item.id)}
-              className="bg-gray-700 hover:bg-red-700 text-gray-400 hover:text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
-            >
-              삭제
-            </button>
-          </div>
-        </div>
+          item={item}
+          ytConnected={ytConnected}
+          isUploading={uploadMutation.isPending && uploadMutation.variables?.id === item.id}
+          disabledHint="설정에서 YouTube 계정을 먼저 연결하세요"
+          onUpload={handleYoutubeUpload}
+          onDelete={handleDelete}
+        />
       ))}
     </div>
   );
