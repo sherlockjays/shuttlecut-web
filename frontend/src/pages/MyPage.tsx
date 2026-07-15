@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query"
 import { auth, exports as exportsApi, youtube as youtubeApi } from "@/api"
+import { meOptions } from "@/queries/auth"
 import type { UserInfo } from "@/models/user"
 import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export"
 import { PLAN_LIMITS } from "@/models/plan"
@@ -166,15 +168,7 @@ function ExportsTab() {
 }
 
 function UsageTab() {
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    auth
-      .me()
-      .then(setUser)
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: user, isLoading: loading } = useQuery(meOptions);
 
   if (loading) return <p className="text-gray-400 py-8">불러오는 중...</p>;
   if (!user) return null;
