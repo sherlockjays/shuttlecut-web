@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { auth as authApi } from "@/api"
 import { youtubeStatusOptions } from "@/queries/youtube"
+import { meOptions } from "@/queries/auth"
 
 export type AppPage = "projects" | "pricing" | "guide" | "mypage" | "admin"
 
@@ -19,13 +19,10 @@ export default function AppLayout({
   const queryClient = useQueryClient()
   const { data: yt } = useQuery(youtubeStatusOptions)
   const ytConnected = yt?.connected ?? false
-  const [isAdmin, setIsAdmin] = useState(false)
+  const { data: me } = useQuery(meOptions)
+  const isAdmin = me?.plan === "admin"
 
   const activePage = (location.pathname.slice(1) as AppPage) || "projects"
-
-  useEffect(() => {
-    authApi.me().then((u: { plan: string }) => setIsAdmin(u.plan === "admin")).catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (searchParams.get("youtube_connected") === "1") {

@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
-import { auth, exports as exportsApi, youtube as youtubeApi } from "@/api"
+import { exports as exportsApi, youtube as youtubeApi } from "@/api"
 import { meOptions } from "@/queries/auth"
 import { youtubeStatusOptions } from "@/queries/youtube"
 import { exportsOptions } from "@/queries/exports"
-import type { UserInfo } from "@/models/user"
 import { PLAN_LIMITS } from "@/models/plan"
 import ExportRow from "@/pages/ExportRow"
 
@@ -100,15 +99,10 @@ function UsageTab() {
 }
 
 function SettingsTab() {
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: user, isLoading: loading } = useQuery(meOptions);
   const queryClient = useQueryClient();
   const { data: yt } = useQuery(youtubeStatusOptions);
   const ytConnected = yt?.connected ?? false;
-
-  useEffect(() => {
-    auth.me().then(setUser).finally(() => setLoading(false));
-  }, []);
 
   const handleYtDisconnect = async () => {
     if (!confirm("YouTube 계정 연결을 해제하시겠습니까?")) return;
