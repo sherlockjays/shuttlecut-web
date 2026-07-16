@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import { exports as exportsApi } from "@/api"
 import { youtubeStatusOptions } from "@/queries/youtube"
-import { exportsOptions } from "@/queries/exports"
+import { exportsOptions, pollWhileUploading } from "@/queries/exports"
 import ExportRow from "@/pages/ExportRow"
 
 export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
@@ -11,10 +11,7 @@ export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
 
   const { data: list = [], isLoading: loading } = useQuery({
     ...exportsOptions,
-    refetchInterval: (query) => {
-      const anyUploading = query.state.data?.some(item => item.youtube_url === "uploading")
-      return anyUploading ? 3000 : false
-    },
+    refetchInterval: pollWhileUploading,
   })
 
   const deleteMutation = useMutation({
