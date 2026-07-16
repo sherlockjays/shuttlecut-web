@@ -29,20 +29,9 @@ function ExportsTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: ({ id, postComment }: { id: number; postComment: boolean }) =>
-      exportsApi.uploadToYoutube(id, postComment),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
-    onError: (e: unknown) => alert(e instanceof Error ? e.message : "YouTube 업로드 실패"),
-  });
-
   const handleDelete = (id: number) => {
     if (!confirm("이 내보내기 기록과 파일을 삭제하시겠습니까?")) return;
     deleteMutation.mutate(id);
-  };
-
-  const handleYoutubeUpload = (id: number) => {
-    uploadMutation.mutate({ id, postComment: ytPostComment });
   };
 
   if (loading) return <p className="text-gray-400 py-8">불러오는 중...</p>;
@@ -72,9 +61,8 @@ function ExportsTab() {
           key={item.id}
           item={item}
           ytConnected={ytConnected}
-          isUploading={uploadMutation.isPending && uploadMutation.variables?.id === item.id}
+          postComment={ytPostComment}
           disabledHint="설정에서 YouTube 계정을 먼저 연결하세요"
-          onUpload={handleYoutubeUpload}
           onDelete={handleDelete}
         />
       ))}

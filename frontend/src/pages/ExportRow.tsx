@@ -1,21 +1,31 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { exports as exportsApi } from "@/api"
+import { exportsOptions } from "@/queries/exports"
 import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export"
 
 export default function ExportRow({
   item,
   ytConnected,
-  isUploading,
+  postComment,
   disabledHint,
-  onUpload,
   onDelete,
 }: {
   item: ExportItem
   ytConnected: boolean
-  isUploading: boolean
+  postComment: boolean
   disabledHint: string
-  onUpload: (id: number) => void
   onDelete: (id: number) => void
 }) {
+  const queryClient = useQueryClient()
+
+  const uploadMutation = useMutation({
+    mutationFn: () => exportsApi.uploadToYoutube(item.id, postComment),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
+    onError: (e: unknown) => alert(e instanceof Error ? e.message : "YouTube 업로드 실패"),
+  })
+
+  const isUploading = item.youtube_url === "uploading" || uploadMutation.isPending
+
   return (
     <div className="bg-gray-800 rounded-xl p-4 flex items-center justify-between">
       <div className="flex-1 min-w-0">
@@ -51,11 +61,11 @@ export default function ExportRow({
             >
               YouTube ↗
             </a>
-          ) : item.youtube_url === "uploading" || isUploading ? (
+          ) : isUploading ? (
             <span className="text-gray-400 text-xs px-2 py-1.5">업로드 중...</span>
           ) : (
             <button
-              onClick={() => onUpload(item.id)}
+              onClick={() => uploadMutation.mutate()}
               disabled={!ytConnected}
               title={ytConnected ? "YouTube에 업로드" : disabledHint}
               className="bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-sm transition-colors"

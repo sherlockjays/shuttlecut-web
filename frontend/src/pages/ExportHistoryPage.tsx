@@ -22,19 +22,9 @@ export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
   })
 
-  const uploadMutation = useMutation({
-    mutationFn: (id: number) => exportsApi.uploadToYoutube(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
-    onError: (e: unknown) => alert(e instanceof Error ? e.message : "YouTube 업로드 실패"),
-  })
-
   const handleDelete = (id: number) => {
     if (!confirm("이 내보내기 기록과 파일을 삭제하시겠습니까?")) return
     deleteMutation.mutate(id)
-  }
-
-  const handleYoutubeUpload = (id: number) => {
-    uploadMutation.mutate(id)
   }
 
   return (
@@ -61,9 +51,8 @@ export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
                 key={item.id}
                 item={item}
                 ytConnected={ytConnected}
-                isUploading={uploadMutation.isPending && uploadMutation.variables === item.id}
+                postComment={true}
                 disabledHint="대시보드에서 YouTube 계정을 먼저 연결하세요"
-                onUpload={handleYoutubeUpload}
                 onDelete={handleDelete}
               />
             ))}
