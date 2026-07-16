@@ -1,24 +1,21 @@
-import { useState, useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { projects } from "@/api"
-import type { Project } from "@/models/project"
+import { projectsOptions } from "@/queries/projects"
 
 export default function DashboardPage({ onOpenEditor }: { onOpenEditor: (id: number) => void }) {
-  const [list, setList] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    projects.list().then(setList).finally(() => setLoading(false))
-  }, [])
+  const queryClient = useQueryClient()
+  const { data: list = [], isLoading: loading } = useQuery(projectsOptions)
 
   const createNew = async () => {
     const res = await projects.create({ title: "새 프로젝트" })
+    queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey })
     onOpenEditor(res.id)
   }
 
   const deleteProject = async (id: number) => {
     if (!confirm("프로젝트를 삭제하시겠습니까?")) return
     await projects.delete(id)
-    setList(l => l.filter(p => p.id !== id))
+    queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey })
   }
 
   return (

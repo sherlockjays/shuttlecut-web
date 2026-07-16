@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react"
-import { projects, videos, exports as exportsApi, youtube as youtubeApi } from "@/api"
+import { useQuery } from "@tanstack/react-query"
+import { projects, videos, exports as exportsApi } from "@/api"
+import { youtubeStatusOptions } from "@/queries/youtube"
+import { exportStatusOptions } from "@/queries/exports"
 import { type Rally, type ProjectData } from "@/models/project"
 import { THEMES, SIZES, type ThemeId } from "@/models/theme"
 
@@ -31,7 +34,8 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   const [exportMsg, setExportMsg] = useState("")
   const [exportEta, setExportEta] = useState<number | null>(null)
   const [exportDoneId, setExportDoneId] = useState<number | null>(null)
-  const [ytConnected, setYtConnected] = useState(false)
+  const { data: yt } = useQuery(youtubeStatusOptions)
+  const ytConnected = yt?.connected ?? false
   const [ytUploading, setYtUploading] = useState(false)
   const [ytUrl, setYtUrl] = useState<string | null>(null)
   const [ytPostComment, setYtPostComment] = useState(true)
@@ -55,7 +59,6 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
         setVideoId(vid)
       }
     })
-    youtubeApi.status().then((s: { connected: boolean }) => setYtConnected(s.connected)).catch(() => {})
   }, [projectId])
 
   // 자동 저장 (3초 debounce)
@@ -156,24 +159,30 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
     return m > 0 ? `약 ${m}분 ${s}초 남음` : `약 ${s}초 남음`
   }
 
+  const { data: exportStatus } = useQuery({
+    ...exportStatusOptions(exportDoneId!),
+    refetchInterval: (query) => {
+      const url = query.state.data?.youtube_url
+      return url && url !== "uploading" ? false : 3000
+    },
+    enabled: ytUploading && exportDoneId != null,
+  })
+
+  useEffect(() => {
+    if (!ytUploading || !exportStatus) return
+    if (exportStatus.youtube_url && exportStatus.youtube_url !== "uploading") {
+      setYtUrl(exportStatus.youtube_url)
+      setYtUploading(false)
+    } else if (!exportStatus.youtube_url) {
+      setYtUploading(false)
+    }
+  }, [exportStatus, ytUploading])
+
   const startYoutubeUpload = async () => {
     if (!exportDoneId) return
     setYtUploading(true)
     try {
       await exportsApi.uploadToYoutube(exportDoneId, ytPostComment)
-      // 3초마다 폴링해서 youtube_url 확인
-      const poll = setInterval(async () => {
-        const s = await exportsApi.status(exportDoneId)
-        if (s.youtube_url && s.youtube_url !== "uploading") {
-          setYtUrl(s.youtube_url)
-          setYtUploading(false)
-          clearInterval(poll)
-        } else if (!s.youtube_url && !ytUploading) {
-          // 실패해서 null로 돌아온 경우
-          setYtUploading(false)
-          clearInterval(poll)
-        }
-      }, 3000)
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "YouTube 업로드 실패")
       setYtUploading(false)

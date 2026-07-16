@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { admin as adminApi } from "@/api"
-import type { AdminUser, Stats } from "@/models/user"
-import { STATUS_LABEL, STATUS_CLASS, STATUSES, type AdminExport } from "@/models/export"
+import { adminUsersOptions, adminStatsOptions, adminExportsOptions } from "@/queries/admin"
+import { STATUS_LABEL, STATUS_CLASS, STATUSES } from "@/models/export"
 import { PLANS, type Plan } from "@/models/plan"
 
 const PLAN_BADGE: Record<Plan, string> = {
@@ -16,46 +17,27 @@ const PLAN_BADGE: Record<Plan, string> = {
 
 export default function AdminPage() {
   const [tab, setTab] = useState<"users" | "stats" | "tasks">("users")
-  const [users, setUsers] = useState<AdminUser[]>([])
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [taskExports, setTaskExports] = useState<AdminExport[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
   const [saving, setSaving] = useState<number | null>(null)
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    loadUsers()
-    loadStats()
-  }, [])
+  const {
+    data: users = [],
+    isLoading: loading,
+    error: usersError,
+  } = useQuery(adminUsersOptions)
+  const { data: stats } = useQuery(adminStatsOptions)
+  const { data: taskExports = [] } = useQuery({
+    ...adminExportsOptions,
+    enabled: tab === "tasks",
+  })
 
-  async function loadUsers() {
-    setLoading(true)
-    try {
-      setUsers(await adminApi.users())
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function loadStats() {
-    try {
-      setStats(await adminApi.stats())
-    } catch {}
-  }
-
-  async function loadTasks() {
-    try {
-      setTaskExports(await adminApi.exports(50))
-    } catch {}
-  }
+  const error = usersError instanceof Error ? usersError.message : ""
 
   async function handlePlanChange(uid: number, plan: Plan) {
     setSaving(uid)
     try {
       await adminApi.updateUser(uid, { plan })
-      setUsers(prev => prev.map(u => u.id === uid ? { ...u, plan } : u))
+      queryClient.invalidateQueries({ queryKey: adminUsersOptions.queryKey })
     } catch (e: any) {
       alert("변경 실패: " + e.message)
     } finally {
@@ -68,7 +50,7 @@ export default function AdminPage() {
     setSaving(uid)
     try {
       await adminApi.updateUser(uid, { export_count: 0 })
-      setUsers(prev => prev.map(u => u.id === uid ? { ...u, export_count: 0 } : u))
+      queryClient.invalidateQueries({ queryKey: adminUsersOptions.queryKey })
     } catch (e: any) {
       alert("초기화 실패: " + e.message)
     } finally {
@@ -85,10 +67,7 @@ export default function AdminPage() {
         {(["users", "stats", "tasks"] as const).map(t => (
           <button
             key={t}
-            onClick={() => {
-              setTab(t)
-              if (t === "tasks") loadTasks()
-            }}
+            onClick={() => setTab(t)}
             className={`pb-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               tab === t ? "border-yellow-400 text-white" : "border-transparent text-gray-400 hover:text-white"
             }`}
