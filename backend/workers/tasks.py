@@ -95,8 +95,20 @@ def _build_step1_cmd(i, rally, fps, duration, video_path, is_hlg, is_hdr, use_gp
     raw_path = f"{tmpdir}/raw{i:04d}.mp4"
 
     if is_hlg:
-        if use_gpu and ENABLE_OPENCL:
-            # OpenCL tonemap: GPU에서 HLG→SDR 변환
+        import sys as _sys
+        if _sys.platform == "win32":
+            # Windows: libplacebo (Vulkan) + h264_nvenc — 드라이버 610+
+            enc = (["-c:v", "h264_nvenc", "-preset", "p1", "-qp", "18"] if use_gpu
+                   else ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "18"])
+            cmd = (["ffmpeg", "-y",
+                    "-ss", str(start_t), "-t", str(clip_dur), "-i", video_path,
+                    "-map", "0:v:0", "-map", "0:a:0?",
+                    "-vf", "libplacebo=color_primaries=bt709:color_trc=bt709:tonemapping=hable:format=yuv420p"]
+                   + enc
+                   + _SDR_COLOR_FLAGS
+                   + ["-c:a", "aac", "-avoid_negative_ts", "make_zero", raw_path])
+        elif use_gpu and ENABLE_OPENCL:
+            # OpenCL tonemap: GPU에서 HLG→SDR 변환 (Linux)
             cmd = ["ffmpeg", "-y",
                    "-init_hw_device", "opencl=gpu:0.0",
                    "-filter_hw_device", "gpu",

@@ -1,6 +1,3 @@
-** WARNING: connection is not using a post-quantum key exchange algorithm.
-** This session may be vulnerable to "store now, decrypt later" attacks.
-** The server may need to be upgraded. See https://openssh.com/pq.html
 const BASE = import.meta.env.VITE_API_URL || ""
 
 function headers() {
@@ -63,6 +60,9 @@ export const videos = {
     })
   },
   streamUrl: (videoId: string) => `${BASE}/api/videos/stream/${videoId}?token=${localStorage.getItem("token") || ""}`,
+  previewUrl: (videoId: string) => `${BASE}/api/videos/preview/${videoId}?token=${localStorage.getItem("token") || ""}`,
+  previewStatus: (videoId: string): Promise<{ status: "ready" | "processing" | "not_found" }> =>
+    apiFetch(`/api/videos/preview-status/${videoId}`),
 }
 
 export const exports = {
