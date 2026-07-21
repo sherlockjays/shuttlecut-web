@@ -59,7 +59,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900">
+    <main className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="w-full max-w-sm bg-gray-800 rounded-2xl p-8 shadow-xl">
         <h1 className="text-2xl font-bold text-white mb-2 text-center">🏸 ShuttleCut</h1>
         <p className="text-gray-400 text-sm text-center mb-6">
@@ -112,7 +112,8 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
                 className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" required />
 
               {view === "register" && (
-                <div className="space-y-2 pt-1">
+                <fieldset className="border-0 p-0 m-0 space-y-2 pt-1">
+                  <legend className="sr-only">필수 동의 항목</legend>
                   <label className="flex items-start gap-2 cursor-pointer">
                     <input type="checkbox" checked={agreedTerms} onChange={e => setAgreedTerms(e.target.checked)}
                       className="mt-0.5 accent-blue-500" />
@@ -129,7 +130,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
                       <a href="/privacy" target="_blank" className="text-blue-400 hover:underline">개인정보처리방침</a>에 동의합니다.
                     </span>
                   </label>
-                </div>
+                </fieldset>
               )}
 
               {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -176,6 +177,6 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
           </>
         )}
       </div>
-    </div>
+    </main>
   )
 }
