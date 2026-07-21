@@ -1,22 +1,17 @@
 import { useEffect } from "react"
-import { useNavigate, useLocation, useSearchParams } from "react-router-dom"
+import { Outlet, useNavigate, useLocation, useSearchParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { youtubeStatusOptions } from "@/queries/youtube"
 import { meOptions } from "@/queries/auth"
 
 export type AppPage = "projects" | "pricing" | "guide" | "mypage" | "admin"
 
-export default function AppLayout({
-  onLogout,
-  children,
-}: {
-  onLogout: () => void
-  children: React.ReactNode
-}) {
+export default function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
+  const logout = () => { localStorage.removeItem("token"); navigate("/login") }
   const { data: yt } = useQuery(youtubeStatusOptions)
   const ytConnected = yt?.connected ?? false
   const { data: me } = useQuery(meOptions)
@@ -81,12 +76,12 @@ export default function AppLayout({
           {ytConnected && (
             <span className="text-red-400 text-xs font-medium">▶ YouTube 연결됨</span>
           )}
-          <button onClick={onLogout} className="text-gray-400 hover:text-white text-sm transition-colors">
+          <button onClick={logout} className="text-gray-400 hover:text-white text-sm transition-colors">
             로그아웃
           </button>
         </div>
       </header>
-      {children}
+      <Outlet />
     </div>
   )
 }

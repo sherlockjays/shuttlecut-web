@@ -2,6 +2,7 @@ import { useEffect } from "react"
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useSearchParams, useParams } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
+import { RequireAuth } from "@/components/AuthGuard"
 import LoginPage from "@/pages/LoginPage"
 import DashboardPage from "@/pages/DashboardPage"
 import EditorPage from "@/pages/EditorPage"
@@ -93,26 +94,14 @@ function ResetPasswordRoute() {
   return <ResetPasswordPage token={token} onDone={() => navigate("/login")} />
 }
 
-function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate()
-  if (!localStorage.getItem("token")) return <Navigate to="/login" replace />
-  const logout = () => { localStorage.removeItem("token"); navigate("/login") }
-  return <AppLayout onLogout={logout}>{children}</AppLayout>
-}
-
 function ProjectsRoute() {
   const navigate = useNavigate()
-  return (
-    <ProtectedLayout>
-      <DashboardPage onOpenEditor={(id) => navigate(`/editor/${id}`)} />
-    </ProtectedLayout>
-  )
+  return <DashboardPage onOpenEditor={(id) => navigate(`/editor/${id}`)} />
 }
 
 function EditorRoute() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
-  if (!localStorage.getItem("token")) return <Navigate to="/login" replace />
   if (!projectId) return <Navigate to="/projects" replace />
   return <EditorPage projectId={parseInt(projectId)} onBack={() => navigate("/projects")} />
 }
@@ -130,12 +119,16 @@ export default function App() {
           <Route path="/login" element={<LoginRoute />} />
           <Route path="/forgot-password" element={<ForgotPasswordRoute />} />
           <Route path="/reset-password" element={<ResetPasswordRoute />} />
-          <Route path="/editor/:projectId" element={<EditorRoute />} />
-          <Route path="/projects" element={<ProjectsRoute />} />
-          <Route path="/pricing" element={<ProtectedLayout><PricingPage /></ProtectedLayout>} />
-          <Route path="/guide" element={<ProtectedLayout><GuidePage /></ProtectedLayout>} />
-          <Route path="/mypage" element={<ProtectedLayout><MyPage /></ProtectedLayout>} />
-          <Route path="/admin" element={<ProtectedLayout><AdminPage /></ProtectedLayout>} />
+          <Route element={<RequireAuth />}>
+            <Route path="/editor/:projectId" element={<EditorRoute />} />
+            <Route element={<AppLayout />}>
+              <Route path="/projects" element={<ProjectsRoute />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/guide" element={<GuidePage />} />
+              <Route path="/mypage" element={<MyPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+            </Route>
+          </Route>
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
