@@ -68,11 +68,10 @@ export function LoginRoute() {
 }
 
 export function ResetPasswordRoute() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const token = searchParams.get("token")
   if (!token) return <Navigate to="/login" replace />
-  return <ResetPasswordPage token={token} onDone={() => navigate("/login")} />
+  return <ResetPasswordPage token={token} />
 }
 
 export function ProjectsRoute() {

@@ -1,7 +1,8 @@
 import { useState } from "react"
+import { Link } from "react-router-dom"
 import { auth } from "@/api"
 
-export default function ResetPasswordPage({ token, onDone }: { token: string; onDone: () => void }) {
+export default function ResetPasswordPage({ token }: { token: string }) {
   const [pw, setPw] = useState("")
   const [pw2, setPw2] = useState("")
   const [done, setDone] = useState(false)
@@ -33,10 +34,10 @@ export default function ResetPasswordPage({ token, onDone }: { token: string; on
             <div className="text-4xl mb-4">✅</div>
             <p className="text-white font-medium mb-2">비밀번호가 변경됐습니다</p>
             <p className="text-gray-400 text-sm mb-6">새 비밀번호로 로그인해주세요.</p>
-            <button onClick={onDone}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-3 font-medium transition-colors">
+            <Link to="/login"
+              className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-3 font-medium transition-colors">
               로그인하러 가기
-            </button>
+            </Link>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
