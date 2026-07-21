@@ -17,6 +17,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   const [loading, setLoading] = useState(false)
   const [agreedTerms, setAgreedTerms] = useState(false)
   const [agreedPrivacy, setAgreedPrivacy] = useState(false)
+  const needsConsent = view === "register" && (!agreedTerms || !agreedPrivacy)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -124,7 +125,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
 
               {error && <p className="text-red-400 text-sm">{error}</p>}
               <button type="submit"
-                disabled={loading || (view === "register" && (!agreedTerms || !agreedPrivacy))}
+                disabled={loading || needsConsent}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg py-3 font-medium transition-colors">
                 {loading ? "처리 중..." : view === "login" ? "로그인" : "회원가입"}
               </button>
@@ -139,7 +140,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
               </div>
             </div>
 
-            {view === "register" && (!agreedTerms || !agreedPrivacy) ? (
+            {needsConsent ? (
               <div className="text-xs text-gray-500 text-center py-3 border border-gray-700 rounded-lg">
                 약관에 동의하면 Google 로그인을 이용할 수 있습니다.
               </div>
