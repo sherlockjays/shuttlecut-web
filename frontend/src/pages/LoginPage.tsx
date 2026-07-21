@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { auth } from "@/api"
+import type { VerifyBanner } from "@/models/auth"
 
 interface Props {
-  verifyBanner: "success" | "fail" | "google_error" | null
+  verifyBanner: VerifyBanner
   onClearBanner: () => void
 }
 
