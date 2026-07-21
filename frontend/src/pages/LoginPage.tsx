@@ -39,6 +39,8 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (view === "registered") return;
+    
     setError(""); setLoading(true)
     try {
       const res = view === "login"
