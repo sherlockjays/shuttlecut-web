@@ -29,10 +29,13 @@ export async function apiFetch<T = unknown>(path: string, opts: RequestInit = {}
 export const auth = {
   register: (email: string, password: string) =>
     apiFetch<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password }) }),
-  login: (email: string, password: string): Promise<LoginResponse> => {
+  login: (email: string, password: string) => {
     const form = new URLSearchParams({ username: email, password })
-    return fetch(`${BASE}/api/auth/login`, { method: "POST", body: form })
-      .then(r => r.json())
+    return apiFetch<LoginResponse>("/api/auth/login", {
+      method: "POST",
+      body: form,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    })
   },
   me: (): Promise<UserInfo> =>
     apiFetch<UserInfo>("/api/auth/me"),

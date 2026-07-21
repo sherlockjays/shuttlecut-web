@@ -45,14 +45,10 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
     try {
       if (view === "login") {
         const res = await auth.login(email, pw)
-        const token = res.access_token
-        if (!token) throw new Error(res.detail || "인증 실패")
-        saveToken(token)
+        saveToken(res.access_token)
         navigate("/projects")
       } else {
-        const res = await auth.register(email, pw)
-        const token = res.token
-        if (!token) throw new Error("인증 실패")
+        await auth.register(email, pw)
         setView("registered")
       }
     } catch (e: any) {
