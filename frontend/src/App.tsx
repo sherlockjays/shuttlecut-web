@@ -3,13 +3,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
 import { RequireAuth } from "@/components/AuthGuard"
 import AppLayout from "@/components/AppLayout"
+import DashboardPage from "@/pages/DashboardPage"
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage"
 import PricingPage from "@/pages/PricingPage"
 import GuidePage from "@/pages/GuidePage"
 import MyPage from "@/pages/MyPage"
 import AdminPage from "@/pages/AdminPage"
 import TermsPage from "@/pages/TermsPage"
 import PrivacyPage from "@/pages/PrivacyPage"
-import { RootHandler, LoginRoute, ForgotPasswordRoute, ResetPasswordRoute, ProjectsRoute, EditorRoute } from "@/routes"
+import { RootHandler, LoginRoute, ResetPasswordRoute, EditorRoute } from "@/routes"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -22,12 +24,12 @@ export default function App() {
         <Routes>
           <Route path="/" element={<RootHandler />} />
           <Route path="/login" element={<LoginRoute />} />
-          <Route path="/forgot-password" element={<ForgotPasswordRoute />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordRoute />} />
           <Route element={<RequireAuth />}>
             <Route path="/editor/:projectId" element={<EditorRoute />} />
             <Route element={<AppLayout />}>
-              <Route path="/projects" element={<ProjectsRoute />} />
+              <Route path="/projects" element={<DashboardPage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/guide" element={<GuidePage />} />
               <Route path="/mypage" element={<MyPage />} />

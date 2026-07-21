@@ -1,7 +1,8 @@
 import { useState } from "react"
+import { Link } from "react-router-dom"
 import { auth } from "@/api"
 
-export default function ForgotPasswordPage({ onBack }: { onBack: () => void }) {
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -35,10 +36,10 @@ export default function ForgotPasswordPage({ onBack }: { onBack: () => void }) {
               비밀번호 재설정 링크를 보냈습니다.<br />
               스팸함도 확인해보세요.
             </p>
-            <button onClick={onBack}
-              className="w-full bg-gray-700 hover:bg-gray-600 text-white rounded-lg py-3 text-sm transition-colors">
+            <Link to="/login"
+              className="block w-full text-center bg-gray-700 hover:bg-gray-600 text-white rounded-lg py-3 text-sm transition-colors">
               로그인으로 돌아가기
-            </button>
+            </Link>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
@@ -56,10 +57,10 @@ export default function ForgotPasswordPage({ onBack }: { onBack: () => void }) {
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg py-3 font-medium transition-colors">
               {loading ? "전송 중..." : "재설정 링크 보내기"}
             </button>
-            <button type="button" onClick={onBack}
-              className="w-full text-gray-400 hover:text-white text-sm py-2 transition-colors">
+            <Link to="/login"
+              className="block w-full text-center text-gray-400 hover:text-white text-sm py-2 transition-colors">
               로그인으로 돌아가기
-            </button>
+            </Link>
           </form>
         )}
       </div>

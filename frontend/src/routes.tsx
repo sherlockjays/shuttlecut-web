@@ -2,9 +2,7 @@ import { useEffect } from "react"
 import { Navigate, useNavigate, useSearchParams, useParams } from "react-router-dom"
 import { auth } from "@/api"
 import LoginPage from "@/pages/LoginPage"
-import DashboardPage from "@/pages/DashboardPage"
 import EditorPage from "@/pages/EditorPage"
-import ForgotPasswordPage from "@/pages/ForgotPasswordPage"
 import ResetPasswordPage from "@/pages/ResetPasswordPage"
 
 // 루트 경로: OAuth 콜백 처리 및 리다이렉트
@@ -51,7 +49,6 @@ export function RootHandler() {
 }
 
 export function LoginRoute() {
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   if (localStorage.getItem("token")) return <Navigate to="/projects" replace />
@@ -63,35 +60,21 @@ export function LoginRoute() {
 
   return (
     <LoginPage
-      onLogin={() => navigate("/projects")}
-      onForgotPassword={() => navigate("/forgot-password")}
       verifyBanner={verifyBanner as "success" | "fail" | "google_error" | null}
       onClearBanner={() => setSearchParams({}, { replace: true })}
     />
   )
 }
 
-export function ForgotPasswordRoute() {
-  const navigate = useNavigate()
-  return <ForgotPasswordPage onBack={() => navigate("/login")} />
-}
-
 export function ResetPasswordRoute() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const token = searchParams.get("token")
   if (!token) return <Navigate to="/login" replace />
-  return <ResetPasswordPage token={token} onDone={() => navigate("/login")} />
-}
-
-export function ProjectsRoute() {
-  const navigate = useNavigate()
-  return <DashboardPage onOpenEditor={(id) => navigate(`/editor/${id}`)} />
+  return <ResetPasswordPage token={token} />
 }
 
 export function EditorRoute() {
   const { projectId } = useParams<{ projectId: string }>()
-  const navigate = useNavigate()
   if (!projectId) return <Navigate to="/projects" replace />
-  return <EditorPage projectId={parseInt(projectId)} onBack={() => navigate("/projects")} />
+  return <EditorPage projectId={parseInt(projectId)} />
 }
