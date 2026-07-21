@@ -39,21 +39,22 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (view === "registered") return;
-    
+    if (view === "registered") return
+
     setError(""); setLoading(true)
     try {
-      const res = view === "login"
-        ? await auth.login(email, pw)
-        : await auth.register(email, pw)
-      const token = res.access_token || res.token
-      if (!token) throw new Error(res.detail || "인증 실패")
-      if (view === "register") {
+      if (view === "login") {
+        const res = await auth.login(email, pw)
+        const token = res.access_token
+        if (!token) throw new Error(res.detail || "인증 실패")
+        saveToken(token)
+        navigate("/projects")
+      } else {
+        const res = await auth.register(email, pw)
+        const token = res.token
+        if (!token) throw new Error("인증 실패")
         setView("registered")
-        return
       }
-      saveToken(token)
-      navigate("/projects")
     } catch (e: any) {
       setError(e.message)
     } finally {

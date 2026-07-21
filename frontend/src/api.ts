@@ -1,6 +1,7 @@
 import type { ExportItem, AdminExport } from "@/models/export"
 import type { UserInfo, AdminUser, Stats } from "@/models/user"
 import type { Project, ProjectData } from "@/models/project"
+import type { LoginResponse, RegisterResponse } from "@/models/auth"
 
 const BASE = import.meta.env.VITE_API_URL || ""
 
@@ -27,8 +28,8 @@ export async function apiFetch<T = unknown>(path: string, opts: RequestInit = {}
 
 export const auth = {
   register: (email: string, password: string) =>
-    apiFetch("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password }) }),
-  login: (email: string, password: string) => {
+    apiFetch<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password }) }),
+  login: (email: string, password: string): Promise<LoginResponse> => {
     const form = new URLSearchParams({ username: email, password })
     return fetch(`${BASE}/api/auth/login`, { method: "POST", body: form })
       .then(r => r.json())
