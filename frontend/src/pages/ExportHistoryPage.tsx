@@ -1,33 +1,37 @@
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
-import { exports as exportsApi } from "@/api"
-import { youtubeStatusOptions } from "@/queries/youtube"
-import { exportsOptions, pollWhileUploading } from "@/queries/exports"
-import ExportRow from "@/pages/ExportRow"
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { exports as exportsApi } from "@/api";
+import { youtubeStatusOptions } from "@/queries/youtube";
+import { exportsOptions, pollWhileUploading } from "@/queries/exports";
+import ExportRow from "@/pages/ExportRow";
 
 export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
-  const { data: yt } = useQuery(youtubeStatusOptions)
-  const ytConnected = yt?.connected ?? false
-  const queryClient = useQueryClient()
+  const { data: yt } = useQuery(youtubeStatusOptions);
+  const ytConnected = yt?.connected ?? false;
+  const queryClient = useQueryClient();
 
   const { data: list = [], isLoading: loading } = useQuery({
     ...exportsOptions,
     refetchInterval: pollWhileUploading,
-  })
+  });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => exportsApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
-  })
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
+  });
 
   const handleDelete = (id: number) => {
-    if (!confirm("이 내보내기 기록과 파일을 삭제하시겠습니까?")) return
-    deleteMutation.mutate(id)
-  }
+    if (!confirm("이 내보내기 기록과 파일을 삭제하시겠습니까?")) return;
+    deleteMutation.mutate(id);
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center gap-4">
-        <button onClick={onBack} className="text-gray-400 hover:text-white text-sm transition-colors">
+        <button
+          onClick={onBack}
+          className="text-gray-400 hover:text-white text-sm transition-colors"
+        >
           ← 대시보드
         </button>
         <h1 className="text-lg font-bold">내보내기 히스토리</h1>
@@ -43,7 +47,7 @@ export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
           </div>
         ) : (
           <div className="grid gap-3">
-            {list.map(item => (
+            {list.map((item) => (
               <ExportRow
                 key={item.id}
                 item={item}
@@ -57,5 +61,5 @@ export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
         )}
       </main>
     </div>
-  )
+  );
 }
