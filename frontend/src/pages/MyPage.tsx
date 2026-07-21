@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
-import { exports as exportsApi, youtube as youtubeApi } from "@/api"
-import { meOptions } from "@/queries/auth"
-import { youtubeStatusOptions } from "@/queries/youtube"
-import { exportsOptions, pollWhileUploading } from "@/queries/exports"
-import { PLAN_LIMITS } from "@/models/plan"
-import ExportRow from "@/pages/ExportRow"
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { exports as exportsApi, youtube as youtubeApi } from "@/api";
+import { meOptions } from "@/queries/auth";
+import { youtubeStatusOptions } from "@/queries/youtube";
+import { exportsOptions, pollWhileUploading } from "@/queries/exports";
+import { PLAN_LIMITS } from "@/models/plan";
+import ExportRow from "@/pages/ExportRow";
 
 type Tab = "exports" | "usage" | "settings";
 
@@ -22,7 +22,8 @@ function ExportsTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => exportsApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
   });
 
   const handleDelete = (id: number) => {

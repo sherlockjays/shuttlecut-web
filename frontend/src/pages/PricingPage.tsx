@@ -35,11 +35,7 @@ const plans = [
     badge: "추천",
     border: "border-blue-500",
     highlight: true,
-    features: [
-      "Basic 기능 포함",
-      "워터마크 없음",
-      "YouTube 업로드",
-    ],
+    features: ["Basic 기능 포함", "워터마크 없음", "YouTube 업로드"],
   },
   {
     name: "Premium",
