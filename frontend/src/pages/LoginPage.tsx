@@ -1,14 +1,14 @@
 import { useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
 import { auth } from "@/api"
 
 interface Props {
-  onLogin: () => void
-  onForgotPassword: () => void
   verifyBanner: "success" | "fail" | "google_error" | null
   onClearBanner: () => void
 }
 
-export default function LoginPage({ onLogin, onForgotPassword, verifyBanner, onClearBanner }: Props) {
+export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
+  const navigate = useNavigate()
   const [email, setEmail] = useState("")
   const [pw, setPw] = useState("")
   const [mode, setMode] = useState<"login" | "register">("login")
@@ -32,7 +32,7 @@ export default function LoginPage({ onLogin, onForgotPassword, verifyBanner, onC
         return
       }
       localStorage.setItem("token", token)
-      onLogin()
+      navigate("/projects")
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -157,10 +157,10 @@ export default function LoginPage({ onLogin, onForgotPassword, verifyBanner, onC
             )}
 
             {mode === "login" && (
-              <button onClick={onForgotPassword}
-                className="w-full text-gray-400 hover:text-white text-sm mt-1 py-1 transition-colors">
+              <Link to="/forgot-password"
+                className="block w-full text-center text-gray-400 hover:text-white text-sm mt-1 py-1 transition-colors">
                 비밀번호를 잊으셨나요?
-              </button>
+              </Link>
             )}
           </>
         )}

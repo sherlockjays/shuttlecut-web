@@ -51,7 +51,6 @@ export function RootHandler() {
 }
 
 export function LoginRoute() {
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   if (localStorage.getItem("token")) return <Navigate to="/projects" replace />
@@ -63,8 +62,6 @@ export function LoginRoute() {
 
   return (
     <LoginPage
-      onLogin={() => navigate("/projects")}
-      onForgotPassword={() => navigate("/forgot-password")}
       verifyBanner={verifyBanner as "success" | "fail" | "google_error" | null}
       onClearBanner={() => setSearchParams({}, { replace: true })}
     />
