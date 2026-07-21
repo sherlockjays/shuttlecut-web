@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { Navigate, useNavigate, useSearchParams, useParams } from "react-router-dom"
+import { auth } from "@/api"
 import LoginPage from "@/pages/LoginPage"
 import DashboardPage from "@/pages/DashboardPage"
 import EditorPage from "@/pages/EditorPage"
@@ -19,8 +20,7 @@ export function RootHandler() {
     }
     const googleCode = searchParams.get("google_code")
     if (googleCode) {
-      fetch(`/api/auth/google/exchange?code=${googleCode}`)
-        .then(r => r.json())
+      auth.exchangeGoogleCode(googleCode)
         .then(data => {
           if (data.access_token) localStorage.setItem("token", data.access_token)
           navigate("/projects", { replace: true })

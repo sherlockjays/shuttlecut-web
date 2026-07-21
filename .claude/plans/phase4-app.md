@@ -60,7 +60,7 @@ App.tsx에 `RootHandler`/`LoginRoute`/`ForgotPasswordRoute`/`ResetPasswordRoute`
 
 ---
 
-### Step 2 — RootHandler의 Google OAuth exchange를 api.ts로 이동 (예정)
+### Step 2 — RootHandler의 Google OAuth exchange를 api.ts로 이동 (완료)
 
 **`frontend/src/api.ts`** `auth` 네임스페이스에 추가:
 ```ts
@@ -95,7 +95,8 @@ auth.exchangeGoogleCode(googleCode)
 
 각 Step 완료 시 개별 커밋:
 1. ✅ `refactor: 인증 가드와 AppLayout chrome을 별도 라우트 계층으로 분리` (`88277d4`)
-2. `refactor: Google OAuth 코드 교환을 api.ts로 이동`
+2. ✅ `refactor: App.tsx의 라우트 wrapper 컴포넌트를 routes.tsx로 분리` (`87c9d2c`)
+3. `refactor: Google OAuth 코드 교환을 api.ts로 이동` (예정)
 
 모든 커밋 완료 후 단일 PR.
 
@@ -112,7 +113,7 @@ npm run build
 - [x] 로그아웃 상태에서 보호된 라우트 접근 시 `/login` 리다이렉트 (Step 1)
 - [x] 로그인 후 `/projects`/`/pricing`/`/guide`/`/mypage`/`/admin`에서 AppLayout chrome 정상 렌더 (Step 1)
 - [x] `/editor/:id`가 chrome 없이 풀스크린 렌더 (Step 1)
-- [ ] Google 로그인 콜백(`/?google_code=...`) 플로우 — 토큰 저장 후 `/projects` 이동, 실패 시 `/login?google_error=1` 이동 (Step 2)
+- [x] Google 로그인 콜백(`/?google_code=...`) 플로우 — 토큰 저장 후 `/projects` 이동, 실패 시 `/login?google_error=1` 이동 (Step 2, `npm run build` 통과로 검증. 실 OAuth 왕복은 미검증)
 
 ---
 
