@@ -39,6 +39,7 @@ export const auth = {
   },
   me: (): Promise<UserInfo> =>
     apiFetch<UserInfo>("/api/auth/me"),
+  googleLoginUrl: () => `${BASE}/api/auth/google`,
   exchangeGoogleCode: (code: string): Promise<{ access_token?: string }> =>
     apiFetch<{ access_token?: string }>(`/api/auth/google/exchange?code=${code}`),
   forgotPassword: (email: string) =>
