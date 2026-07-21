@@ -2,7 +2,6 @@ import { useEffect } from "react"
 import { Navigate, useNavigate, useSearchParams, useParams } from "react-router-dom"
 import { auth } from "@/api"
 import LoginPage from "@/pages/LoginPage"
-import DashboardPage from "@/pages/DashboardPage"
 import EditorPage from "@/pages/EditorPage"
 import ResetPasswordPage from "@/pages/ResetPasswordPage"
 
@@ -72,11 +71,6 @@ export function ResetPasswordRoute() {
   const token = searchParams.get("token")
   if (!token) return <Navigate to="/login" replace />
   return <ResetPasswordPage token={token} />
-}
-
-export function ProjectsRoute() {
-  const navigate = useNavigate()
-  return <DashboardPage onOpenEditor={(id) => navigate(`/editor/${id}`)} />
 }
 
 export function EditorRoute() {

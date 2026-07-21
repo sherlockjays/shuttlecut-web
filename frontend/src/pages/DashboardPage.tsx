@@ -1,15 +1,17 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { Link, useNavigate } from "react-router-dom"
 import { projects } from "@/api"
 import { projectsOptions } from "@/queries/projects"
 
-export default function DashboardPage({ onOpenEditor }: { onOpenEditor: (id: number) => void }) {
+export default function DashboardPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: list = [], isLoading: loading } = useQuery(projectsOptions)
 
   const createNew = async () => {
     const res = await projects.create({ title: "새 프로젝트" })
     queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey })
-    onOpenEditor(res.id)
+    navigate(`/editor/${res.id}`)
   }
 
   const deleteProject = async (id: number) => {
@@ -51,10 +53,10 @@ export default function DashboardPage({ onOpenEditor }: { onOpenEditor: (id: num
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => onOpenEditor(p.id)}
+                  <Link to={`/editor/${p.id}`}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
                     편집
-                  </button>
+                  </Link>
                   <button onClick={() => deleteProject(p.id)}
                     className="bg-gray-700 hover:bg-red-700 text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-colors">
                     삭제
