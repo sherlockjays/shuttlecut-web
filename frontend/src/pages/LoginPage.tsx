@@ -11,10 +11,9 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   const navigate = useNavigate()
   const [email, setEmail] = useState("")
   const [pw, setPw] = useState("")
-  const [mode, setMode] = useState<"login" | "register">("login")
+  const [view, setView] = useState<"login" | "register" | "registered">("login")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-  const [registered, setRegistered] = useState(false)
   const [agreedTerms, setAgreedTerms] = useState(false)
   const [agreedPrivacy, setAgreedPrivacy] = useState(false)
 
@@ -22,13 +21,13 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
     e.preventDefault()
     setError(""); setLoading(true)
     try {
-      const res = mode === "login"
+      const res = view === "login"
         ? await auth.login(email, pw)
         : await auth.register(email, pw)
       const token = res.access_token || res.token
       if (!token) throw new Error(res.detail || "인증 실패")
-      if (mode === "register") {
-        setRegistered(true)
+      if (view === "register") {
+        setView("registered")
         return
       }
       localStorage.setItem("token", token)
@@ -69,7 +68,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
         )}
 
         {/* 회원가입 완료 안내 */}
-        {registered ? (
+        {view === "registered" ? (
           <div className="text-center">
             <div className="text-4xl mb-4">📧</div>
             <p className="text-white font-medium mb-2">가입을 완료해주세요</p>
@@ -78,7 +77,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
               인증 메일을 보냈습니다.<br />
               메일의 링크를 클릭하면 인증이 완료됩니다.
             </p>
-            <button onClick={() => { setRegistered(false); setMode("login") }}
+            <button onClick={() => setView("login")}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-3 font-medium transition-colors">
               로그인하러 가기
             </button>
@@ -87,9 +86,9 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
           <>
             <div className="flex mb-6 bg-gray-700 rounded-lg p-1">
               {(["login", "register"] as const).map(m => (
-                <button key={m} onClick={() => { setMode(m); setError("") }}
+                <button key={m} onClick={() => { setView(m); setError("") }}
                   className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors
-                    ${mode === m ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>
+                    ${view === m ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>
                   {m === "login" ? "로그인" : "회원가입"}
                 </button>
               ))}
@@ -101,7 +100,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
               <input type="password" placeholder="비밀번호 (8자 이상)" value={pw} onChange={e => setPw(e.target.value)}
                 className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" required />
 
-              {mode === "register" && (
+              {view === "register" && (
                 <div className="space-y-2 pt-1">
                   <label className="flex items-start gap-2 cursor-pointer">
                     <input type="checkbox" checked={agreedTerms} onChange={e => setAgreedTerms(e.target.checked)}
@@ -124,9 +123,9 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
 
               {error && <p className="text-red-400 text-sm">{error}</p>}
               <button type="submit"
-                disabled={loading || (mode === "register" && (!agreedTerms || !agreedPrivacy))}
+                disabled={loading || (view === "register" && (!agreedTerms || !agreedPrivacy))}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg py-3 font-medium transition-colors">
-                {loading ? "처리 중..." : mode === "login" ? "로그인" : "회원가입"}
+                {loading ? "처리 중..." : view === "login" ? "로그인" : "회원가입"}
               </button>
             </form>
 
@@ -139,7 +138,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
               </div>
             </div>
 
-            {mode === "register" && (!agreedTerms || !agreedPrivacy) ? (
+            {view === "register" && (!agreedTerms || !agreedPrivacy) ? (
               <div className="text-xs text-gray-500 text-center py-3 border border-gray-700 rounded-lg">
                 약관에 동의하면 Google 로그인을 이용할 수 있습니다.
               </div>
@@ -156,7 +155,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
             </a>
             )}
 
-            {mode === "login" && (
+            {view === "login" && (
               <Link to="/forgot-password"
                 className="block w-full text-center text-gray-400 hover:text-white text-sm mt-1 py-1 transition-colors">
                 비밀번호를 잊으셨나요?
