@@ -81,7 +81,6 @@ export function ProjectsRoute() {
 
 export function EditorRoute() {
   const { projectId } = useParams<{ projectId: string }>()
-  const navigate = useNavigate()
   if (!projectId) return <Navigate to="/projects" replace />
-  return <EditorPage projectId={parseInt(projectId)} onBack={() => navigate("/projects")} />
+  return <EditorPage projectId={parseInt(projectId)} />
 }

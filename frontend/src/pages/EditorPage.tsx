@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import { Link } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { projects, videos, exports as exportsApi } from "@/api"
 import { youtubeStatusOptions } from "@/queries/youtube"
@@ -23,7 +24,7 @@ const CANVAS_THEMES: Record<ThemeId, Record<string, string>> = {
   green: { header_bg: "#0a3c14", row_bg: "#05280a", header_text: "#c8ffd2", name_text: "#b4ff64", score_text: "#b4ff64", border: "#50c864", divider: "#3ca050", row_div: "#3ca050" },
 }
 
-export default function EditorPage({ projectId, onBack }: { projectId: number; onBack: () => void }) {
+export default function EditorPage({ projectId }: { projectId: number }) {
   const [data, setData] = useState<ProjectData>(EMPTY)
   const [videoId, setVideoId] = useState("")
   const [uploading, setUploading] = useState(false)
@@ -328,7 +329,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       {/* 헤더 */}
       <header className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center gap-4">
-        <button onClick={onBack} className="text-gray-400 hover:text-white text-sm">← 대시보드</button>
+        <Link to="/projects" className="text-gray-400 hover:text-white text-sm">← 대시보드</Link>
         <input value={data.title} onChange={e => update({ title: e.target.value })}
           className="bg-transparent text-white font-medium outline-none border-b border-transparent hover:border-gray-600 focus:border-blue-500 px-1" />
         {saved && <span className="text-green-400 text-xs">저장됨 ✓</span>}
