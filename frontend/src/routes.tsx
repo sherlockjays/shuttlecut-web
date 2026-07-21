@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import { Navigate, useNavigate, useSearchParams, useParams } from "react-router-dom"
-import { auth } from "@/api"
+import { auth, saveToken } from "@/api"
 import type { VerifyBanner } from "@/models/auth"
 import LoginPage from "@/pages/LoginPage"
 import EditorPage from "@/pages/EditorPage"
@@ -21,7 +21,7 @@ export function RootHandler() {
     if (googleCode) {
       auth.exchangeGoogleCode(googleCode)
         .then(data => {
-          if (data.access_token) localStorage.setItem("token", data.access_token)
+          if (data.access_token) saveToken(data.access_token)
           navigate("/projects", { replace: true })
         })
         .catch(() => navigate("/login?google_error=1", { replace: true }))

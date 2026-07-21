@@ -12,6 +12,10 @@ function headers() {
   }
 }
 
+export function saveToken(token: string) {
+  localStorage.setItem("token", token)
+}
+
 export async function apiFetch<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...opts, headers: { ...headers(), ...(opts.headers || {}) } })
   if (!res.ok) {

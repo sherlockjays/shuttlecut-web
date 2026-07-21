@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { auth } from "@/api"
+import { auth, saveToken } from "@/api"
 import type { VerifyBanner } from "@/models/auth"
 
 interface Props {
@@ -31,7 +31,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
         setView("registered")
         return
       }
-      localStorage.setItem("token", token)
+      saveToken(token)
       navigate("/projects")
     } catch (e: any) {
       setError(e.message)
