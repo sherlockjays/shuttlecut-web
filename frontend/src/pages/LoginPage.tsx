@@ -8,6 +8,24 @@ interface Props {
   onClearBanner: () => void
 }
 
+const VERIFY_BANNERS: Record<NonNullable<VerifyBanner>, { text: string; className: string; buttonClassName: string }> = {
+  success: {
+    text: "이메일 인증이 완료됐습니다!",
+    className: "bg-green-900/50 border-green-600 text-green-300",
+    buttonClassName: "text-green-400",
+  },
+  fail: {
+    text: "인증 링크가 만료됐습니다. 다시 가입해주세요.",
+    className: "bg-red-900/50 border-red-600 text-red-300",
+    buttonClassName: "text-red-400",
+  },
+  google_error: {
+    text: "Google 로그인에 실패했습니다. 다시 시도해주세요.",
+    className: "bg-red-900/50 border-red-600 text-red-300",
+    buttonClassName: "text-red-400",
+  },
+}
+
 export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   const navigate = useNavigate()
   const [email, setEmail] = useState("")
@@ -50,22 +68,10 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
         </p>
 
         {/* 이메일 인증 배너 */}
-        {verifyBanner === "success" && (
-          <div className="mb-4 bg-green-900/50 border border-green-600 text-green-300 rounded-lg px-4 py-3 text-sm flex justify-between items-center">
-            <span>이메일 인증이 완료됐습니다!</span>
-            <button onClick={onClearBanner} className="text-green-400 hover:text-white ml-2">✕</button>
-          </div>
-        )}
-        {verifyBanner === "fail" && (
-          <div className="mb-4 bg-red-900/50 border border-red-600 text-red-300 rounded-lg px-4 py-3 text-sm flex justify-between items-center">
-            <span>인증 링크가 만료됐습니다. 다시 가입해주세요.</span>
-            <button onClick={onClearBanner} className="text-red-400 hover:text-white ml-2">✕</button>
-          </div>
-        )}
-        {verifyBanner === "google_error" && (
-          <div className="mb-4 bg-red-900/50 border border-red-600 text-red-300 rounded-lg px-4 py-3 text-sm flex justify-between items-center">
-            <span>Google 로그인에 실패했습니다. 다시 시도해주세요.</span>
-            <button onClick={onClearBanner} className="text-red-400 hover:text-white ml-2">✕</button>
+        {verifyBanner && (
+          <div className={`mb-4 border rounded-lg px-4 py-3 text-sm flex justify-between items-center ${VERIFY_BANNERS[verifyBanner].className}`}>
+            <span>{VERIFY_BANNERS[verifyBanner].text}</span>
+            <button onClick={onClearBanner} className={`hover:text-white ml-2 ${VERIFY_BANNERS[verifyBanner].buttonClassName}`}>✕</button>
           </div>
         )}
 
