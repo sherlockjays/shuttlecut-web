@@ -4,7 +4,6 @@ import { auth } from "@/api"
 import LoginPage from "@/pages/LoginPage"
 import DashboardPage from "@/pages/DashboardPage"
 import EditorPage from "@/pages/EditorPage"
-import ForgotPasswordPage from "@/pages/ForgotPasswordPage"
 import ResetPasswordPage from "@/pages/ResetPasswordPage"
 
 // 루트 경로: OAuth 콜백 처리 및 리다이렉트
@@ -66,11 +65,6 @@ export function LoginRoute() {
       onClearBanner={() => setSearchParams({}, { replace: true })}
     />
   )
-}
-
-export function ForgotPasswordRoute() {
-  const navigate = useNavigate()
-  return <ForgotPasswordPage onBack={() => navigate("/login")} />
 }
 
 export function ResetPasswordRoute() {
