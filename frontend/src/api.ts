@@ -1,6 +1,7 @@
 import type { ExportItem, AdminExport } from "@/models/export"
 import type { UserInfo, AdminUser, Stats } from "@/models/user"
 import type { Project, ProjectData } from "@/models/project"
+import type { LoginResponse, RegisterResponse } from "@/models/auth"
 
 const BASE = import.meta.env.VITE_API_URL || ""
 
@@ -10,6 +11,10 @@ function headers() {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
+}
+
+export function saveToken(token: string) {
+  localStorage.setItem("token", token)
 }
 
 export async function apiFetch<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -23,14 +28,18 @@ export async function apiFetch<T = unknown>(path: string, opts: RequestInit = {}
 
 export const auth = {
   register: (email: string, password: string) =>
-    apiFetch("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password }) }),
+    apiFetch<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password }) }),
   login: (email: string, password: string) => {
     const form = new URLSearchParams({ username: email, password })
-    return fetch(`${BASE}/api/auth/login`, { method: "POST", body: form })
-      .then(r => r.json())
+    return apiFetch<LoginResponse>("/api/auth/login", {
+      method: "POST",
+      body: form,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    })
   },
   me: (): Promise<UserInfo> =>
     apiFetch<UserInfo>("/api/auth/me"),
+  googleLoginUrl: () => `${BASE}/api/auth/google`,
   exchangeGoogleCode: (code: string): Promise<{ access_token?: string }> =>
     apiFetch<{ access_token?: string }>(`/api/auth/google/exchange?code=${code}`),
   forgotPassword: (email: string) =>
