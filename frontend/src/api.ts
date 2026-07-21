@@ -31,6 +31,8 @@ export const auth = {
   },
   me: (): Promise<UserInfo> =>
     apiFetch<UserInfo>("/api/auth/me"),
+  exchangeGoogleCode: (code: string): Promise<{ access_token?: string }> =>
+    apiFetch<{ access_token?: string }>(`/api/auth/google/exchange?code=${code}`),
   forgotPassword: (email: string) =>
     apiFetch("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
   resetPassword: (token: string, new_password: string) =>
