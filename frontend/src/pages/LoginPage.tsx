@@ -70,7 +70,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
         {verifyBanner && (
           <div className={`mb-4 border rounded-lg px-4 py-3 text-sm flex justify-between items-center ${VERIFY_BANNERS[verifyBanner].className}`}>
             <span>{VERIFY_BANNERS[verifyBanner].text}</span>
-            <button onClick={onClearBanner} className={`hover:text-white ml-2 ${VERIFY_BANNERS[verifyBanner].buttonClassName}`}>✕</button>
+            <button onClick={onClearBanner} aria-label="배너 닫기" className={`hover:text-white ml-2 ${VERIFY_BANNERS[verifyBanner].buttonClassName}`}>✕</button>
           </div>
         )}
 
@@ -91,9 +91,10 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
           </div>
         ) : (
           <>
-            <div className="flex mb-6 bg-gray-700 rounded-lg p-1">
+            <div role="tablist" aria-label="로그인/회원가입 전환" className="flex mb-6 bg-gray-700 rounded-lg p-1">
               {(["login", "register"] as const).map(m => (
-                <button key={m} onClick={() => { setView(m); setError("") }}
+                <button key={m} id={`tab-${m}`} role="tab" aria-selected={view === m} aria-controls="auth-panel"
+                  onClick={() => { setView(m); setError("") }}
                   className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors
                     ${view === m ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>
                   {m === "login" ? "로그인" : "회원가입"}
@@ -101,10 +102,13 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
               ))}
             </div>
 
+            <div id="auth-panel" role="tabpanel" aria-labelledby={`tab-${view}`}>
             <form onSubmit={submit} className="space-y-4">
-              <input type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)}
+              <label htmlFor="email" className="sr-only">이메일</label>
+              <input id="email" type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)}
                 className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" required />
-              <input type="password" placeholder="비밀번호 (8자 이상)" value={pw} onChange={e => setPw(e.target.value)}
+              <label htmlFor="password" className="sr-only">비밀번호</label>
+              <input id="password" type="password" placeholder="비밀번호 (8자 이상)" value={pw} onChange={e => setPw(e.target.value)}
                 className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" required />
 
               {view === "register" && (
@@ -152,7 +156,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
             ) : (
             <a href={auth.googleLoginUrl()}
               className="flex items-center justify-center gap-3 w-full bg-white hover:bg-gray-100 text-gray-800 rounded-lg py-3 font-medium transition-colors text-sm">
-              <svg viewBox="0 0 24 24" className="w-5 h-5" xmlns="http://www.w3.org/2000/svg">
+              <svg viewBox="0 0 24 24" className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -168,6 +172,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
                 비밀번호를 잊으셨나요?
               </Link>
             )}
+            </div>
           </>
         )}
       </div>
