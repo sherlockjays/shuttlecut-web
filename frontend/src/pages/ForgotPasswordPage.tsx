@@ -1,25 +1,24 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { auth } from "@/api";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const submit = async (e: React.FormEvent) => {
+  const {
+    mutate: submitForgotPassword,
+    isPending,
+    error,
+  } = useMutation({
+    mutationFn: () => auth.forgotPassword(email),
+    onSuccess: () => setSent(true),
+  });
+
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      await auth.forgotPassword(email);
-      setSent(true);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    submitForgotPassword();
   };
 
   return (
@@ -61,13 +60,13 @@ export default function ForgotPasswordPage() {
               className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && <p className="text-red-400 text-sm">{error.message}</p>}
             <button
               type="submit"
-              disabled={loading}
+              disabled={isPending}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg py-3 font-medium transition-colors"
             >
-              {loading ? "전송 중..." : "재설정 링크 보내기"}
+              {isPending ? "전송 중..." : "재설정 링크 보내기"}
             </button>
             <Link
               to="/login"
