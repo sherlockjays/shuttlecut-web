@@ -62,7 +62,10 @@ export default function ResetPasswordPage({ token }: { token: string }) {
               type="password"
               placeholder="새 비밀번호 (6자 이상)"
               value={pw}
-              onChange={(e) => setPw(e.target.value)}
+              onChange={(e) => {
+                setPw(e.target.value);
+                setMismatchError("");
+              }}
               className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               minLength={6}
               required
@@ -71,7 +74,10 @@ export default function ResetPasswordPage({ token }: { token: string }) {
               type="password"
               placeholder="비밀번호 확인"
               value={pw2}
-              onChange={(e) => setPw2(e.target.value)}
+              onChange={(e) => {
+                setPw2(e.target.value);
+                setMismatchError("");
+              }}
               className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
