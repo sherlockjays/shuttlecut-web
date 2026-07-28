@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { auth } from "@/api";
 
@@ -6,26 +7,28 @@ export default function ResetPasswordPage({ token }: { token: string }) {
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [done, setDone] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [mismatchError, setMismatchError] = useState("");
 
-  const submit = async (e: React.FormEvent) => {
+  const {
+    mutate: submitReset,
+    isPending,
+    error,
+  } = useMutation({
+    mutationFn: () => auth.resetPassword(token, pw),
+    onSuccess: () => setDone(true),
+  });
+
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (pw !== pw2) {
-      setError("비밀번호가 일치하지 않습니다.");
+      setMismatchError("비밀번호가 일치하지 않습니다.");
       return;
     }
-    setError("");
-    setLoading(true);
-    try {
-      await auth.resetPassword(token, pw);
-      setDone(true);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    setMismatchError("");
+    submitReset();
   };
+
+  const errorMessage = mismatchError || error?.message;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
@@ -72,13 +75,15 @@ export default function ResetPasswordPage({ token }: { token: string }) {
               className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {errorMessage && (
+              <p className="text-red-400 text-sm">{errorMessage}</p>
+            )}
             <button
               type="submit"
-              disabled={loading}
+              disabled={isPending}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg py-3 font-medium transition-colors"
             >
-              {loading ? "변경 중..." : "비밀번호 변경"}
+              {isPending ? "변경 중..." : "비밀번호 변경"}
             </button>
           </form>
         )}
