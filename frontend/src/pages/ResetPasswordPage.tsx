@@ -18,13 +18,24 @@ export default function ResetPasswordPage({ token }: { token: string }) {
     onSuccess: () => setDone(true),
   });
 
+  const handlePwChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.value;
+    setPw(next);
+    setMismatchError(pw2 && next !== pw2 ? "비밀번호가 일치하지 않습니다." : "");
+  };
+
+  const handlePw2Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.value;
+    setPw2(next);
+    setMismatchError(next && pw !== next ? "비밀번호가 일치하지 않습니다." : "");
+  };
+
   const submit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (pw !== pw2) {
       setMismatchError("비밀번호가 일치하지 않습니다.");
       return;
     }
-    setMismatchError("");
     submitReset();
   };
 
@@ -62,10 +73,7 @@ export default function ResetPasswordPage({ token }: { token: string }) {
               type="password"
               placeholder="새 비밀번호 (6자 이상)"
               value={pw}
-              onChange={(e) => {
-                setPw(e.target.value);
-                setMismatchError("");
-              }}
+              onChange={handlePwChange}
               className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               minLength={6}
               required
@@ -74,10 +82,7 @@ export default function ResetPasswordPage({ token }: { token: string }) {
               type="password"
               placeholder="비밀번호 확인"
               value={pw2}
-              onChange={(e) => {
-                setPw2(e.target.value);
-                setMismatchError("");
-              }}
+              onChange={handlePw2Change}
               className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
