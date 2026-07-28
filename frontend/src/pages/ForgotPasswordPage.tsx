@@ -16,7 +16,7 @@ export default function ForgotPasswordPage() {
     onSuccess: () => setSent(true),
   });
 
-  const submit = (e: React.FormEvent) => {
+  const submit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     submitForgotPassword();
   };

@@ -61,7 +61,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
 
   const activeMutation = view === "register" ? registerMutation : loginMutation;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (view === "registered") return;
     activeMutation.mutate();

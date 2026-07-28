@@ -18,7 +18,7 @@ export default function ResetPasswordPage({ token }: { token: string }) {
     onSuccess: () => setDone(true),
   });
 
-  const submit = (e: React.FormEvent) => {
+  const submit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (pw !== pw2) {
       setMismatchError("비밀번호가 일치하지 않습니다.");
