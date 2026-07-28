@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { auth, saveToken } from "@/api";
 import type { VerifyBanner } from "@/models/auth";
@@ -36,32 +37,34 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   const [view, setView] = useState<"login" | "register" | "registered">(
     "login",
   );
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [agreedPrivacy, setAgreedPrivacy] = useState(false);
   const needsConsent = view === "register" && (!agreedTerms || !agreedPrivacy);
 
-  const submit = async (e: React.FormEvent) => {
+  const loginMutation = useMutation({
+    mutationFn: () => auth.login(email, pw),
+    onSuccess: (res) => {
+      saveToken(res.access_token);
+      navigate("/projects");
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: () => auth.register(email, pw),
+    onSuccess: () => {
+      // pw만 초기화: email은 "registered" 화면에서 발송 대상 표시 및
+      // 로그인 탭 복귀 시 재입력 방지를 위해 그대로 유지
+      setPw("");
+      setView("registered");
+    },
+  });
+
+  const activeMutation = view === "register" ? registerMutation : loginMutation;
+
+  const submit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (view === "registered") return;
-
-    setError("");
-    setLoading(true);
-    try {
-      if (view === "login") {
-        const res = await auth.login(email, pw);
-        saveToken(res.access_token);
-        navigate("/projects");
-      } else {
-        await auth.register(email, pw);
-        setView("registered");
-      }
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    activeMutation.mutate();
   };
 
   return (
@@ -124,7 +127,8 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
                   aria-controls="auth-panel"
                   onClick={() => {
                     setView(m);
-                    setError("");
+                    loginMutation.reset();
+                    registerMutation.reset();
                   }}
                   className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors
                     ${view === m ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}
@@ -209,13 +213,17 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
                   </fieldset>
                 )}
 
-                {error && <p className="text-red-400 text-sm">{error}</p>}
+                {activeMutation.error && (
+                  <p className="text-red-400 text-sm">
+                    {activeMutation.error.message}
+                  </p>
+                )}
                 <button
                   type="submit"
-                  disabled={loading || needsConsent}
+                  disabled={activeMutation.isPending || needsConsent}
                   className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg py-3 font-medium transition-colors"
                 >
-                  {loading
+                  {activeMutation.isPending
                     ? "처리 중..."
                     : view === "login"
                       ? "로그인"
