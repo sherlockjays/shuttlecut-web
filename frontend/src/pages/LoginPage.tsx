@@ -16,9 +16,8 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   const [view, setView] = useState<"login" | "register" | "registered">(
     "login",
   );
-  const [agreedTerms, setAgreedTerms] = useState(false);
-  const [agreedPrivacy, setAgreedPrivacy] = useState(false);
-  const needsConsent = view === "register" && (!agreedTerms || !agreedPrivacy);
+  const [allAgreed, setAllAgreed] = useState(false);
+  const needsConsent = view === "register" && !allAgreed;
 
   const loginMutation = useMutation({
     mutationFn: () => auth.login(email, pw),
@@ -149,47 +148,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
                 />
 
                 {view === "register" && (
-                  <fieldset className="border-0 p-0 m-0 space-y-2 pt-1">
-                    <legend className="sr-only">필수 동의 항목</legend>
-                    <label className="flex items-start gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={agreedTerms}
-                        onChange={(e) => setAgreedTerms(e.target.checked)}
-                        className="mt-0.5 accent-blue-500"
-                      />
-                      <span className="text-xs text-gray-400">
-                        (필수){" "}
-                        <a
-                          href="/terms"
-                          target="_blank"
-                          className="text-blue-400 hover:underline"
-                        >
-                          이용약관
-                        </a>
-                        에 동의합니다.
-                      </span>
-                    </label>
-                    <label className="flex items-start gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={agreedPrivacy}
-                        onChange={(e) => setAgreedPrivacy(e.target.checked)}
-                        className="mt-0.5 accent-blue-500"
-                      />
-                      <span className="text-xs text-gray-400">
-                        (필수){" "}
-                        <a
-                          href="/privacy"
-                          target="_blank"
-                          className="text-blue-400 hover:underline"
-                        >
-                          개인정보처리방침
-                        </a>
-                        에 동의합니다.
-                      </span>
-                    </label>
-                  </fieldset>
+                  <ConsentFields onChange={setAllAgreed} />
                 )}
 
                 {activeMutation.error && (
@@ -268,5 +227,60 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
         )}
       </div>
     </main>
+  );
+}
+
+function ConsentFields({ onChange }: { onChange: (agreed: boolean) => void }) {
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [agreedPrivacy, setAgreedPrivacy] = useState(false);
+
+  return (
+    <fieldset className="border-0 p-0 m-0 space-y-2 pt-1">
+      <legend className="sr-only">필수 동의 항목</legend>
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={agreedTerms}
+          onChange={(e) => {
+            setAgreedTerms(e.target.checked);
+            onChange(e.target.checked && agreedPrivacy);
+          }}
+          className="mt-0.5 accent-blue-500"
+        />
+        <span className="text-xs text-gray-400">
+          (필수){" "}
+          <a
+            href="/terms"
+            target="_blank"
+            className="text-blue-400 hover:underline"
+          >
+            이용약관
+          </a>
+          에 동의합니다.
+        </span>
+      </label>
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={agreedPrivacy}
+          onChange={(e) => {
+            setAgreedPrivacy(e.target.checked);
+            onChange(agreedTerms && e.target.checked);
+          }}
+          className="mt-0.5 accent-blue-500"
+        />
+        <span className="text-xs text-gray-400">
+          (필수){" "}
+          <a
+            href="/privacy"
+            target="_blank"
+            className="text-blue-400 hover:underline"
+          >
+            개인정보처리방침
+          </a>
+          에 동의합니다.
+        </span>
+      </label>
+    </fieldset>
   );
 }
