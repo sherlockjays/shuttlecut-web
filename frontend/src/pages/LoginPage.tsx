@@ -10,36 +10,7 @@ interface Props {
 }
 
 export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
-  const [view, setView] = useState<"login" | "register">("login");
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
-  const [allAgreed, setAllAgreed] = useState(false);
-  const needsConsent = view === "register" && !allAgreed;
-
-  const loginMutation = useMutation({
-    mutationFn: () => auth.login(email, pw),
-    onSuccess: (res) => {
-      saveToken(res.access_token);
-      navigate("/projects");
-    },
-  });
-
-  const registerMutation = useMutation({
-    mutationFn: () => auth.register(email, pw),
-    onSuccess: () => {
-      setPw("");
-      setRegisteredEmail(email);
-    },
-  });
-
-  const activeMutation = view === "register" ? registerMutation : loginMutation;
-
-  const submit = (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    activeMutation.mutate();
-  };
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-900">
@@ -67,150 +38,180 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
           </div>
         )}
 
-        {/* 회원가입 완료 안내 */}
         {registeredEmail ? (
           <RegisteredNotice
             email={registeredEmail}
             onBack={() => setRegisteredEmail(null)}
           />
         ) : (
-          <>
-            <div
-              role="tablist"
-              aria-label="로그인/회원가입 전환"
-              className="flex mb-6 bg-gray-700 rounded-lg p-1"
-            >
-              {(["login", "register"] as const).map((m) => (
-                <button
-                  key={m}
-                  id={`tab-${m}`}
-                  role="tab"
-                  aria-selected={view === m}
-                  aria-controls="auth-panel"
-                  onClick={() => {
-                    setView(m);
-                    loginMutation.reset();
-                    registerMutation.reset();
-                  }}
-                  className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors
-                    ${view === m ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}
-                >
-                  {m === "login" ? "로그인" : "회원가입"}
-                </button>
-              ))}
-            </div>
-
-            <div
-              id="auth-panel"
-              role="tabpanel"
-              aria-labelledby={`tab-${view}`}
-            >
-              <form onSubmit={submit} className="space-y-4">
-                <label htmlFor="email" className="sr-only">
-                  이메일
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="이메일"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                <label htmlFor="password" className="sr-only">
-                  비밀번호
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  placeholder="비밀번호 (8자 이상)"
-                  value={pw}
-                  onChange={(e) => setPw(e.target.value)}
-                  className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-
-                {view === "register" && (
-                  <ConsentFields onChange={setAllAgreed} />
-                )}
-
-                {activeMutation.error && (
-                  <p className="text-red-400 text-sm">
-                    {activeMutation.error.message}
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  disabled={activeMutation.isPending || needsConsent}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg py-3 font-medium transition-colors"
-                >
-                  {activeMutation.isPending
-                    ? "처리 중..."
-                    : view === "login"
-                      ? "로그인"
-                      : "회원가입"}
-                </button>
-              </form>
-
-              <div className="relative my-2">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-600" />
-                </div>
-                <div className="relative flex justify-center text-xs text-gray-500">
-                  <span className="bg-gray-800 px-2">또는</span>
-                </div>
-              </div>
-
-              {needsConsent ? (
-                <div className="text-xs text-gray-500 text-center py-3 border border-gray-700 rounded-lg">
-                  약관에 동의하면 Google 로그인을 이용할 수 있습니다.
-                </div>
-              ) : (
-                <a
-                  href={auth.googleLoginUrl()}
-                  className="flex items-center justify-center gap-3 w-full bg-white hover:bg-gray-100 text-gray-800 rounded-lg py-3 font-medium transition-colors text-sm"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="w-5 h-5"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      fill="#4285F4"
-                    />
-                    <path
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      fill="#34A853"
-                    />
-                    <path
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      fill="#FBBC05"
-                    />
-                    <path
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      fill="#EA4335"
-                    />
-                  </svg>
-                  Google로 로그인
-                </a>
-              )}
-
-              {view === "login" && (
-                <Link
-                  to="/forgot-password"
-                  className="block w-full text-center text-gray-400 hover:text-white text-sm mt-1 py-1 transition-colors"
-                >
-                  비밀번호를 잊으셨나요?
-                </Link>
-              )}
-            </div>
-          </>
+          <AuthForm onRegisterSuccess={setRegisteredEmail} />
         )}
       </div>
     </main>
+  );
+}
+
+function AuthForm({
+  onRegisterSuccess,
+}: {
+  onRegisterSuccess: (email: string) => void;
+}) {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [tab, setTab] = useState<"login" | "register">("login");
+  const [allAgreed, setAllAgreed] = useState(false);
+  const needsConsent = tab === "register" && !allAgreed;
+
+  const loginMutation = useMutation({
+    mutationFn: () => auth.login(email, pw),
+    onSuccess: (res) => {
+      saveToken(res.access_token);
+      navigate("/projects");
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: () => auth.register(email, pw),
+    onSuccess: () => onRegisterSuccess(email),
+  });
+
+  const activeMutation = tab === "register" ? registerMutation : loginMutation;
+
+  const submit = (e: React.SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    activeMutation.mutate();
+  };
+
+  return (
+    <>
+      <div
+        role="tablist"
+        aria-label="로그인/회원가입 전환"
+        className="flex mb-6 bg-gray-700 rounded-lg p-1"
+      >
+        {(["login", "register"] as const).map((tabValue) => (
+          <button
+            key={tabValue}
+            id={`tab-${tabValue}`}
+            role="tab"
+            aria-selected={tab === tabValue}
+            aria-controls="auth-panel"
+            onClick={() => {
+              setTab(tabValue);
+              loginMutation.reset();
+              registerMutation.reset();
+            }}
+            className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors
+              ${tab === tabValue ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}
+          >
+            {tabValue === "login" ? "로그인" : "회원가입"}
+          </button>
+        ))}
+      </div>
+
+      <div id="auth-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
+        <form onSubmit={submit} className="space-y-4">
+          <label htmlFor="email" className="sr-only">
+            이메일
+          </label>
+          <input
+            id="email"
+            type="email"
+            placeholder="이메일"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+          <label htmlFor="password" className="sr-only">
+            비밀번호
+          </label>
+          <input
+            id="password"
+            type="password"
+            placeholder="비밀번호 (8자 이상)"
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+
+          {tab === "register" && <ConsentFields onChange={setAllAgreed} />}
+
+          {activeMutation.error && (
+            <p className="text-red-400 text-sm">
+              {activeMutation.error.message}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={activeMutation.isPending || needsConsent}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg py-3 font-medium transition-colors"
+          >
+            {activeMutation.isPending
+              ? "처리 중..."
+              : tab === "login"
+                ? "로그인"
+                : "회원가입"}
+          </button>
+        </form>
+
+        <div className="relative my-2">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-600" />
+          </div>
+          <div className="relative flex justify-center text-xs text-gray-500">
+            <span className="bg-gray-800 px-2">또는</span>
+          </div>
+        </div>
+
+        {needsConsent ? (
+          <div className="text-xs text-gray-500 text-center py-3 border border-gray-700 rounded-lg">
+            약관에 동의하면 Google 로그인을 이용할 수 있습니다.
+          </div>
+        ) : (
+          <a
+            href={auth.googleLoginUrl()}
+            className="flex items-center justify-center gap-3 w-full bg-white hover:bg-gray-100 text-gray-800 rounded-lg py-3 font-medium transition-colors text-sm"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="w-5 h-5"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                fill="#4285F4"
+              />
+              <path
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                fill="#34A853"
+              />
+              <path
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                fill="#FBBC05"
+              />
+              <path
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                fill="#EA4335"
+              />
+            </svg>
+            Google로 로그인
+          </a>
+        )}
+
+        {tab === "login" && (
+          <Link
+            to="/forgot-password"
+            className="block w-full text-center text-gray-400 hover:text-white text-sm mt-1 py-1 transition-colors"
+          >
+            비밀번호를 잊으셨나요?
+          </Link>
+        )}
+      </div>
+    </>
   );
 }
 
