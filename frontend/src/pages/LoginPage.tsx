@@ -2,33 +2,12 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { auth, saveToken } from "@/api";
-import type { VerifyBanner } from "@/models/auth";
+import { VERIFY_BANNERS, type VerifyBanner } from "@/models/auth";
 
 interface Props {
   verifyBanner: VerifyBanner;
   onClearBanner: () => void;
 }
-
-const VERIFY_BANNERS: Record<
-  NonNullable<VerifyBanner>,
-  { text: string; className: string; buttonClassName: string }
-> = {
-  success: {
-    text: "이메일 인증이 완료됐습니다!",
-    className: "bg-green-900/50 border-green-600 text-green-300",
-    buttonClassName: "text-green-400",
-  },
-  fail: {
-    text: "인증 링크가 만료됐습니다. 다시 가입해주세요.",
-    className: "bg-red-900/50 border-red-600 text-red-300",
-    buttonClassName: "text-red-400",
-  },
-  google_error: {
-    text: "Google 로그인에 실패했습니다. 다시 시도해주세요.",
-    className: "bg-red-900/50 border-red-600 text-red-300",
-    buttonClassName: "text-red-400",
-  },
-};
 
 export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   const navigate = useNavigate();
