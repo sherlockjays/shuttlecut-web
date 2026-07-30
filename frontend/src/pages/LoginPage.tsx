@@ -13,9 +13,8 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
-  const [view, setView] = useState<"login" | "register" | "registered">(
-    "login",
-  );
+  const [view, setView] = useState<"login" | "register">("login");
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
   const [allAgreed, setAllAgreed] = useState(false);
   const needsConsent = view === "register" && !allAgreed;
 
@@ -30,10 +29,8 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   const registerMutation = useMutation({
     mutationFn: () => auth.register(email, pw),
     onSuccess: () => {
-      // pw만 초기화: email은 "registered" 화면에서 발송 대상 표시 및
-      // 로그인 탭 복귀 시 재입력 방지를 위해 그대로 유지
       setPw("");
-      setView("registered");
+      setRegisteredEmail(email);
     },
   });
 
@@ -41,7 +38,6 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
 
   const submit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (view === "registered") return;
     activeMutation.mutate();
   };
 
@@ -72,23 +68,11 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
         )}
 
         {/* 회원가입 완료 안내 */}
-        {view === "registered" ? (
-          <div className="text-center">
-            <div className="text-4xl mb-4">📧</div>
-            <p className="text-white font-medium mb-2">가입을 완료해주세요</p>
-            <p className="text-gray-400 text-sm mb-6">
-              <span className="text-blue-400">{email}</span>로<br />
-              인증 메일을 보냈습니다.
-              <br />
-              메일의 링크를 클릭하면 인증이 완료됩니다.
-            </p>
-            <button
-              onClick={() => setView("login")}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-3 font-medium transition-colors"
-            >
-              로그인하러 가기
-            </button>
-          </div>
+        {registeredEmail ? (
+          <RegisteredNotice
+            email={registeredEmail}
+            onBack={() => setRegisteredEmail(null)}
+          />
         ) : (
           <>
             <div
@@ -227,6 +211,33 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
         )}
       </div>
     </main>
+  );
+}
+
+function RegisteredNotice({
+  email,
+  onBack,
+}: {
+  email: string;
+  onBack: () => void;
+}) {
+  return (
+    <div className="text-center">
+      <div className="text-4xl mb-4">📧</div>
+      <p className="text-white font-medium mb-2">가입을 완료해주세요</p>
+      <p className="text-gray-400 text-sm mb-6">
+        <span className="text-blue-400">{email}</span>로<br />
+        인증 메일을 보냈습니다.
+        <br />
+        메일의 링크를 클릭하면 인증이 완료됩니다.
+      </p>
+      <button
+        onClick={onBack}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-3 font-medium transition-colors"
+      >
+        로그인하러 가기
+      </button>
+    </div>
   );
 }
 
