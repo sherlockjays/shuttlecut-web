@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { projects } from "@/api";
 import { projectsOptions } from "@/queries/projects";
@@ -8,16 +8,27 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const { data: list = [], isLoading: loading } = useQuery(projectsOptions);
 
-  const createNew = async () => {
-    const res = await projects.create({ title: "새 프로젝트" });
-    queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey });
-    navigate(`/editor/${res.id}`);
-  };
+  const createMutation = useMutation({
+    mutationFn: () => projects.create({ title: "새 프로젝트" }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey });
+      navigate(`/editor/${res.id}`);
+    },
+    onError: (e: unknown) =>
+      alert(e instanceof Error ? e.message : "프로젝트 생성 실패"),
+  });
 
-  const deleteProject = async (id: number) => {
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => projects.delete(id),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey }),
+    onError: (e: unknown) =>
+      alert(e instanceof Error ? e.message : "프로젝트 삭제 실패"),
+  });
+
+  const handleDelete = (id: number) => {
     if (!confirm("프로젝트를 삭제하시겠습니까?")) return;
-    await projects.delete(id);
-    queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey });
+    deleteMutation.mutate(id);
   };
 
   return (
@@ -25,8 +36,9 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">내 프로젝트</h2>
         <button
-          onClick={createNew}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          onClick={() => createMutation.mutate()}
+          disabled={createMutation.isPending}
+          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
           + 새 프로젝트
         </button>
@@ -39,8 +51,9 @@ export default function DashboardPage() {
           <p className="text-4xl mb-4">🎬</p>
           <p>아직 프로젝트가 없습니다.</p>
           <button
-            onClick={createNew}
-            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm transition-colors"
+            onClick={() => createMutation.mutate()}
+            disabled={createMutation.isPending}
+            className="mt-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg text-sm transition-colors"
           >
             첫 프로젝트 만들기
           </button>
@@ -66,8 +79,12 @@ export default function DashboardPage() {
                   편집
                 </Link>
                 <button
-                  onClick={() => deleteProject(p.id)}
-                  className="bg-gray-700 hover:bg-red-700 text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                  onClick={() => handleDelete(p.id)}
+                  disabled={
+                    deleteMutation.isPending &&
+                    deleteMutation.variables === p.id
+                  }
+                  className="bg-gray-700 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-colors"
                 >
                   삭제
                 </button>
