@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { projects } from "@/api";
 import { projectsOptions } from "@/queries/projects";
+import type { Project } from "@/models/project";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -61,38 +62,53 @@ export default function DashboardPage() {
       ) : (
         <div className="grid gap-4">
           {list.map((p) => (
-            <div
+            <ProjectCard
               key={p.id}
-              className="bg-gray-800 rounded-xl p-5 flex items-center justify-between hover:bg-gray-750 transition-colors"
-            >
-              <div>
-                <h3 className="font-medium">{p.title}</h3>
-                <p className="text-gray-400 text-sm mt-1">
-                  {new Date(p.updated_at).toLocaleString("ko-KR")}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Link
-                  to={`/editor/${p.id}`}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
-                >
-                  편집
-                </Link>
-                <button
-                  onClick={() => handleDelete(p.id)}
-                  disabled={
-                    deleteMutation.isPending &&
-                    deleteMutation.variables === p.id
-                  }
-                  className="bg-gray-700 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-colors"
-                >
-                  삭제
-                </button>
-              </div>
-            </div>
+              project={p}
+              isDeleting={
+                deleteMutation.isPending && deleteMutation.variables === p.id
+              }
+              onDelete={handleDelete}
+            />
           ))}
         </div>
       )}
     </main>
+  );
+}
+
+function ProjectCard({
+  project,
+  isDeleting,
+  onDelete,
+}: {
+  project: Project;
+  isDeleting: boolean;
+  onDelete: (id: number) => void;
+}) {
+  return (
+    <div className="bg-gray-800 rounded-xl p-5 flex items-center justify-between hover:bg-gray-750 transition-colors">
+      <div>
+        <h3 className="font-medium">{project.title}</h3>
+        <p className="text-gray-400 text-sm mt-1">
+          {new Date(project.updated_at).toLocaleString("ko-KR")}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <Link
+          to={`/editor/${project.id}`}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+        >
+          편집
+        </Link>
+        <button
+          onClick={() => onDelete(project.id)}
+          disabled={isDeleting}
+          className="bg-gray-700 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-colors"
+        >
+          삭제
+        </button>
+      </div>
+    </div>
   );
 }
