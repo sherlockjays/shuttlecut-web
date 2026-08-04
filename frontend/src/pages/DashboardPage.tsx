@@ -35,7 +35,7 @@ export default function DashboardPage() {
   return (
     <main className="max-w-4xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">내 프로젝트</h2>
+        <h1 className="text-2xl font-bold">내 프로젝트</h1>
         <button
           onClick={() => createMutation.mutate()}
           disabled={createMutation.isPending}
@@ -46,10 +46,14 @@ export default function DashboardPage() {
       </div>
 
       {loading ? (
-        <p className="text-gray-400">불러오는 중...</p>
+        <p className="text-gray-400" role="status">
+          불러오는 중...
+        </p>
       ) : list.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
-          <p className="text-4xl mb-4">🎬</p>
+          <p className="text-4xl mb-4" aria-hidden="true">
+            🎬
+          </p>
           <p>아직 프로젝트가 없습니다.</p>
           <button
             onClick={() => createMutation.mutate()}
@@ -60,7 +64,7 @@ export default function DashboardPage() {
           </button>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <ul className="grid gap-4">
           {list.map((p) => (
             <ProjectCard
               key={p.id}
@@ -71,7 +75,7 @@ export default function DashboardPage() {
               onDelete={handleDelete}
             />
           ))}
-        </div>
+        </ul>
       )}
     </main>
   );
@@ -87,7 +91,7 @@ function ProjectCard({
   onDelete: (id: number) => void;
 }) {
   return (
-    <div className="bg-gray-800 rounded-xl p-5 flex items-center justify-between hover:bg-gray-750 transition-colors">
+    <li className="bg-gray-800 rounded-xl p-5 flex items-center justify-between hover:bg-gray-750 transition-colors">
       <div>
         <h3 className="font-medium">{project.title}</h3>
         <p className="text-gray-400 text-sm mt-1">
@@ -99,16 +103,16 @@ function ProjectCard({
           to={`/editor/${project.id}`}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
         >
-          편집
+          <span className="sr-only">{project.title} </span>편집
         </Link>
         <button
           onClick={() => onDelete(project.id)}
           disabled={isDeleting}
           className="bg-gray-700 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-colors"
         >
-          삭제
+          <span className="sr-only">{project.title} </span>삭제
         </button>
       </div>
-    </div>
+    </li>
   );
 }
