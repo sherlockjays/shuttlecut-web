@@ -23,4 +23,4 @@ Write-Host "[shuttlecut] 네이티브 워커 시작 (ENABLE_GPU=1, ENABLE_OPENCL
 Write-Host "[shuttlecut] PYTHONPATH=$env:PYTHONPATH"
 
 Set-Location $BACKEND
-& "$VENV\celery" -A workers.tasks.celery worker --loglevel=info --concurrency=1
+& "$VENV\celery" -A workers.tasks.celery worker --loglevel=info --pool=solo
