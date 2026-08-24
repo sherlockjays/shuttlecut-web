@@ -1,6 +1,3 @@
-** WARNING: connection is not using a post-quantum key exchange algorithm.
-** This session may be vulnerable to "store now, decrypt later" attacks.
-** The server may need to be upgraded. See https://openssh.com/pq.html
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -10,7 +7,9 @@ load_dotenv()
 
 from api.routes import videos, projects, export, auth, admin as admin_route, internal
 from api.routes import youtube as youtube_route
-from api.routes import autoedit as autoedit_route
+# TODO: autoedit.py는 models.database.AutoEditProject 모델이 없어서 아직 로드 불가.
+# 나스에만 있던 원본을 백업 목적으로만 커밋함 (모델 추가 후 재연결 필요)
+# from api.routes import autoedit as autoedit_route
 from models.database import init_db, engine
 
 app = FastAPI(title="ShuttleCut API", version="1.0.0")
@@ -49,7 +48,7 @@ app.include_router(projects.router,          prefix="/api/projects",  tags=["pro
 app.include_router(export.router,            prefix="/api/export",    tags=["export"])
 app.include_router(youtube_route.router,     prefix="/api/youtube",   tags=["youtube"])
 app.include_router(admin_route.router,       prefix="/api/admin",     tags=["admin"])
-app.include_router(autoedit_route.router,    prefix="/api/autoedit",  tags=["autoedit"])
+# app.include_router(autoedit_route.router,    prefix="/api/autoedit",  tags=["autoedit"])
 app.include_router(internal.router,          prefix="/api/internal",  tags=["internal"])
 
 @app.get("/api/health")
