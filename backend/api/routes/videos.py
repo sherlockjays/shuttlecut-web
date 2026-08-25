@@ -92,7 +92,7 @@ def stream_user(token: str = None, db: Session = Depends(get_db)) -> User:
 
 
 @router.get("/preview-status/{video_id}")
-async def preview_status(video_id: str, user: User = Depends(stream_user)):
+async def preview_status(video_id: str, user: User = Depends(current_user)):
     user_dir = STORAGE / str(user.id)
     if (user_dir / f"{video_id}_preview.mp4").exists():
         return {"status": "ready"}
