@@ -15,15 +15,25 @@ CHUNK = 1024 * 1024  # 1MB
 _preview_generating: set[str] = set()
 
 def _create_preview(src: str, dst: str, video_id: str):
+    """dst에 바로 안 쓰고 임시 파일에 쓴 뒤 완료되면 원자적으로 교체.
+    바로 dst에 쓰면 ffmpeg가 파일을 만드는 순간부터 존재는 하지만 아직
+    다 안 써진 상태라, preview_status의 단순 존재 확인(exists())이 이걸
+    "ready"로 오판해 미완성 파일을 프론트에 스트리밍하게 되는 문제가 있었음."""
+    tmp_dst = dst + ".tmp"
     try:
-        subprocess.run([
+        result = subprocess.run([
             "ffmpeg", "-y", "-i", src,
             "-vf", "scale=1280:-2",
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
             "-c:a", "aac", "-ac", "2",
             "-movflags", "+faststart",
-            dst,
+            "-f", "mp4",
+            tmp_dst,
         ], capture_output=True)
+        if result.returncode == 0 and Path(tmp_dst).exists():
+            os.replace(tmp_dst, dst)
+        else:
+            Path(tmp_dst).unlink(missing_ok=True)
     finally:
         _preview_generating.discard(video_id)
 
