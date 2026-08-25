@@ -75,7 +75,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
         scoreboard_theme: p.scoreboard_theme ?? "dark",
       })
       if (p.video_path) {
-        const vid = p.video_path.split("/").pop()?.split(".")[0] || ""
+        const vid = p.video_path.split(/[/\\]/).pop()?.split(".")[0] || ""
         setVideoId(vid)
       }
     })
