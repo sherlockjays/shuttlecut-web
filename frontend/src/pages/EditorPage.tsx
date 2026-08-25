@@ -62,6 +62,7 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
   const [videoDuration, setVideoDuration] = useState(0)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
+  const [previewStatus, setPreviewStatus] = useState<"idle" | "processing" | "ready">("idle")
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const historyRef = useRef<ProjectData[]>([])
@@ -80,6 +81,22 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
     })
     youtubeApi.status().then((s: { connected: boolean }) => setYtConnected(s.connected)).catch(() => {})
   }, [projectId])
+
+  useEffect(() => {
+    if (!videoId) return
+    setPreviewStatus("idle")
+    let timer: ReturnType<typeof setInterval>
+    const check = async () => {
+      try {
+        const res = await videos.previewStatus(videoId)
+        if (res.status === "ready") { setPreviewStatus("ready"); clearInterval(timer) }
+        else if (res.status === "processing") setPreviewStatus("processing")
+      } catch {}
+    }
+    check()
+    timer = setInterval(check, 4000)
+    return () => clearInterval(timer)
+  }, [videoId])
 
   // 자동 저장 (3초 debounce)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -337,6 +354,9 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
       data.level, data.match_name, videoDuration])
 
   const streamUrl = videoId ? videos.streamUrl(videoId) : ""
+  const videoSrc = videoId
+    ? (previewStatus === "ready" ? videos.previewUrl(videoId) : streamUrl)
+    : ""
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -362,9 +382,14 @@ export default function EditorPage({ projectId, onBack }: { projectId: number; o
             </label>
           ) : (
             <div className="relative w-full">
-              <video ref={videoRef} src={streamUrl} controls className="w-full rounded-xl bg-black" style={{ maxHeight: "60vh" }}
+              <video ref={videoRef} src={videoSrc} controls className="w-full rounded-xl bg-black" style={{ maxHeight: "60vh" }}
                 onLoadedMetadata={() => setVideoDuration(videoRef.current?.duration || 0)} />
               <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none rounded-xl" style={{ width: "100%", height: "100%" }} />
+              {previewStatus === "processing" && (
+                <div className="absolute top-2 left-2 bg-black/70 text-yellow-300 text-xs px-2 py-1 rounded">
+                  프리뷰 생성 중... (Chrome에서 재생 불가 시 잠시 후 새로고침)
+                </div>
+              )}
             </div>
           )}
 
