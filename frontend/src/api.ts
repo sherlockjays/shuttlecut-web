@@ -70,6 +70,7 @@ export const exports = {
   start: (projectId: number) => apiFetch(`/api/export/${projectId}`, { method: "POST" }),
   status: (exportId: number) => apiFetch(`/api/export/${exportId}/status`),
   wsUrl: (exportId: number) => {
+    if (BASE) return `${BASE.replace(/^http/, "ws")}/api/export/ws/${exportId}`
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:"
     return `${proto}//${window.location.host}/api/export/ws/${exportId}`
   },
