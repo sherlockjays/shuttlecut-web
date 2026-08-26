@@ -84,47 +84,39 @@ export const projects = {
 export const videos = {
   upload: async (file: File, onProgress?: (pct: number) => void) => {
     const token = localStorage.getItem("token") || "";
+    const form = new FormData();
+    form.append("file", file);
 
-    // 1. Signed URL 발급 + VM 사전 시작
-    const urlRes = await fetch(
-      `${BASE}/api/videos/upload-url?filename=${encodeURIComponent(file.name)}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    );
-    if (!urlRes.ok) throw new Error("업로드 준비 실패");
-    const { upload_url, blob_name, video_id, content_type } =
-      await urlRes.json();
-
-    // 2. GCS 직접 업로드 (NAS 거치지 않음)
-    await new Promise<void>((resolve, reject) => {
+    return new Promise<{
+      video_id: string;
+      path: string;
+      filename: string;
+      fps: number;
+      total_frames: number;
+    }>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("PUT", upload_url);
-      xhr.setRequestHeader("Content-Type", content_type);
+      xhr.open("POST", `${BASE}/api/videos/upload`);
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable)
           onProgress?.(Math.round((e.loaded / e.total) * 100));
       };
-      xhr.onload = () =>
-        xhr.status < 300 ? resolve() : reject(new Error("업로드 실패"));
+      xhr.onload = () => {
+        if (xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+        else reject(new Error("업로드 실패"));
+      };
       xhr.onerror = () => reject(new Error("업로드 실패"));
-      xhr.send(file);
+      xhr.send(form);
     });
-
-    // 3. 확인 + 메타데이터 수신
-    const confirmRes = await fetch(`${BASE}/api/videos/confirm`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ blob_name, video_id, filename: file.name }),
-    });
-    if (!confirmRes.ok) throw new Error("업로드 확인 실패");
-    return confirmRes.json();
   },
   streamUrl: (videoId: string) =>
     `${BASE}/api/videos/stream/${videoId}?token=${localStorage.getItem("token") || ""}`,
+  previewUrl: (videoId: string) =>
+    `${BASE}/api/videos/preview/${videoId}?token=${localStorage.getItem("token") || ""}`,
+  previewStatus: (
+    videoId: string,
+  ): Promise<{ status: "ready" | "processing" | "not_found" }> =>
+    apiFetch(`/api/videos/preview-status/${videoId}`),
 };
 
 export const exports = {
@@ -136,6 +128,7 @@ export const exports = {
   status: (exportId: number): Promise<ExportItem> =>
     apiFetch<ExportItem>(`/api/export/${exportId}/status`),
   wsUrl: (exportId: number) => {
+    if (BASE) return `${BASE.replace(/^http/, "ws")}/api/export/ws/${exportId}`;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     return `${proto}//${window.location.host}/api/export/ws/${exportId}`;
   },
@@ -168,4 +161,68 @@ export const youtube = {
   authUrl: () =>
     `${BASE}/api/youtube/auth?token=${localStorage.getItem("token") || ""}`,
   disconnect: () => apiFetch("/api/youtube/disconnect", { method: "DELETE" }),
+};
+
+export const autoedit = {
+  listProjects: () => apiFetch("/api/autoedit/projects"),
+  getProject: (id: number) => apiFetch(`/api/autoedit/projects/${id}`),
+  deleteProject: (id: number) =>
+    apiFetch(`/api/autoedit/projects/${id}`, { method: "DELETE" }),
+  uploadVideo: (file: File) => {
+    const token = localStorage.getItem("token") || "";
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`${BASE}/api/autoedit/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    }).then((r) =>
+      r.ok
+        ? r.json()
+        : r.json().then((e) => {
+            throw new Error(e.detail);
+          }),
+    );
+  },
+  setCourt: (
+    id: number,
+    court_points: unknown,
+    image_width: number,
+    image_height: number,
+  ) =>
+    apiFetch(`/api/autoedit/projects/${id}/court`, {
+      method: "POST",
+      body: JSON.stringify({ court_points, image_width, image_height }),
+    }),
+  startAnalysis: (
+    id: number,
+    player1_name: string,
+    player2_name: string,
+    game_format: number,
+    match_type: string,
+  ) =>
+    apiFetch(`/api/autoedit/projects/${id}/analyze`, {
+      method: "POST",
+      body: JSON.stringify({
+        player1_name,
+        player2_name,
+        game_format,
+        match_type,
+      }),
+    }),
+  getStatus: (id: number) => apiFetch(`/api/autoedit/projects/${id}/status`),
+  saveRallies: (id: number, rallies: unknown) =>
+    apiFetch(`/api/autoedit/projects/${id}/rallies`, {
+      method: "PUT",
+      body: JSON.stringify({ rallies }),
+    }),
+  createExport: (id: number, opts: object) =>
+    apiFetch(`/api/autoedit/projects/${id}/export`, {
+      method: "POST",
+      body: JSON.stringify(opts),
+    }),
+  thumbUrl: (id: number) =>
+    `${BASE}/api/autoedit/projects/${id}/thumb?token=${localStorage.getItem("token") || ""}`,
+  streamUrl: (id: number) =>
+    `${BASE}/api/autoedit/projects/${id}/stream?token=${localStorage.getItem("token") || ""}`,
 };

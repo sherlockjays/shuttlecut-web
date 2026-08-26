@@ -13,6 +13,13 @@ frontend/.env
 backend/.env
 client_secret.json
 youtube_token.json
+.env.gcp
+.env.local-worker
+.env.native-worker
+
+# 네이티브 워커
+worker-venv/
+backend/fonts/
 
 # Docker volumes
 *.db

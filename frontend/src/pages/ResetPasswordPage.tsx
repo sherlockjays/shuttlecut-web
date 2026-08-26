@@ -21,13 +21,17 @@ export default function ResetPasswordPage({ token }: { token: string }) {
   const handlePwChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const next = e.target.value;
     setPw(next);
-    setMismatchError(pw2 && next !== pw2 ? "비밀번호가 일치하지 않습니다." : "");
+    setMismatchError(
+      pw2 && next !== pw2 ? "비밀번호가 일치하지 않습니다." : "",
+    );
   };
 
   const handlePw2Change = (e: React.ChangeEvent<HTMLInputElement>) => {
     const next = e.target.value;
     setPw2(next);
-    setMismatchError(next && pw !== next ? "비밀번호가 일치하지 않습니다." : "");
+    setMismatchError(
+      next && pw !== next ? "비밀번호가 일치하지 않습니다." : "",
+    );
   };
 
   const submit = (e: React.SubmitEvent<HTMLFormElement>) => {

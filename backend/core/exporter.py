@@ -14,10 +14,12 @@ except ImportError:
 
 from .rally_manager import Rally
 
-# Linux 환경 폰트 (NanumGothic 없으면 기본 폰트 사용)
-FONT_PATH = "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf"
-if not Path(FONT_PATH).exists():
-    FONT_PATH = None  # PIL 기본 폰트 사용
+_FONT_CANDIDATES = [
+    os.getenv("FONT_PATH", ""),
+    "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",  # Linux (Docker)
+    str(Path(__file__).parent.parent / "fonts" / "NanumGothicBold.ttf"),  # 프로젝트 내
+]
+FONT_PATH = next((p for p in _FONT_CANDIDATES if p and Path(p).exists()), None)
 TAIL_SECONDS = 1.5   # 랠리 끝점 이후 추가 시간
 
 THEMES = {
