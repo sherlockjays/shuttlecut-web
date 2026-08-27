@@ -1,0 +1,36 @@
+name: "작업 (Task)"
+description: "버그도 새 기능도 아닌 정리/리팩토링/설정 변경 등의 작업"
+labels: ["task"]
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: 배경
+      description: 왜 필요한가 — 발견 경위, 지금 상태의 문제점
+    validations:
+      required: true
+  - type: textarea
+    id: todo
+    attributes:
+      label: 해야 할 일
+      description: 체크리스트 형태로 작성해주세요
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: 스코프 제외
+      description: 이번엔 하지 않는 것과 그 이유. 관련 이슈가 있다면 링크
+    validations:
+      required: false
+  - type: textarea
+    id: related-files
+    attributes:
+      label: 관련 파일
+      description: 이 작업과 관련된 파일 경로
+      placeholder: |
+        - path/to/file
+    validations:
+      required: false
