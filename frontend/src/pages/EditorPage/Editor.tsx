@@ -78,7 +78,7 @@ const CANVAS_THEMES: Record<ThemeId, Record<string, string>> = {
   },
 };
 
-export default function EditorPage({ projectId }: { projectId: number }) {
+export default function Editor({ projectId }: { projectId: number }) {
   const [data, setData] = useState<ProjectData>(EMPTY);
   const [videoId, setVideoId] = useState("");
   const [uploading, setUploading] = useState(false);

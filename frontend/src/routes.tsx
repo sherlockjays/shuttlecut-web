@@ -1,14 +1,8 @@
 import { useEffect } from "react";
-import {
-  Navigate,
-  useNavigate,
-  useSearchParams,
-  useParams,
-} from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { auth, saveToken } from "@/api";
 import type { VerifyBanner } from "@/models/auth";
 import LoginPage from "@/pages/LoginPage";
-import EditorPage from "@/pages/EditorPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 
 // 루트 경로: OAuth 콜백 처리 및 리다이렉트
@@ -86,8 +80,3 @@ export function ResetPasswordRoute() {
   return <ResetPasswordPage token={token} />;
 }
 
-export function EditorRoute() {
-  const { projectId } = useParams<{ projectId: string }>();
-  if (!projectId) return <Navigate to="/projects" replace />;
-  return <EditorPage projectId={parseInt(projectId)} />;
-}
