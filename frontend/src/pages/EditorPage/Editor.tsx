@@ -191,13 +191,13 @@ export default function Editor({ projectId }: { projectId: number }) {
         setMarking(false);
         return;
       }
-      const rally: Rally = [
-        markStart,
+      const rally: Rally = {
+        start: markStart,
         end,
-        data.player1_score,
-        data.player2_score,
-        0,
-      ];
+        p1Score: data.player1_score,
+        p2Score: data.player2_score,
+        winner: 0,
+      };
       update({ rallies: [...data.rallies, rally] });
       setMarking(false);
     }
@@ -207,13 +207,13 @@ export default function Editor({ projectId }: { projectId: number }) {
   const addScore = (player: 1 | 2) => {
     if (marking) {
       const end = currentFrame();
-      const rally: Rally = [
-        markStart,
+      const rally: Rally = {
+        start: markStart,
         end,
-        data.player1_score,
-        data.player2_score,
-        player,
-      ];
+        p1Score: data.player1_score,
+        p2Score: data.player2_score,
+        winner: player,
+      };
       const p1 = data.player1_score + (player === 1 ? 1 : 0);
       const p2 = data.player2_score + (player === 2 ? 1 : 0);
       update({
@@ -242,7 +242,7 @@ export default function Editor({ projectId }: { projectId: number }) {
     if (data.rallies.length > prev.rallies.length && videoRef.current) {
       const prevLastRally = prev.rallies[prev.rallies.length - 1];
       if (prevLastRally) {
-        videoRef.current.currentTime = prevLastRally[1] / data.fps;
+        videoRef.current.currentTime = prevLastRally.end / data.fps;
       }
     }
     setData(prev);
@@ -596,27 +596,27 @@ export default function Editor({ projectId }: { projectId: number }) {
                   title="랠리 타임라인 - 클릭하면 해당 구간으로 이동"
                 >
                   {data.rallies.map((r, i) => {
-                    const left = (r[0] / totalFrames) * 100;
+                    const left = (r.start / totalFrames) * 100;
                     const width = Math.max(
                       0.5,
-                      ((r[1] - r[0]) / totalFrames) * 100,
+                      ((r.end - r.start) / totalFrames) * 100,
                     );
                     return (
                       <div
                         key={i}
                         onClick={() => {
                           if (videoRef.current)
-                            videoRef.current.currentTime = r[0] / data.fps;
+                            videoRef.current.currentTime = r.start / data.fps;
                         }}
-                        title={`랠리 ${i + 1}: ${r[2]}-${r[3]}`}
+                        title={`랠리 ${i + 1}: ${r.p1Score}-${r.p2Score}`}
                         className="absolute top-0 h-full cursor-pointer hover:brightness-125 transition-all"
                         style={{
                           left: `${left}%`,
                           width: `${width}%`,
                           backgroundColor:
-                            r[4] === 1
+                            r.winner === 1
                               ? "#3b82f6"
-                              : r[4] === 2
+                              : r.winner === 2
                                 ? "#ef4444"
                                 : "#6b7280",
                         }}
@@ -787,14 +787,14 @@ export default function Editor({ projectId }: { projectId: number }) {
                   key={i}
                   onClick={() => {
                     if (videoRef.current)
-                      videoRef.current.currentTime = r[0] / data.fps;
+                      videoRef.current.currentTime = r.start / data.fps;
                   }}
                   className="flex items-center justify-between rounded px-2 py-1.5 text-xs cursor-pointer hover:brightness-125 transition-all"
                   style={{
                     backgroundColor:
-                      r[4] === 1
+                      r.winner === 1
                         ? "#1e3a5f"
-                        : r[4] === 2
+                        : r.winner === 2
                           ? "#5f1e1e"
                           : "#374151",
                   }}
@@ -803,10 +803,10 @@ export default function Editor({ projectId }: { projectId: number }) {
                     랠리 {i + 1}
                   </span>
                   <span
-                    className={`font-mono font-medium ${r[4] === 1 ? "text-blue-300" : r[4] === 2 ? "text-red-300" : "text-gray-300"}`}
+                    className={`font-mono font-medium ${r.winner === 1 ? "text-blue-300" : r.winner === 2 ? "text-red-300" : "text-gray-300"}`}
                   >
-                    {r[2]}-{r[3]} → {r[4] === 1 ? r[2] + 1 : r[2]}-
-                    {r[4] === 2 ? r[3] + 1 : r[3]}
+                    {r.p1Score}-{r.p2Score} → {r.winner === 1 ? r.p1Score + 1 : r.p1Score}-
+                    {r.winner === 2 ? r.p2Score + 1 : r.p2Score}
                   </span>
                   <button
                     onClick={(e) => {
