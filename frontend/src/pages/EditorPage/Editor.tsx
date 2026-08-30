@@ -7,7 +7,7 @@ import { exportStatusOptions } from "@/queries/exports";
 import { type Rally, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, type ThemeId } from "@/models/theme";
 
-const EMPTY: ProjectData = {
+const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
   video_path: "",
   fps: 30,
@@ -79,7 +79,7 @@ const CANVAS_THEMES: Record<ThemeId, Record<string, string>> = {
 };
 
 export default function Editor({ projectId }: { projectId: number }) {
-  const [data, setData] = useState<ProjectData>(EMPTY);
+  const [data, setData] = useState<ProjectData>(DEFAULT_PROJECT_DATA);
   const [videoId, setVideoId] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
@@ -109,7 +109,7 @@ export default function Editor({ projectId }: { projectId: number }) {
   useEffect(() => {
     projects.get(projectId).then((p) => {
       setData({
-        ...EMPTY,
+        ...DEFAULT_PROJECT_DATA,
         ...p,
         scoreboard_scale: p.scoreboard_scale ?? 1.0,
         scoreboard_theme: p.scoreboard_theme ?? "dark",
