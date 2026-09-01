@@ -25,6 +25,13 @@ const DEFAULT_PROJECT_DATA: ProjectData = {
   scoreboard_theme: "dark",
 };
 
+const MATCH_INFO_FIELDS = [
+  { key: "match_date", label: "날짜", placeholder: "YYYY-MM-DD" },
+  { key: "tournament_name", label: "대회명", placeholder: "대회명" },
+  { key: "level", label: "급수", placeholder: "A조, 혼합복식" },
+  { key: "match_name", label: "경기명", placeholder: "32강, 결승" },
+] as const;
+
 const CANVAS_THEMES: Record<ThemeId, Record<string, string>> = {
   dark: {
     header_bg: "#1e1e1e",
@@ -642,18 +649,13 @@ export default function Editor({ projectId }: { projectId: number }) {
               경기 정보
             </h3>
             <div className="space-y-2">
-              {[
-                ["날짜", "match_date", "YYYY-MM-DD"],
-                ["대회명", "tournament_name", "대회명"],
-                ["급수", "level", "A조, 혼합복식"],
-                ["경기명", "match_name", "32강, 결승"],
-              ].map(([label, key, ph]) => (
+              {MATCH_INFO_FIELDS.map(({ key, label, placeholder }) => (
                 <div key={key}>
                   <label className="text-xs text-gray-500">{label}</label>
                   <input
-                    value={(data as any)[key]}
-                    placeholder={ph}
-                    onChange={(e) => update({ [key]: e.target.value } as any)}
+                    value={data[key]}
+                    placeholder={placeholder}
+                    onChange={(e) => update({ [key]: e.target.value })}
                     className="w-full bg-gray-700 text-white text-sm rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 mt-0.5"
                   />
                 </div>
