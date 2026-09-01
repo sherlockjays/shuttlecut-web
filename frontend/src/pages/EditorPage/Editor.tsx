@@ -32,6 +32,15 @@ const MATCH_INFO_FIELDS = [
   { key: "match_name", label: "경기명", placeholder: "32강, 결승" },
 ] as const;
 
+const RALLY_WINNER_COLORS: Record<
+  Rally["winner"],
+  { timelineClass: string; listBgClass: string; listText: string }
+> = {
+  1: { timelineClass: "bg-blue-500", listBgClass: "bg-blue-950", listText: "text-blue-300" },
+  2: { timelineClass: "bg-red-500", listBgClass: "bg-red-900", listText: "text-red-300" },
+  0: { timelineClass: "bg-gray-500", listBgClass: "bg-gray-700", listText: "text-gray-300" },
+};
+
 const CANVAS_THEMES: Record<ThemeId, Record<string, string>> = {
   dark: {
     header_bg: "#1e1e1e",
@@ -616,16 +625,10 @@ export default function Editor({ projectId }: { projectId: number }) {
                             videoRef.current.currentTime = r.start / data.fps;
                         }}
                         title={`랠리 ${i + 1}: ${r.p1Score}-${r.p2Score}`}
-                        className="absolute top-0 h-full cursor-pointer hover:brightness-125 transition-all"
+                        className={`absolute top-0 h-full cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].timelineClass}`}
                         style={{
                           left: `${left}%`,
                           width: `${width}%`,
-                          backgroundColor:
-                            r.winner === 1
-                              ? "#3b82f6"
-                              : r.winner === 2
-                                ? "#ef4444"
-                                : "#6b7280",
                         }}
                       />
                     );
@@ -791,21 +794,13 @@ export default function Editor({ projectId }: { projectId: number }) {
                     if (videoRef.current)
                       videoRef.current.currentTime = r.start / data.fps;
                   }}
-                  className="flex items-center justify-between rounded px-2 py-1.5 text-xs cursor-pointer hover:brightness-125 transition-all"
-                  style={{
-                    backgroundColor:
-                      r.winner === 1
-                        ? "#1e3a5f"
-                        : r.winner === 2
-                          ? "#5f1e1e"
-                          : "#374151",
-                  }}
+                  className={`flex items-center justify-between rounded px-2 py-1.5 text-xs cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].listBgClass}`}
                 >
                   <span className="text-gray-300 w-10 shrink-0">
                     랠리 {i + 1}
                   </span>
                   <span
-                    className={`font-mono font-medium ${r.winner === 1 ? "text-blue-300" : r.winner === 2 ? "text-red-300" : "text-gray-300"}`}
+                    className={`font-mono font-medium ${RALLY_WINNER_COLORS[r.winner].listText}`}
                   >
                     {r.p1Score}-{r.p2Score} → {r.winner === 1 ? r.p1Score + 1 : r.p1Score}-
                     {r.winner === 2 ? r.p2Score + 1 : r.p2Score}
