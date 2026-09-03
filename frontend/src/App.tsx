@@ -11,12 +11,8 @@ import MyPage from "@/pages/MyPage";
 import AdminPage from "@/pages/AdminPage";
 import TermsPage from "@/pages/TermsPage";
 import PrivacyPage from "@/pages/PrivacyPage";
-import {
-  RootHandler,
-  LoginRoute,
-  ResetPasswordRoute,
-  EditorRoute,
-} from "@/routes";
+import EditorPage from "@/pages/EditorPage";
+import { RootHandler, LoginRoute, ResetPasswordRoute } from "@/routes";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -32,7 +28,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordRoute />} />
           <Route element={<RequireAuth />}>
-            <Route path="/editor/:projectId" element={<EditorRoute />} />
+            <Route path="/editor/:projectId" element={<EditorPage />} />
             <Route element={<AppLayout />}>
               <Route path="/projects" element={<DashboardPage />} />
               <Route path="/pricing" element={<PricingPage />} />
