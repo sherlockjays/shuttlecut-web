@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { projects, videos, exports as exportsApi } from "@/api";
+import { videos, exports as exportsApi } from "@/api";
+import { getProject, updateProject } from "@/apis/projects";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
 import { type Rally, type ProjectData } from "@/models/project";
@@ -86,7 +87,7 @@ export default function Editor({ projectId }: { projectId: number }) {
   const futureRef = useRef<ProjectData[]>([]);
 
   useEffect(() => {
-    projects.get(projectId).then((p) => {
+    getProject(projectId).then((p) => {
       setData({
         ...DEFAULT_PROJECT_DATA,
         ...p,
@@ -123,7 +124,7 @@ export default function Editor({ projectId }: { projectId: number }) {
   const save = (d: ProjectData) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      await projects.update(projectId, d);
+      await updateProject(projectId, d);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     }, 3000);
@@ -280,7 +281,7 @@ export default function Editor({ projectId }: { projectId: number }) {
   const startExport = async () => {
     // 미저장 변경사항 즉시 flush
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    await projects.update(projectId, data);
+    await updateProject(projectId, data);
 
     setExportPct(0);
     setExportMsg("시작 중...");

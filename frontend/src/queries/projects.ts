@@ -1,7 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
-import { projects } from "@/api";
+import { listProjects } from "@/apis/projects";
 
 export const projectsOptions = queryOptions({
   queryKey: ["projects"],
-  queryFn: projects.list,
+  queryFn: listProjects,
 });
