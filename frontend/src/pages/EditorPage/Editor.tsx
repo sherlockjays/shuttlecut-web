@@ -5,7 +5,7 @@ import { projects, videos, exports as exportsApi } from "@/api";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
 import { type Rally, type ProjectData } from "@/models/project";
-import { THEMES, SIZES, type ThemeId } from "@/models/theme";
+import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
@@ -30,67 +30,30 @@ const MATCH_INFO_FIELDS = [
   { key: "tournament_name", label: "대회명", placeholder: "대회명" },
   { key: "level", label: "급수", placeholder: "A조, 혼합복식" },
   { key: "match_name", label: "경기명", placeholder: "32강, 결승" },
-] as const;
+] satisfies {
+  key: keyof ProjectData;
+  label: string;
+  placeholder: string;
+}[];
 
 const RALLY_WINNER_COLORS: Record<
   Rally["winner"],
   { timelineClass: string; listBgClass: string; listText: string }
 > = {
-  1: { timelineClass: "bg-blue-500", listBgClass: "bg-blue-950", listText: "text-blue-300" },
-  2: { timelineClass: "bg-red-500", listBgClass: "bg-red-900", listText: "text-red-300" },
-  0: { timelineClass: "bg-gray-500", listBgClass: "bg-gray-700", listText: "text-gray-300" },
-};
-
-const CANVAS_THEMES: Record<ThemeId, Record<string, string>> = {
-  dark: {
-    header_bg: "#1e1e1e",
-    row_bg: "#000000",
-    header_text: "#dcdcdc",
-    name_text: "#ffdc00",
-    score_text: "#ffdc00",
-    border: "#ffffff",
-    divider: "#b4b4b4",
-    row_div: "#c8c8c8",
+  1: {
+    timelineClass: "bg-blue-500",
+    listBgClass: "bg-blue-950",
+    listText: "text-blue-300",
   },
-  light: {
-    header_bg: "#f0f0f0",
-    row_bg: "#ffffff",
-    header_text: "#323232",
-    name_text: "#1e50c8",
-    score_text: "#1e50c8",
-    border: "#323232",
-    divider: "#969696",
-    row_div: "#969696",
+  2: {
+    timelineClass: "bg-red-500",
+    listBgClass: "bg-red-900",
+    listText: "text-red-300",
   },
-  blue: {
-    header_bg: "#002878",
-    row_bg: "#001450",
-    header_text: "#c8dcff",
-    name_text: "#ffdc00",
-    score_text: "#ffdc00",
-    border: "#64a0ff",
-    divider: "#5078c8",
-    row_div: "#5082d2",
-  },
-  red: {
-    header_bg: "#781414",
-    row_bg: "#500000",
-    header_text: "#ffdcdc",
-    name_text: "#ffdc00",
-    score_text: "#ffdc00",
-    border: "#ff6464",
-    divider: "#c85050",
-    row_div: "#c85050",
-  },
-  green: {
-    header_bg: "#0a3c14",
-    row_bg: "#05280a",
-    header_text: "#c8ffd2",
-    name_text: "#b4ff64",
-    score_text: "#b4ff64",
-    border: "#50c864",
-    divider: "#3ca050",
-    row_div: "#3ca050",
+  0: {
+    timelineClass: "bg-gray-500",
+    listBgClass: "bg-gray-700",
+    listText: "text-gray-300",
   },
 };
 
@@ -802,7 +765,8 @@ export default function Editor({ projectId }: { projectId: number }) {
                   <span
                     className={`font-mono font-medium ${RALLY_WINNER_COLORS[r.winner].listText}`}
                   >
-                    {r.p1Score}-{r.p2Score} → {r.winner === 1 ? r.p1Score + 1 : r.p1Score}-
+                    {r.p1Score}-{r.p2Score} →{" "}
+                    {r.winner === 1 ? r.p1Score + 1 : r.p1Score}-
                     {r.winner === 2 ? r.p2Score + 1 : r.p2Score}
                   </span>
                   <button
