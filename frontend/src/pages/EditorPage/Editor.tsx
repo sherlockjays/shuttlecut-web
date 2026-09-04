@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { videos, exports as exportsApi } from "@/api";
-import { getProject, updateProject } from "@/apis/projects";
+import { updateProject } from "@/apis/projects";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
+import { projectOptions } from "@/queries/projects";
 import { type Rally, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 
@@ -86,20 +87,20 @@ export default function Editor({ projectId }: { projectId: number }) {
   const historyRef = useRef<ProjectData[]>([]);
   const futureRef = useRef<ProjectData[]>([]);
 
+  const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
+  const seededRef = useRef<number | null>(null);
+
   useEffect(() => {
-    getProject(projectId).then((p) => {
-      setData({
-        ...DEFAULT_PROJECT_DATA,
-        ...p,
-        scoreboard_scale: p.scoreboard_scale ?? 1.0,
-        scoreboard_theme: p.scoreboard_theme ?? "dark",
-      });
-      if (p.video_path) {
-        const vid = p.video_path.split(/[/\\]/).pop()?.split(".")[0] || "";
-        setVideoId(vid);
-      }
+    if (!fetchedProject || seededRef.current === projectId) return;
+    seededRef.current = projectId;
+    setData({
+      ...DEFAULT_PROJECT_DATA,
+      ...fetchedProject,
+      scoreboard_scale: fetchedProject.scoreboard_scale ?? 1.0,
+      scoreboard_theme: fetchedProject.scoreboard_theme ?? "dark",
     });
-  }, [projectId]);
+    setVideoId(fetchedProject.video_id ?? "");
+  }, [fetchedProject, projectId]);
 
   useEffect(() => {
     if (!videoId) return;
@@ -486,6 +487,11 @@ export default function Editor({ projectId }: { projectId: number }) {
         />
         {saved && <span className="text-green-400 text-xs">저장됨 ✓</span>}
       </header>
+      {isError && (
+        <p className="text-red-400 text-sm px-4 pt-2">
+          프로젝트를 불러오지 못했습니다.
+        </p>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* 왼쪽: 영상 + 컨트롤 */}
