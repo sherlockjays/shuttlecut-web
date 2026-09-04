@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { projects } from "@/api";
+import { createProject, deleteProject } from "@/apis/projects";
 import { projectsOptions } from "@/queries/projects";
 import type { Project } from "@/models/project";
 
@@ -10,7 +10,7 @@ export default function DashboardPage() {
   const { data: list = [], isLoading: loading } = useQuery(projectsOptions);
 
   const createMutation = useMutation({
-    mutationFn: () => projects.create({ title: "새 프로젝트" }),
+    mutationFn: () => createProject({ title: "새 프로젝트" }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey });
       navigate(`/editor/${res.id}`);
@@ -20,7 +20,7 @@ export default function DashboardPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => projects.delete(id),
+    mutationFn: (id: number) => deleteProject(id),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey }),
     onError: (e: unknown) =>

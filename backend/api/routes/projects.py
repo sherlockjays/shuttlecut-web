@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+from pathlib import Path
 
 from models.database import get_db, User, Project
 from api.routes.auth import current_user
@@ -48,7 +49,8 @@ def get_project(pid: int, user: User = Depends(current_user), db: Session = Depe
     p = db.query(Project).filter(Project.id == pid, Project.user_id == user.id).first()
     if not p:
         raise HTTPException(404)
-    return p.__dict__
+    video_id = Path(p.video_path).stem if p.video_path else None
+    return {**p.__dict__, "video_id": video_id}
 
 
 @router.put("/{pid}")

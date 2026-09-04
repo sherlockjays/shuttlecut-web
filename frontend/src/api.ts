@@ -1,12 +1,5 @@
 import type { ExportItem, AdminExport } from "@/models/export";
 import type { UserInfo, AdminUser, Stats } from "@/models/user";
-import {
-  rallyFromWire,
-  rallyToWire,
-  type Project,
-  type ProjectData,
-  type RallyWire,
-} from "@/models/project";
 import type { LoginResponse, RegisterResponse } from "@/models/auth";
 
 const BASE = import.meta.env.VITE_API_URL || "";
@@ -68,28 +61,6 @@ export const auth = {
       method: "POST",
       body: JSON.stringify({ token, new_password }),
     }),
-};
-
-// TODO(#26): 프로젝트 데이터 계층 분리 시 별도 파일로 이동 예정
-export const projects = {
-  list: (): Promise<Project[]> => apiFetch<Project[]>("/api/projects/"),
-  get: async (id: number): Promise<Partial<ProjectData>> => {
-    const raw = await apiFetch<
-      Partial<Omit<ProjectData, "rallies">> & { rallies?: RallyWire[] }
-    >(`/api/projects/${id}`);
-    return { ...raw, rallies: (raw.rallies ?? []).map(rallyFromWire) };
-  },
-  create: (data: object): Promise<{ id: number }> =>
-    apiFetch<{ id: number }>("/api/projects/", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-  update: (id: number, data: ProjectData) =>
-    apiFetch(`/api/projects/${id}`, {
-      method: "PUT",
-      body: JSON.stringify({ ...data, rallies: data.rallies.map(rallyToWire) }),
-    }),
-  delete: (id: number) => apiFetch(`/api/projects/${id}`, { method: "DELETE" }),
 };
 
 export const videos = {
