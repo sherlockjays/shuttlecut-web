@@ -45,3 +45,5 @@ export type ProjectData = {
   scoreboard_scale: number;
   scoreboard_theme: ThemeId;
 };
+
+export type ProjectDetail = ProjectData & { video_id: string | null };

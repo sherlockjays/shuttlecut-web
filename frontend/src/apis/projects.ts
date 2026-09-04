@@ -4,15 +4,16 @@ import {
   rallyToWire,
   type Project,
   type ProjectData,
+  type ProjectDetail,
   type RallyWire,
 } from "@/models/project";
 
 export const listProjects = (): Promise<Project[]> =>
   apiFetch<Project[]>("/api/projects/");
 
-export const getProject = async (id: number): Promise<Partial<ProjectData>> => {
+export const getProject = async (id: number): Promise<Partial<ProjectDetail>> => {
   const raw = await apiFetch<
-    Partial<Omit<ProjectData, "rallies">> & { rallies?: RallyWire[] }
+    Partial<Omit<ProjectDetail, "rallies">> & { rallies?: RallyWire[] }
   >(`/api/projects/${id}`);
   return { ...raw, rallies: (raw.rallies ?? []).map(rallyFromWire) };
 };
