@@ -200,10 +200,13 @@ export default function Editor({ projectId }: { projectId: number }) {
     }
   };
 
-  // 되돌리기
+  // 되돌리기 / 다시하기
+  // 마킹은 undo 스택 밖이라 되돌려도 markStart가 옛 시점에 남는다. 그대로 두면 이후 R로
+  // 종료할 때 end <= markStart 가드에 걸려 랠리가 조용히 생성되지 않으므로 마킹을 끝낸다.
   const handleUndo = () => {
     const moved = undo();
     if (!moved) return;
+    setMarking(false);
     // 랠리가 추가된 것을 되돌리는 경우 → 이전 랠리의 끝 지점으로 이동
     if (
       moved.from.rallies.length > moved.to.rallies.length &&
@@ -214,6 +217,10 @@ export default function Editor({ projectId }: { projectId: number }) {
         videoRef.current.currentTime = prevLastRally.end / moved.to.fps;
       }
     }
+  };
+
+  const handleRedo = () => {
+    if (redo()) setMarking(false);
   };
 
   // 내보내기
@@ -315,7 +322,7 @@ export default function Editor({ projectId }: { projectId: number }) {
         (e.code === "KeyZ" && e.ctrlKey && e.shiftKey) ||
         (e.code === "KeyY" && e.ctrlKey)
       )
-        redo();
+        handleRedo();
       if (e.code === "ArrowLeft") {
         if (videoRef.current)
           videoRef.current.currentTime -= e.shiftKey ? 10 : 5;
@@ -706,7 +713,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                   ↩ 되돌리기
                 </button>
                 <button
-                  onClick={redo}
+                  onClick={handleRedo}
                   disabled={!canRedo}
                   title="다시하기 (Ctrl+Y)"
                   className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 py-1.5 rounded-lg text-xs transition-colors"
