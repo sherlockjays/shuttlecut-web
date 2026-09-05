@@ -5,7 +5,7 @@ import { createDebouncedSaver, type DebouncedSaver } from "../debouncedSaver";
 export const AUTO_SAVE_DELAY_MS = 3000;
 const SAVED_INDICATOR_MS = 2000;
 
-export type SaveStatus = "idle" | "saved";
+export type SaveStatus = "idle" | "saved" | "error";
 
 /**
  * value가 바뀔 때마다 자동으로 저장한다.
@@ -14,22 +14,37 @@ export type SaveStatus = "idle" | "saved";
 export function useAutoSave(
   value: ProjectData,
   save: (value: ProjectData) => Promise<unknown>,
+  /** 저장이 실패했을 때. 연속 실패 구간에서는 첫 번째에만 호출된다. */
+  onFailure?: () => void,
 ) {
   const [status, setStatus] = useState<SaveStatus>("idle");
 
-  // 저장은 타이머와 flush에서만 일어나므로 렌더마다 최신 save로 갱신해두면 된다.
-  // 덕분에 호출부가 save를 useCallback으로 감쌀 필요가 없다.
-  const saveRef = useRef(save);
+  // 콜백은 타이머와 flush에서만 불리므로 렌더마다 최신 것으로 갱신해두면 된다.
+  // 덕분에 호출부가 useCallback으로 감쌀 필요가 없다.
+  const callbacksRef = useRef({ save, onFailure });
   useEffect(() => {
-    saveRef.current = save;
+    callbacksRef.current = { save, onFailure };
   });
+
+  const failedRef = useRef(false);
 
   const saverRef = useRef<DebouncedSaver<ProjectData> | null>(null);
   saverRef.current ??= createDebouncedSaver({
     initial: value,
     delay: AUTO_SAVE_DELAY_MS,
-    save: (v) => saveRef.current(v),
-    onSaved: () => setStatus("saved"),
+    save: (v) => callbacksRef.current.save(v),
+    onSaved: () => {
+      failedRef.current = false;
+      setStatus("saved");
+    },
+    onError: () => {
+      // 오프라인 상태로 편집이 이어지면 3초마다 실패하므로 첫 번째에만 알린다.
+      if (!failedRef.current) {
+        failedRef.current = true;
+        callbacksRef.current.onFailure?.();
+      }
+      setStatus("error");
+    },
   });
   const saver = saverRef.current;
 

@@ -92,7 +92,11 @@ export default function Editor({ projectId }: { projectId: number }) {
     status: saveStatus,
     flush: flushSave,
     markSaved,
-  } = useAutoSave(data, (d) => updateProject(projectId, d));
+  } = useAutoSave(
+    data,
+    (d) => updateProject(projectId, d),
+    () => alert("자동저장에 실패했습니다. 연결 상태를 확인해주세요."),
+  );
 
   useEffect(() => {
     if (!fetchedProject || seededRef.current === projectId) return;
@@ -464,6 +468,9 @@ export default function Editor({ projectId }: { projectId: number }) {
         />
         {saveStatus === "saved" && (
           <span className="text-green-400 text-xs">저장됨 ✓</span>
+        )}
+        {saveStatus === "error" && (
+          <span className="text-red-400 text-xs">저장 실패 ⚠</span>
         )}
       </header>
       {isError && (
