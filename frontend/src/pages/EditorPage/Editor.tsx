@@ -8,6 +8,8 @@ import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions } from "@/queries/projects";
 import { type Rally, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
+import { useAutoSave } from "./hooks/useAutoSave";
+import { useProjectDraft } from "./hooks/useProjectDraft";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
@@ -60,7 +62,8 @@ const RALLY_WINNER_COLORS: Record<
 };
 
 export default function Editor({ projectId }: { projectId: number }) {
-  const [data, setData] = useState<ProjectData>(DEFAULT_PROJECT_DATA);
+  const { data, update, undo, redo, reset, canUndo, canRedo } =
+    useProjectDraft(DEFAULT_PROJECT_DATA);
   const [videoId, setVideoId] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
@@ -75,32 +78,39 @@ export default function Editor({ projectId }: { projectId: number }) {
   const [ytUploading, setYtUploading] = useState(false);
   const [ytUrl, setYtUrl] = useState<string | null>(null);
   const [ytPostComment, setYtPostComment] = useState(true);
-  const [saved, setSaved] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
   const [previewStatus, setPreviewStatus] = useState<
     "idle" | "processing" | "ready"
   >("idle");
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const historyRef = useRef<ProjectData[]>([]);
-  const futureRef = useRef<ProjectData[]>([]);
 
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
   const seededRef = useRef<number | null>(null);
 
+  const {
+    status: saveStatus,
+    flush: flushSave,
+    markSaved,
+  } = useAutoSave(
+    data,
+    (d) => updateProject(projectId, d),
+    () => alert("자동저장에 실패했습니다. 연결 상태를 확인해주세요."),
+  );
+
   useEffect(() => {
     if (!fetchedProject || seededRef.current === projectId) return;
     seededRef.current = projectId;
-    setData({
+    const seeded = {
       ...DEFAULT_PROJECT_DATA,
       ...fetchedProject,
       scoreboard_scale: fetchedProject.scoreboard_scale ?? 1.0,
       scoreboard_theme: fetchedProject.scoreboard_theme ?? "dark",
-    });
+    };
+    reset(seeded); // 다른 프로젝트를 열면 이전 undo 이력도 함께 비운다
+    markSaved(seeded); // 서버에서 막 읽어온 값이라 되쓸 필요가 없다
     setVideoId(fetchedProject.video_id ?? "");
-  }, [fetchedProject, projectId]);
+  }, [fetchedProject, projectId, reset, markSaved]);
 
   useEffect(() => {
     if (!videoId) return;
@@ -119,27 +129,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     timer = setInterval(check, 4000);
     return () => clearInterval(timer);
   }, [videoId]);
-
-  // 자동 저장 (3초 debounce)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const save = (d: ProjectData) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      await updateProject(projectId, d);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    }, 3000);
-  };
-
-  const update = (patch: Partial<ProjectData>) => {
-    historyRef.current = [...historyRef.current.slice(-49), data];
-    futureRef.current = [];
-    setCanUndo(true);
-    setCanRedo(false);
-    const next = { ...data, ...patch };
-    setData(next);
-    save(next);
-  };
 
   // 영상 업로드
   const handleFile = async (file: File) => {
@@ -212,33 +201,26 @@ export default function Editor({ projectId }: { projectId: number }) {
   };
 
   // 되돌리기 / 다시하기
-  const undo = () => {
-    if (historyRef.current.length === 0) return;
-    futureRef.current = [data, ...futureRef.current];
-    const prev = historyRef.current[historyRef.current.length - 1];
-    historyRef.current = historyRef.current.slice(0, -1);
-    setCanUndo(historyRef.current.length > 0);
-    setCanRedo(true);
+  // 마킹은 undo 스택 밖이라 되돌려도 markStart가 옛 시점에 남는다. 그대로 두면 이후 R로
+  // 종료할 때 end <= markStart 가드에 걸려 랠리가 조용히 생성되지 않으므로 마킹을 끝낸다.
+  const handleUndo = () => {
+    const moved = undo();
+    if (!moved) return;
+    setMarking(false);
     // 랠리가 추가된 것을 되돌리는 경우 → 이전 랠리의 끝 지점으로 이동
-    if (data.rallies.length > prev.rallies.length && videoRef.current) {
-      const prevLastRally = prev.rallies[prev.rallies.length - 1];
+    if (
+      moved.from.rallies.length > moved.to.rallies.length &&
+      videoRef.current
+    ) {
+      const prevLastRally = moved.to.rallies[moved.to.rallies.length - 1];
       if (prevLastRally) {
-        videoRef.current.currentTime = prevLastRally.end / data.fps;
+        videoRef.current.currentTime = prevLastRally.end / moved.to.fps;
       }
     }
-    setData(prev);
-    save(prev);
   };
 
-  const redo = () => {
-    if (futureRef.current.length === 0) return;
-    historyRef.current = [...historyRef.current, data];
-    const next = futureRef.current[0];
-    futureRef.current = futureRef.current.slice(1);
-    setCanUndo(true);
-    setCanRedo(futureRef.current.length > 0);
-    setData(next);
-    save(next);
+  const handleRedo = () => {
+    if (redo()) setMarking(false);
   };
 
   // 내보내기
@@ -280,9 +262,15 @@ export default function Editor({ projectId }: { projectId: number }) {
   };
 
   const startExport = async () => {
-    // 미저장 변경사항 즉시 flush
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    await updateProject(projectId, data);
+    // 백엔드가 DB에서 읽어 영상을 만들므로, 미저장 변경사항을 먼저 반영해야 한다.
+    try {
+      await flushSave();
+    } catch {
+      setExportPct(0);
+      setExportMsg("저장에 실패해 내보내기를 중단했습니다.");
+      setTimeout(() => setExportPct(null), 3000);
+      return;
+    }
 
     setExportPct(0);
     setExportMsg("시작 중...");
@@ -329,12 +317,12 @@ export default function Editor({ projectId }: { projectId: number }) {
       if (e.code === "KeyR") toggleMark();
       if (e.code === "Digit1") addScore(1);
       if (e.code === "Digit2") addScore(2);
-      if (e.code === "KeyZ" && e.ctrlKey && !e.shiftKey) undo();
+      if (e.code === "KeyZ" && e.ctrlKey && !e.shiftKey) handleUndo();
       if (
         (e.code === "KeyZ" && e.ctrlKey && e.shiftKey) ||
         (e.code === "KeyY" && e.ctrlKey)
       )
-        redo();
+        handleRedo();
       if (e.code === "ArrowLeft") {
         if (videoRef.current)
           videoRef.current.currentTime -= e.shiftKey ? 10 : 5;
@@ -485,7 +473,12 @@ export default function Editor({ projectId }: { projectId: number }) {
           onChange={(e) => update({ title: e.target.value })}
           className="bg-transparent text-white font-medium outline-none border-b border-transparent hover:border-gray-600 focus:border-blue-500 px-1"
         />
-        {saved && <span className="text-green-400 text-xs">저장됨 ✓</span>}
+        {saveStatus === "saved" && (
+          <span className="text-green-400 text-xs">저장됨 ✓</span>
+        )}
+        {saveStatus === "error" && (
+          <span className="text-red-400 text-xs">저장 실패 ⚠</span>
+        )}
       </header>
       {isError && (
         <p className="text-red-400 text-sm px-4 pt-2">
@@ -712,7 +705,7 @@ export default function Editor({ projectId }: { projectId: number }) {
               </div>
               <div className="flex gap-2 mt-2">
                 <button
-                  onClick={undo}
+                  onClick={handleUndo}
                   disabled={!canUndo}
                   title="되돌리기 (Ctrl+Z)"
                   className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 py-1.5 rounded-lg text-xs transition-colors"
@@ -720,7 +713,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                   ↩ 되돌리기
                 </button>
                 <button
-                  onClick={redo}
+                  onClick={handleRedo}
                   disabled={!canRedo}
                   title="다시하기 (Ctrl+Y)"
                   className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 py-1.5 rounded-lg text-xs transition-colors"
