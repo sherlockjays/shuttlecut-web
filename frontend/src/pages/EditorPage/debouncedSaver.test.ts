@@ -138,6 +138,63 @@ describe("markSaved", () => {
   });
 });
 
+// 저장 요청을 원하는 시점에 끝낼 수 있게 만드는 헬퍼
+const deferred = () => {
+  let resolve: () => void = () => {};
+  const promise = new Promise<void>((res) => {
+    resolve = () => res();
+  });
+  return { promise, resolve };
+};
+
+describe("동시 저장", () => {
+  it("앞선 저장이 끝나기 전에는 다음 저장을 보내지 않는다", async () => {
+    const first = deferred();
+    const save = vi
+      .fn()
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValue(undefined);
+    const { saver } = setup(save);
+
+    saver.schedule("a");
+    await vi.advanceTimersByTimeAsync(DELAY);
+    expect(save).toHaveBeenCalledExactlyOnceWith("a");
+
+    saver.schedule("b");
+    const flushed = saver.flush();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(save).toHaveBeenCalledOnce(); // a가 끝나지 않아 b는 아직 나가지 않는다
+
+    first.resolve();
+    await flushed;
+
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenLastCalledWith("b");
+  });
+
+  it("기다리는 동안 값이 또 바뀌면 최신값으로 저장한다", async () => {
+    const first = deferred();
+    const save = vi
+      .fn()
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValue(undefined);
+    const { saver } = setup(save);
+
+    saver.schedule("a");
+    await vi.advanceTimersByTimeAsync(DELAY);
+
+    saver.schedule("b");
+    const flushed = saver.flush();
+    saver.schedule("c"); // 큐가 실행되기 전에 다시 변경
+
+    first.resolve();
+    await flushed;
+
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenLastCalledWith("c");
+  });
+});
+
 describe("저장 실패", () => {
   it("onError를 호출하고 onSaved는 호출하지 않는다", async () => {
     const error = new Error("네트워크 오류");
@@ -149,6 +206,33 @@ describe("저장 실패", () => {
 
     expect(onError).toHaveBeenCalledExactlyOnceWith(error);
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it("flush는 저장에 실패하면 거부된다", async () => {
+    const error = new Error("네트워크 오류");
+    const save = vi.fn().mockRejectedValue(error);
+    const { saver } = setup(save);
+
+    saver.schedule("a");
+
+    await expect(saver.flush()).rejects.toThrow("네트워크 오류");
+  });
+
+  it("앞선 저장이 실패해도 다음 저장은 정상 실행된다", async () => {
+    const save = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("네트워크 오류"))
+      .mockResolvedValue(undefined);
+    const { saver, onSaved } = setup(save);
+
+    saver.schedule("a");
+    await vi.advanceTimersByTimeAsync(DELAY);
+
+    saver.schedule("b");
+    await saver.flush();
+
+    expect(save).toHaveBeenLastCalledWith("b");
+    expect(onSaved).toHaveBeenCalledOnce();
   });
 
   it("실패한 값은 기준선이 되지 않아 다음 예약에서 다시 저장된다", async () => {
