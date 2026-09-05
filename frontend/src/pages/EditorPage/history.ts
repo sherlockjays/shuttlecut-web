@@ -1,5 +1,3 @@
-// undo/redo 스택 자료구조. React에 의존하지 않아 훅과 별개로 테스트할 수 있다.
-
 export const HISTORY_LIMIT = 50;
 
 // [...past, present, ...future]가 항상 시간순이 되도록 유지한다.
