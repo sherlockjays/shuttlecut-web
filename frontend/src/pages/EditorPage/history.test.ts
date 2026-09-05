@@ -56,7 +56,11 @@ describe("undoHistory", () => {
     for (const v of [2, 3]) h = pushHistory(h, v);
     h = undoHistory(h);
     expect(h.future).toEqual([3]);
-    expect(pushHistory(h, 99)).toEqual({ past: [1, 2], present: 99, future: [] });
+    expect(pushHistory(h, 99)).toEqual({
+      past: [1, 2],
+      present: 99,
+      future: [],
+    });
   });
 
   it("past가 비어있으면 원본을 그대로 반환한다", () => {
