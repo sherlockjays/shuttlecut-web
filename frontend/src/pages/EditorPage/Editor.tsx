@@ -8,6 +8,7 @@ import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions } from "@/queries/projects";
 import { type Rally, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
+import { useAutoSave } from "./hooks/useAutoSave";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
@@ -75,7 +76,6 @@ export default function Editor({ projectId }: { projectId: number }) {
   const [ytUploading, setYtUploading] = useState(false);
   const [ytUrl, setYtUrl] = useState<string | null>(null);
   const [ytPostComment, setYtPostComment] = useState(true);
-  const [saved, setSaved] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -90,17 +90,25 @@ export default function Editor({ projectId }: { projectId: number }) {
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
   const seededRef = useRef<number | null>(null);
 
+  const {
+    status: saveStatus,
+    flush: flushSave,
+    markSaved,
+  } = useAutoSave(data, (d) => updateProject(projectId, d));
+
   useEffect(() => {
     if (!fetchedProject || seededRef.current === projectId) return;
     seededRef.current = projectId;
-    setData({
+    const seeded = {
       ...DEFAULT_PROJECT_DATA,
       ...fetchedProject,
       scoreboard_scale: fetchedProject.scoreboard_scale ?? 1.0,
       scoreboard_theme: fetchedProject.scoreboard_theme ?? "dark",
-    });
+    };
+    setData(seeded);
+    markSaved(seeded); // 서버에서 막 읽어온 값이라 되쓸 필요가 없다
     setVideoId(fetchedProject.video_id ?? "");
-  }, [fetchedProject, projectId]);
+  }, [fetchedProject, projectId, markSaved]);
 
   useEffect(() => {
     if (!videoId) return;
@@ -120,25 +128,12 @@ export default function Editor({ projectId }: { projectId: number }) {
     return () => clearInterval(timer);
   }, [videoId]);
 
-  // 자동 저장 (3초 debounce)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const save = (d: ProjectData) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      await updateProject(projectId, d);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    }, 3000);
-  };
-
   const update = (patch: Partial<ProjectData>) => {
     historyRef.current = [...historyRef.current.slice(-49), data];
     futureRef.current = [];
     setCanUndo(true);
     setCanRedo(false);
-    const next = { ...data, ...patch };
-    setData(next);
-    save(next);
+    setData({ ...data, ...patch });
   };
 
   // 영상 업로드
@@ -227,7 +222,6 @@ export default function Editor({ projectId }: { projectId: number }) {
       }
     }
     setData(prev);
-    save(prev);
   };
 
   const redo = () => {
@@ -238,7 +232,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     setCanUndo(true);
     setCanRedo(futureRef.current.length > 0);
     setData(next);
-    save(next);
   };
 
   // 내보내기
@@ -280,9 +273,15 @@ export default function Editor({ projectId }: { projectId: number }) {
   };
 
   const startExport = async () => {
-    // 미저장 변경사항 즉시 flush
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    await updateProject(projectId, data);
+    // 백엔드가 DB에서 읽어 영상을 만들므로, 미저장 변경사항을 먼저 반영해야 한다.
+    try {
+      await flushSave();
+    } catch {
+      setExportPct(0);
+      setExportMsg("저장에 실패해 내보내기를 중단했습니다.");
+      setTimeout(() => setExportPct(null), 3000);
+      return;
+    }
 
     setExportPct(0);
     setExportMsg("시작 중...");
@@ -485,7 +484,9 @@ export default function Editor({ projectId }: { projectId: number }) {
           onChange={(e) => update({ title: e.target.value })}
           className="bg-transparent text-white font-medium outline-none border-b border-transparent hover:border-gray-600 focus:border-blue-500 px-1"
         />
-        {saved && <span className="text-green-400 text-xs">저장됨 ✓</span>}
+        {saveStatus === "saved" && (
+          <span className="text-green-400 text-xs">저장됨 ✓</span>
+        )}
       </header>
       {isError && (
         <p className="text-red-400 text-sm px-4 pt-2">
