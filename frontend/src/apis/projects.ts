@@ -11,10 +11,15 @@ import {
 export const listProjects = (): Promise<Project[]> =>
   apiFetch<Project[]>("/api/projects/");
 
-export const getProject = async (id: number): Promise<Partial<ProjectDetail>> => {
-  const raw = await apiFetch<
-    Partial<Omit<ProjectDetail, "rallies">> & { rallies?: RallyWire[] }
-  >(`/api/projects/${id}`);
+// rallies 컬럼이 nullable이라 서버가 null을 줄 수 있다.
+type ProjectDetailWire = Partial<Omit<ProjectDetail, "rallies">> & {
+  rallies?: RallyWire[] | null;
+};
+
+export const getProject = async (
+  id: number,
+): Promise<Partial<ProjectDetail>> => {
+  const raw = await apiFetch<ProjectDetailWire>(`/api/projects/${id}`);
   return { ...raw, rallies: (raw.rallies ?? []).map(rallyFromWire) };
 };
 
@@ -24,11 +29,16 @@ export const createProject = (data: object): Promise<{ id: number }> =>
     body: JSON.stringify(data),
   });
 
-export const updateProject = (id: number, data: ProjectData) =>
-  apiFetch(`/api/projects/${id}`, {
+export const updateProject = async (
+  id: number,
+  data: ProjectData,
+): Promise<Partial<ProjectDetail>> => {
+  const raw = await apiFetch<ProjectDetailWire>(`/api/projects/${id}`, {
     method: "PUT",
     body: JSON.stringify({ ...data, rallies: data.rallies.map(rallyToWire) }),
   });
+  return { ...raw, rallies: (raw.rallies ?? []).map(rallyFromWire) };
+};
 
 export const deleteProject = (id: number) =>
   apiFetch(`/api/projects/${id}`, { method: "DELETE" });
