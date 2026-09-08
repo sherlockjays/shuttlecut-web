@@ -30,6 +30,11 @@ class ProjectBody(BaseModel):
     scoreboard_theme: Optional[str] = "dark"
 
 
+# video_id는 video_path에서 계산하는 파생 필드라 DB 컬럼도 요청 바디도 아니다.
+class ProjectDetail(ProjectBody):
+    video_id: Optional[str] = None
+
+
 @router.get("/")
 def list_projects(user: User = Depends(current_user), db: Session = Depends(get_db)):
     projects = db.query(Project).filter(Project.user_id == user.id)\
@@ -53,7 +58,7 @@ def get_project(pid: int, user: User = Depends(current_user), db: Session = Depe
     return {**p.__dict__, "video_id": video_id}
 
 
-@router.put("/{pid}")
+@router.put("/{pid}", response_model=ProjectDetail)
 def update_project(pid: int, body: ProjectBody, user: User = Depends(current_user), db: Session = Depends(get_db)):
     p = db.query(Project).filter(Project.id == pid, Project.user_id == user.id).first()
     if not p:
@@ -62,7 +67,11 @@ def update_project(pid: int, body: ProjectBody, user: User = Depends(current_use
         setattr(p, k, v)
     p.updated_at = datetime.utcnow()
     db.commit()
-    return {"ok": True}
+    # expire_on_commit이 기본값이라 commit 직후 p.__dict__는 비어 있다.
+    # 속성 접근은 자동으로 다시 읽어오지만 __dict__를 직접 읽는 것은 그렇지 않다.
+    db.refresh(p)
+    video_id = Path(p.video_path).stem if p.video_path else None
+    return {**p.__dict__, "video_id": video_id}
 
 
 @router.delete("/{pid}")
