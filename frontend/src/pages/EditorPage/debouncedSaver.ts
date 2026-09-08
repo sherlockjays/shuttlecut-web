@@ -70,8 +70,8 @@ export function createDebouncedSaver<T>({
     schedule: (value) => {
       latest = value;
       clearTimer();
-      // undo 등으로 이미 저장된 값으로 되돌아온 경우 예약해 둔 저장까지 취소한다.
-      if (value === saved) return;
+      // 이미 저장된 값이어도 예약은 건다. 여기서 미리 판단하면 큐에 대기 중인 저장이
+      // 나중에 기준선을 바꿔놓는 경우를 놓친다. 발화 시점에 비교하면 그 결과까지 반영된다.
       timer = setTimeout(() => {
         timer = null;
         void saveNow(value);

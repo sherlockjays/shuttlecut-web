@@ -223,6 +223,33 @@ describe("동시 저장", () => {
     expect(save).toHaveBeenCalledTimes(3);
     expect(save).toHaveBeenLastCalledWith("c");
   });
+
+  it("저장이 밀려 있는 동안 이미 저장된 값으로 되돌아와도 마지막에 화면 값을 저장한다", async () => {
+    const first = deferred();
+    const second = deferred();
+    const save = vi
+      .fn()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+      .mockResolvedValue(undefined);
+    const { saver } = setup(save);
+
+    saver.schedule("a");
+    await vi.advanceTimersByTimeAsync(DELAY);
+    saver.schedule("b");
+    await vi.advanceTimersByTimeAsync(DELAY); // b는 a가 끝나기를 기다린다
+
+    first.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(save).toHaveBeenCalledTimes(2); // 기준선이 a가 되고 b가 나갔다
+
+    saver.schedule("a"); // undo로 복귀. 기준선과 같지만 b가 아직 떠 있다
+    second.resolve();
+    await vi.advanceTimersByTimeAsync(DELAY);
+
+    expect(save).toHaveBeenCalledTimes(3);
+    expect(save).toHaveBeenLastCalledWith("a");
+  });
 });
 
 describe("저장 실패", () => {
