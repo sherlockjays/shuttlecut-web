@@ -3,7 +3,8 @@ export type DebouncedSaver<T> = {
   schedule(value: T): void;
   /**
    * 예약된 저장을 기다리지 않고 즉시 실행한다. 저장할 변경이 없으면 아무것도 하지 않는다.
-   * 이행되면 서버에 반영된 것이고, 저장에 실패하면 거부된다.
+   * 보낼 값은 부르는 순간 확정되므로, 이행되면 그 시점의 값이 서버에 반영된 것이다.
+   * 저장에 실패하면 거부된다.
    */
   flush(): Promise<void>;
   /**
@@ -45,10 +46,10 @@ export function createDebouncedSaver<T>({
   // 겹쳐, 늦게 도착한 옛 값이 서버를 되돌리거나 기준선을 오염시킬 수 있다.
   let queue: Promise<void> = Promise.resolve();
 
-  const saveNow = () => {
+  // 보낼 값은 부르는 쪽이 확정해서 넘긴다.
+  const saveNow = (value: T) => {
     const attempt = queue.then(async () => {
-      // 큐에서 실행될 때 최신값을 다시 읽으므로, 기다리는 동안 들어온 변경까지 함께 저장된다.
-      const value = latest;
+      // 기다리는 동안 앞선 저장이 같은 값을 이미 보냈을 수 있다.
       if (value === saved) return;
       try {
         await save(value);
@@ -73,13 +74,13 @@ export function createDebouncedSaver<T>({
       if (value === saved) return;
       timer = setTimeout(() => {
         timer = null;
-        void saveNow();
+        void saveNow(value);
       }, delay);
     },
 
     flush: () => {
       clearTimer();
-      return saveNow();
+      return saveNow(latest);
     },
 
     markSaved: (value) => {

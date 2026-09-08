@@ -102,6 +102,30 @@ describe("flush", () => {
     expect(save).not.toHaveBeenCalled();
   });
 
+  it("부른 뒤에 값이 바뀌어도 호출 시점의 값을 저장한다", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { saver } = setup(save);
+
+    saver.schedule("a");
+    const flushed = saver.flush();
+    saver.schedule("b"); // 큐가 실행되기 전에 변경
+    await flushed;
+
+    expect(save).toHaveBeenCalledExactlyOnceWith("a");
+  });
+
+  it("호출 시점에 저장할 변경이 없으면 뒤늦게 값이 바뀌어도 저장하지 않는다", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { saver } = setup(save);
+
+    saver.markSaved("시드값");
+    const flushed = saver.flush();
+    saver.schedule("낡은값"); // 낡은 클로저를 든 effect가 끼어드는 상황
+    await flushed;
+
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("이미 저장을 마친 뒤에 부르면 다시 저장하지 않는다", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { saver } = setup(save);
@@ -172,7 +196,7 @@ describe("동시 저장", () => {
     expect(save).toHaveBeenLastCalledWith("b");
   });
 
-  it("기다리는 동안 값이 또 바뀌면 최신값으로 저장한다", async () => {
+  it("기다리는 동안 들어온 변경은 다음 저장으로 나간다", async () => {
     const first = deferred();
     const save = vi
       .fn()
@@ -190,7 +214,13 @@ describe("동시 저장", () => {
     first.resolve();
     await flushed;
 
+    // 확정해 둔 b가 그대로 나가고, c는 자기 타이머로 따로 나간다.
     expect(save).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenLastCalledWith("b");
+
+    await vi.advanceTimersByTimeAsync(DELAY);
+
+    expect(save).toHaveBeenCalledTimes(3);
     expect(save).toHaveBeenLastCalledWith("c");
   });
 });
