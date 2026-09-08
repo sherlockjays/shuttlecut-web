@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { videos, exports as exportsApi } from "@/api";
 import { updateProject } from "@/apis/projects";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
-import { projectOptions } from "@/queries/projects";
+import { projectOptions, projectsOptions } from "@/queries/projects";
 import { type Rally, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
@@ -87,6 +87,7 @@ export default function Editor({ projectId }: { projectId: number }) {
 
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
   const seededRef = useRef<number | null>(null);
+  const queryClient = useQueryClient();
 
   const {
     status: saveStatus,
@@ -94,7 +95,11 @@ export default function Editor({ projectId }: { projectId: number }) {
     markSaved,
   } = useAutoSave(
     data,
-    (d) => updateProject(projectId, d),
+    async (d) => {
+      const updated = await updateProject(projectId, d);
+      queryClient.setQueryData(projectOptions(projectId).queryKey, updated);
+      queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey });
+    },
     () => alert("자동저장에 실패했습니다. 연결 상태를 확인해주세요."),
   );
 
