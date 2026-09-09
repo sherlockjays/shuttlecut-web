@@ -61,6 +61,9 @@ const RALLY_WINNER_COLORS: Record<
   },
 };
 
+const INVALID_RANGE_MESSAGE =
+  "랠리 종료 지점이 시작 지점보다 앞에 있습니다. 시작 지점 이후로 이동한 뒤 다시 시도해주세요.";
+
 export default function Editor({ projectId }: { projectId: number }) {
   const { data, update, undo, redo, reset, canUndo, canRedo } =
     useProjectDraft(DEFAULT_PROJECT_DATA);
@@ -162,8 +165,9 @@ export default function Editor({ projectId }: { projectId: number }) {
       setMarking(true);
     } else {
       const end = currentFrame();
+      // 잘못 들어온 입력이라 아무 것도 하지 않는다. 마킹을 유지해 시작 지점을 잃지 않게 한다.
       if (end <= markStart) {
-        setMarking(false);
+        alert(INVALID_RANGE_MESSAGE);
         return;
       }
       const rally: Rally = {
@@ -182,6 +186,10 @@ export default function Editor({ projectId }: { projectId: number }) {
   const addScore = (player: 1 | 2) => {
     if (marking) {
       const end = currentFrame();
+      if (end <= markStart) {
+        alert(INVALID_RANGE_MESSAGE);
+        return;
+      }
       const rally: Rally = {
         start: markStart,
         end,
@@ -206,8 +214,8 @@ export default function Editor({ projectId }: { projectId: number }) {
   };
 
   // 되돌리기 / 다시하기
-  // 마킹은 undo 스택 밖이라 되돌려도 markStart가 옛 시점에 남는다. 그대로 두면 이후 R로
-  // 종료할 때 end <= markStart 가드에 걸려 랠리가 조용히 생성되지 않으므로 마킹을 끝낸다.
+  // 마킹은 undo 스택 밖이라 되돌려도 markStart가 옛 시점에 남는다. 되돌린 뒤의 상태와
+  // 맞지 않는 지점이므로 마킹을 끝낸다.
   const handleUndo = () => {
     const moved = undo();
     if (!moved) return;
