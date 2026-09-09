@@ -6,7 +6,12 @@ import { updateProject } from "@/apis/projects";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions, projectsOptions } from "@/queries/projects";
-import { type Rally, type ProjectData } from "@/models/project";
+import {
+  RallyWinner,
+  type Rally,
+  type ScoringTeam,
+  type ProjectData,
+} from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
@@ -42,20 +47,20 @@ const MATCH_INFO_FIELDS = [
 }[];
 
 const RALLY_WINNER_COLORS: Record<
-  Rally["winner"],
+  RallyWinner,
   { timelineClass: string; listBgClass: string; listText: string }
 > = {
-  1: {
+  [RallyWinner.Team1]: {
     timelineClass: "bg-blue-500",
     listBgClass: "bg-blue-950",
     listText: "text-blue-300",
   },
-  2: {
+  [RallyWinner.Team2]: {
     timelineClass: "bg-red-500",
     listBgClass: "bg-red-900",
     listText: "text-red-300",
   },
-  0: {
+  [RallyWinner.None]: {
     timelineClass: "bg-gray-500",
     listBgClass: "bg-gray-700",
     listText: "text-gray-300",
@@ -176,7 +181,7 @@ export default function Editor({ projectId }: { projectId: number }) {
         end,
         p1Score: data.player1_score,
         p2Score: data.player2_score,
-        winner: 0,
+        winner: RallyWinner.None,
       };
       update({ rallies: [...data.rallies, rally] });
       setMarking(false);
@@ -184,7 +189,7 @@ export default function Editor({ projectId }: { projectId: number }) {
   };
 
   // 득점
-  const addScore = (player: 1 | 2) => {
+  const addScore = (player: ScoringTeam) => {
     if (marking) {
       const end = currentFrame();
       if (!isValidRallyRange(markStart, end)) {
@@ -323,8 +328,8 @@ export default function Editor({ projectId }: { projectId: number }) {
         }
       }
       if (e.code === "KeyR") toggleMark();
-      if (e.code === "Digit1") addScore(1);
-      if (e.code === "Digit2") addScore(2);
+      if (e.code === "Digit1") addScore(RallyWinner.Team1);
+      if (e.code === "Digit2") addScore(RallyWinner.Team2);
       if (e.code === "KeyZ" && e.ctrlKey && !e.shiftKey) handleUndo();
       if (
         (e.code === "KeyZ" && e.ctrlKey && e.shiftKey) ||
@@ -699,13 +704,13 @@ export default function Editor({ projectId }: { projectId: number }) {
               </div>
               <div className="flex gap-0">
                 <button
-                  onClick={() => addScore(1)}
+                  onClick={() => addScore(RallyWinner.Team1)}
                   className="flex-1 bg-blue-700 hover:bg-blue-600 text-white py-2 text-sm transition-colors"
                 >
                   1팀 득점 (1)
                 </button>
                 <button
-                  onClick={() => addScore(2)}
+                  onClick={() => addScore(RallyWinner.Team2)}
                   className="flex-1 bg-red-700 hover:bg-red-600 text-white py-2 text-sm transition-colors"
                 >
                   2팀 득점 (2)

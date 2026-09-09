@@ -2,13 +2,24 @@ import type { ThemeId } from "@/models/theme";
 
 export type Project = { id: number; title: string; updated_at: string };
 
-// winner: 1/2는 해당 팀 득점, 0은 득점자 미지정(마킹만 하고 득점 처리는 안 한 랠리)
+// None은 마킹만 하고 득점 처리는 안 한 랠리. 값은 백엔드 와이어 포맷과 같아야 한다.
+export const RallyWinner = {
+  None: 0,
+  Team1: 1,
+  Team2: 2,
+} as const;
+
+export type RallyWinner = (typeof RallyWinner)[keyof typeof RallyWinner];
+
+/** 득점한 팀. 득점이 없는 랠리는 여기 해당하지 않는다. */
+export type ScoringTeam = Exclude<RallyWinner, typeof RallyWinner.None>;
+
 export type Rally = {
   start: number;
   end: number;
   p1Score: number;
   p2Score: number;
-  winner: 0 | 1 | 2;
+  winner: RallyWinner;
 };
 
 // 백엔드 API/DB에 저장되는 와이어 포맷: [start, end, p1, p2, winner]
@@ -21,7 +32,13 @@ export function rallyFromWire([
   p2Score,
   winner,
 ]: RallyWire): Rally {
-  return { start, end, p1Score, p2Score, winner: (winner ?? 0) as 0 | 1 | 2 };
+  return {
+    start,
+    end,
+    p1Score,
+    p2Score,
+    winner: (winner ?? RallyWinner.None) as RallyWinner,
+  };
 }
 
 export function rallyToWire(r: Rally): RallyWire {
