@@ -12,6 +12,14 @@ import {
 export type DraftTransition = { from: ProjectData; to: ProjectData };
 
 /**
+ * 바꿀 필드만 담은 패치. 이전 값에서 파생되는 변경(랠리 추가 등)은 함수형으로 준다.
+ * 그래야 바꾸는 쪽이 현재 draft를 들고 있지 않아도 된다.
+ */
+export type DraftPatch =
+  | Partial<ProjectData>
+  | ((prev: ProjectData) => Partial<ProjectData>);
+
+/**
  * 편집 중인 프로젝트 데이터를 소유하고 변경 이력을 관리한다.
  * 현재값과 undo/redo 스택이 한 state에 있어 서로 어긋날 수 없다.
  */
@@ -20,8 +28,13 @@ export function useProjectDraft(initial: ProjectData) {
     createHistory(initial),
   );
 
-  const update = useCallback((patch: Partial<ProjectData>) => {
-    setHistory((h) => pushHistory(h, { ...h.present, ...patch }));
+  const update = useCallback((patch: DraftPatch) => {
+    setHistory((h) =>
+      pushHistory(h, {
+        ...h.present,
+        ...(typeof patch === "function" ? patch(h.present) : patch),
+      }),
+    );
   }, []);
 
   // undo/redo는 옮겨간 구간을 호출부에 알려줘야 해서 현재 렌더의 history를 직접 읽는다.

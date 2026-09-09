@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { videos, exports as exportsApi } from "@/api";
@@ -6,16 +6,12 @@ import { updateProject } from "@/apis/projects";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions, projectsOptions } from "@/queries/projects";
-import {
-  RallyWinner,
-  type Rally,
-  type ScoringTeam,
-  type ProjectData,
-} from "@/models/project";
+import { RallyWinner, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
-import { applyPoint, isValidRallyRange } from "./rally";
+import { useRallyEditor } from "./hooks/useRallyEditor";
+import { applyPoint } from "./rally";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
@@ -76,8 +72,6 @@ export default function Editor({ projectId }: { projectId: number }) {
   const [videoId, setVideoId] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
-  const [marking, setMarking] = useState(false);
-  const [markStart, setMarkStart] = useState(0);
   const [exportPct, setExportPct] = useState<number | null>(null);
   const [exportMsg, setExportMsg] = useState("");
   const [exportEta, setExportEta] = useState<number | null>(null);
@@ -160,81 +154,37 @@ export default function Editor({ projectId }: { projectId: number }) {
     }
   };
 
-  // 현재 프레임 계산
-  const currentFrame = () =>
+  // 프레임과 시간을 오가는 지점은 여기 둘뿐이다. 랠리 쪽은 프레임으로만 말한다.
+  const getCurrentFrame = () =>
     Math.round((videoRef.current?.currentTime || 0) * data.fps);
-
-  // 랠리 마킹
-  const toggleMark = () => {
-    if (!marking) {
-      setMarkStart(currentFrame());
-      setMarking(true);
-    } else {
-      const end = currentFrame();
-      // 잘못 들어온 입력이라 아무 것도 하지 않는다. 마킹을 유지해 시작 지점을 잃지 않게 한다.
-      if (!isValidRallyRange(markStart, end)) {
-        alert(INVALID_RANGE_MESSAGE);
-        return;
-      }
-      const rally: Rally = {
-        start: markStart,
-        end,
-        p1Score: data.player1_score,
-        p2Score: data.player2_score,
-        winner: RallyWinner.None,
-      };
-      update({ rallies: [...data.rallies, rally] });
-      setMarking(false);
-    }
+  const seekToFrame = (frame: number) => {
+    if (videoRef.current) videoRef.current.currentTime = frame / data.fps;
   };
 
-  // 득점
-  const addScore = (player: ScoringTeam) => {
-    if (marking) {
-      const end = currentFrame();
-      if (!isValidRallyRange(markStart, end)) {
-        alert(INVALID_RANGE_MESSAGE);
-        return;
-      }
-      const rally: Rally = {
-        start: markStart,
-        end,
-        p1Score: data.player1_score,
-        p2Score: data.player2_score,
-        winner: player,
-      };
-      update({
-        rallies: [...data.rallies, rally],
-        ...applyPoint(data.player1_score, data.player2_score, player),
-      });
-      setMarking(false);
-    } else {
-      update(applyPoint(data.player1_score, data.player2_score, player));
-    }
-  };
+  const {
+    marking,
+    toggleRally,
+    addScore,
+    resetScore,
+    deleteRally,
+    onUndone,
+    onRedone,
+  } = useRallyEditor({
+    update,
+    getCurrentFrame,
+    seekToFrame,
+    onInvalidRange: () => alert(INVALID_RANGE_MESSAGE),
+  });
 
-  // 되돌리기 / 다시하기
-  // 마킹은 undo 스택 밖이라 되돌려도 markStart가 옛 시점에 남는다. 되돌린 뒤의 상태와
-  // 맞지 않는 지점이므로 마킹을 끝낸다.
-  const handleUndo = () => {
+  // 단축키 effect의 의존성이라 매 렌더 새로 만들면 리스너가 계속 재등록된다.
+  const handleUndo = useCallback(() => {
     const moved = undo();
-    if (!moved) return;
-    setMarking(false);
-    // 랠리가 추가된 것을 되돌리는 경우 → 이전 랠리의 끝 지점으로 이동
-    if (
-      moved.from.rallies.length > moved.to.rallies.length &&
-      videoRef.current
-    ) {
-      const prevLastRally = moved.to.rallies[moved.to.rallies.length - 1];
-      if (prevLastRally) {
-        videoRef.current.currentTime = prevLastRally.end / moved.to.fps;
-      }
-    }
-  };
+    if (moved) onUndone(moved);
+  }, [undo, onUndone]);
 
-  const handleRedo = () => {
-    if (redo()) setMarking(false);
-  };
+  const handleRedo = useCallback(() => {
+    if (redo()) onRedone();
+  }, [redo, onRedone]);
 
   // 내보내기
   const fmtEta = (sec: number) => {
@@ -327,7 +277,7 @@ export default function Editor({ projectId }: { projectId: number }) {
           videoRef.current?.pause();
         }
       }
-      if (e.code === "KeyR") toggleMark();
+      if (e.code === "KeyR") toggleRally();
       if (e.code === "Digit1") addScore(RallyWinner.Team1);
       if (e.code === "Digit2") addScore(RallyWinner.Team2);
       if (e.code === "KeyZ" && e.ctrlKey && !e.shiftKey) handleUndo();
@@ -347,7 +297,8 @@ export default function Editor({ projectId }: { projectId: number }) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [marking, markStart, data]);
+    // 의존성을 필요한 최소한으로 줄이는 것은 #33에서 다룬다.
+  }, [toggleRally, addScore, handleUndo, handleRedo]);
 
   // 점수판 canvas 미리보기
   useEffect(() => {
@@ -596,10 +547,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                     return (
                       <div
                         key={i}
-                        onClick={() => {
-                          if (videoRef.current)
-                            videoRef.current.currentTime = r.start / data.fps;
-                        }}
+                        onClick={() => seekToFrame(r.start)}
                         title={`랠리 ${i + 1}: ${r.p1Score}-${r.p2Score}`}
                         className={`absolute top-0 h-full cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].timelineClass}`}
                         style={{
@@ -736,7 +684,7 @@ export default function Editor({ projectId }: { projectId: number }) {
               </div>
               <div className="flex gap-2 mt-1">
                 <button
-                  onClick={() => update({ player1_score: 0, player2_score: 0 })}
+                  onClick={resetScore}
                   className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-1.5 rounded-lg text-xs transition-colors"
                 >
                   점수 리셋
@@ -751,7 +699,7 @@ export default function Editor({ projectId }: { projectId: number }) {
               랠리 마킹
             </h3>
             <button
-              onClick={toggleMark}
+              onClick={toggleRally}
               className={`w-full py-3 rounded-xl font-medium text-sm transition-colors ${
                 marking
                   ? "bg-red-600 hover:bg-red-700 animate-pulse"
@@ -772,10 +720,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                 return (
                   <div
                     key={i}
-                    onClick={() => {
-                      if (videoRef.current)
-                        videoRef.current.currentTime = r.start / data.fps;
-                    }}
+                    onClick={() => seekToFrame(r.start)}
                     className={`flex items-center justify-between rounded px-2 py-1.5 text-xs cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].listBgClass}`}
                   >
                     <span className="text-gray-300 w-10 shrink-0">
@@ -791,9 +736,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        update({
-                          rallies: data.rallies.filter((_, j) => j !== i),
-                        });
+                        deleteRally(i);
                       }}
                       className="text-gray-500 hover:text-red-400 ml-1 shrink-0"
                     >
