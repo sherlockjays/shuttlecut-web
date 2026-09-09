@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { videos, exports as exportsApi } from "@/api";
@@ -6,10 +6,12 @@ import { updateProject } from "@/apis/projects";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions, projectsOptions } from "@/queries/projects";
-import { type Rally, type ProjectData } from "@/models/project";
+import { RallyWinner, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
+import { useRallyEditor } from "./hooks/useRallyEditor";
+import { applyPoint } from "./rally";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
@@ -41,25 +43,28 @@ const MATCH_INFO_FIELDS = [
 }[];
 
 const RALLY_WINNER_COLORS: Record<
-  Rally["winner"],
+  RallyWinner,
   { timelineClass: string; listBgClass: string; listText: string }
 > = {
-  1: {
+  [RallyWinner.Team1]: {
     timelineClass: "bg-blue-500",
     listBgClass: "bg-blue-950",
     listText: "text-blue-300",
   },
-  2: {
+  [RallyWinner.Team2]: {
     timelineClass: "bg-red-500",
     listBgClass: "bg-red-900",
     listText: "text-red-300",
   },
-  0: {
+  [RallyWinner.None]: {
     timelineClass: "bg-gray-500",
     listBgClass: "bg-gray-700",
     listText: "text-gray-300",
   },
 };
+
+const INVALID_RANGE_MESSAGE =
+  "랠리 종료 지점이 시작 지점보다 앞에 있습니다. 시작 지점 이후로 이동한 뒤 다시 시도해주세요.";
 
 export default function Editor({ projectId }: { projectId: number }) {
   const { data, update, undo, redo, reset, canUndo, canRedo } =
@@ -67,8 +72,6 @@ export default function Editor({ projectId }: { projectId: number }) {
   const [videoId, setVideoId] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
-  const [marking, setMarking] = useState(false);
-  const [markStart, setMarkStart] = useState(0);
   const [exportPct, setExportPct] = useState<number | null>(null);
   const [exportMsg, setExportMsg] = useState("");
   const [exportEta, setExportEta] = useState<number | null>(null);
@@ -151,82 +154,37 @@ export default function Editor({ projectId }: { projectId: number }) {
     }
   };
 
-  // 현재 프레임 계산
-  const currentFrame = () =>
+  // 프레임과 시간을 오가는 지점은 여기 둘뿐이다. 랠리 쪽은 프레임으로만 말한다.
+  const getCurrentFrame = () =>
     Math.round((videoRef.current?.currentTime || 0) * data.fps);
-
-  // 랠리 마킹
-  const toggleMark = () => {
-    if (!marking) {
-      setMarkStart(currentFrame());
-      setMarking(true);
-    } else {
-      const end = currentFrame();
-      if (end <= markStart) {
-        setMarking(false);
-        return;
-      }
-      const rally: Rally = {
-        start: markStart,
-        end,
-        p1Score: data.player1_score,
-        p2Score: data.player2_score,
-        winner: 0,
-      };
-      update({ rallies: [...data.rallies, rally] });
-      setMarking(false);
-    }
+  const seekToFrame = (frame: number) => {
+    if (videoRef.current) videoRef.current.currentTime = frame / data.fps;
   };
 
-  // 득점
-  const addScore = (player: 1 | 2) => {
-    if (marking) {
-      const end = currentFrame();
-      const rally: Rally = {
-        start: markStart,
-        end,
-        p1Score: data.player1_score,
-        p2Score: data.player2_score,
-        winner: player,
-      };
-      const p1 = data.player1_score + (player === 1 ? 1 : 0);
-      const p2 = data.player2_score + (player === 2 ? 1 : 0);
-      update({
-        rallies: [...data.rallies, rally],
-        player1_score: p1,
-        player2_score: p2,
-      });
-      setMarking(false);
-    } else {
-      update({
-        player1_score: data.player1_score + (player === 1 ? 1 : 0),
-        player2_score: data.player2_score + (player === 2 ? 1 : 0),
-      });
-    }
-  };
+  const {
+    marking,
+    toggleRally,
+    addScore,
+    resetScore,
+    deleteRally,
+    onUndone,
+    onRedone,
+  } = useRallyEditor({
+    update,
+    getCurrentFrame,
+    seekToFrame,
+    onInvalidRange: () => alert(INVALID_RANGE_MESSAGE),
+  });
 
-  // 되돌리기 / 다시하기
-  // 마킹은 undo 스택 밖이라 되돌려도 markStart가 옛 시점에 남는다. 그대로 두면 이후 R로
-  // 종료할 때 end <= markStart 가드에 걸려 랠리가 조용히 생성되지 않으므로 마킹을 끝낸다.
-  const handleUndo = () => {
+  // 단축키 effect의 의존성이라 매 렌더 새로 만들면 리스너가 계속 재등록된다.
+  const handleUndo = useCallback(() => {
     const moved = undo();
-    if (!moved) return;
-    setMarking(false);
-    // 랠리가 추가된 것을 되돌리는 경우 → 이전 랠리의 끝 지점으로 이동
-    if (
-      moved.from.rallies.length > moved.to.rallies.length &&
-      videoRef.current
-    ) {
-      const prevLastRally = moved.to.rallies[moved.to.rallies.length - 1];
-      if (prevLastRally) {
-        videoRef.current.currentTime = prevLastRally.end / moved.to.fps;
-      }
-    }
-  };
+    if (moved) onUndone(moved);
+  }, [undo, onUndone]);
 
-  const handleRedo = () => {
-    if (redo()) setMarking(false);
-  };
+  const handleRedo = useCallback(() => {
+    if (redo()) onRedone();
+  }, [redo, onRedone]);
 
   // 내보내기
   const fmtEta = (sec: number) => {
@@ -319,9 +277,9 @@ export default function Editor({ projectId }: { projectId: number }) {
           videoRef.current?.pause();
         }
       }
-      if (e.code === "KeyR") toggleMark();
-      if (e.code === "Digit1") addScore(1);
-      if (e.code === "Digit2") addScore(2);
+      if (e.code === "KeyR") toggleRally();
+      if (e.code === "Digit1") addScore(RallyWinner.Team1);
+      if (e.code === "Digit2") addScore(RallyWinner.Team2);
       if (e.code === "KeyZ" && e.ctrlKey && !e.shiftKey) handleUndo();
       if (
         (e.code === "KeyZ" && e.ctrlKey && e.shiftKey) ||
@@ -339,7 +297,8 @@ export default function Editor({ projectId }: { projectId: number }) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [marking, markStart, data]);
+    // 의존성을 필요한 최소한으로 줄이는 것은 #33에서 다룬다.
+  }, [toggleRally, addScore, handleUndo, handleRedo]);
 
   // 점수판 canvas 미리보기
   useEffect(() => {
@@ -588,10 +547,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                     return (
                       <div
                         key={i}
-                        onClick={() => {
-                          if (videoRef.current)
-                            videoRef.current.currentTime = r.start / data.fps;
-                        }}
+                        onClick={() => seekToFrame(r.start)}
                         title={`랠리 ${i + 1}: ${r.p1Score}-${r.p2Score}`}
                         className={`absolute top-0 h-full cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].timelineClass}`}
                         style={{
@@ -696,13 +652,13 @@ export default function Editor({ projectId }: { projectId: number }) {
               </div>
               <div className="flex gap-0">
                 <button
-                  onClick={() => addScore(1)}
+                  onClick={() => addScore(RallyWinner.Team1)}
                   className="flex-1 bg-blue-700 hover:bg-blue-600 text-white py-2 text-sm transition-colors"
                 >
                   1팀 득점 (1)
                 </button>
                 <button
-                  onClick={() => addScore(2)}
+                  onClick={() => addScore(RallyWinner.Team2)}
                   className="flex-1 bg-red-700 hover:bg-red-600 text-white py-2 text-sm transition-colors"
                 >
                   2팀 득점 (2)
@@ -728,7 +684,7 @@ export default function Editor({ projectId }: { projectId: number }) {
               </div>
               <div className="flex gap-2 mt-1">
                 <button
-                  onClick={() => update({ player1_score: 0, player2_score: 0 })}
+                  onClick={resetScore}
                   className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-1.5 rounded-lg text-xs transition-colors"
                 >
                   점수 리셋
@@ -743,7 +699,7 @@ export default function Editor({ projectId }: { projectId: number }) {
               랠리 마킹
             </h3>
             <button
-              onClick={toggleMark}
+              onClick={toggleRally}
               className={`w-full py-3 rounded-xl font-medium text-sm transition-colors ${
                 marking
                   ? "bg-red-600 hover:bg-red-700 animate-pulse"
@@ -755,38 +711,40 @@ export default function Editor({ projectId }: { projectId: number }) {
 
             {/* 랠리 목록 */}
             <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
-              {data.rallies.map((r, i) => (
-                <div
-                  key={i}
-                  onClick={() => {
-                    if (videoRef.current)
-                      videoRef.current.currentTime = r.start / data.fps;
-                  }}
-                  className={`flex items-center justify-between rounded px-2 py-1.5 text-xs cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].listBgClass}`}
-                >
-                  <span className="text-gray-300 w-10 shrink-0">
-                    랠리 {i + 1}
-                  </span>
-                  <span
-                    className={`font-mono font-medium ${RALLY_WINNER_COLORS[r.winner].listText}`}
+              {data.rallies.map((r, i) => {
+                const scoreAfterRally = applyPoint(
+                  r.p1Score,
+                  r.p2Score,
+                  r.winner,
+                );
+                return (
+                  <div
+                    key={i}
+                    onClick={() => seekToFrame(r.start)}
+                    className={`flex items-center justify-between rounded px-2 py-1.5 text-xs cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].listBgClass}`}
                   >
-                    {r.p1Score}-{r.p2Score} →{" "}
-                    {r.winner === 1 ? r.p1Score + 1 : r.p1Score}-
-                    {r.winner === 2 ? r.p2Score + 1 : r.p2Score}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      update({
-                        rallies: data.rallies.filter((_, j) => j !== i),
-                      });
-                    }}
-                    className="text-gray-500 hover:text-red-400 ml-1 shrink-0"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+                    <span className="text-gray-300 w-10 shrink-0">
+                      랠리 {i + 1}
+                    </span>
+                    <span
+                      className={`font-mono font-medium ${RALLY_WINNER_COLORS[r.winner].listText}`}
+                    >
+                      {r.p1Score}-{r.p2Score} →{" "}
+                      {scoreAfterRally.player1_score}-
+                      {scoreAfterRally.player2_score}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteRally(i);
+                      }}
+                      className="text-gray-500 hover:text-red-400 ml-1 shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
