@@ -10,6 +10,7 @@ import { type Rally, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
+import { applyPoint, isValidRallyRange } from "./rally";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
@@ -166,7 +167,7 @@ export default function Editor({ projectId }: { projectId: number }) {
     } else {
       const end = currentFrame();
       // 잘못 들어온 입력이라 아무 것도 하지 않는다. 마킹을 유지해 시작 지점을 잃지 않게 한다.
-      if (end <= markStart) {
+      if (!isValidRallyRange(markStart, end)) {
         alert(INVALID_RANGE_MESSAGE);
         return;
       }
@@ -186,7 +187,7 @@ export default function Editor({ projectId }: { projectId: number }) {
   const addScore = (player: 1 | 2) => {
     if (marking) {
       const end = currentFrame();
-      if (end <= markStart) {
+      if (!isValidRallyRange(markStart, end)) {
         alert(INVALID_RANGE_MESSAGE);
         return;
       }
@@ -197,19 +198,13 @@ export default function Editor({ projectId }: { projectId: number }) {
         p2Score: data.player2_score,
         winner: player,
       };
-      const p1 = data.player1_score + (player === 1 ? 1 : 0);
-      const p2 = data.player2_score + (player === 2 ? 1 : 0);
       update({
         rallies: [...data.rallies, rally],
-        player1_score: p1,
-        player2_score: p2,
+        ...applyPoint(data.player1_score, data.player2_score, player),
       });
       setMarking(false);
     } else {
-      update({
-        player1_score: data.player1_score + (player === 1 ? 1 : 0),
-        player2_score: data.player2_score + (player === 2 ? 1 : 0),
-      });
+      update(applyPoint(data.player1_score, data.player2_score, player));
     }
   };
 
@@ -763,38 +758,45 @@ export default function Editor({ projectId }: { projectId: number }) {
 
             {/* 랠리 목록 */}
             <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
-              {data.rallies.map((r, i) => (
-                <div
-                  key={i}
-                  onClick={() => {
-                    if (videoRef.current)
-                      videoRef.current.currentTime = r.start / data.fps;
-                  }}
-                  className={`flex items-center justify-between rounded px-2 py-1.5 text-xs cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].listBgClass}`}
-                >
-                  <span className="text-gray-300 w-10 shrink-0">
-                    랠리 {i + 1}
-                  </span>
-                  <span
-                    className={`font-mono font-medium ${RALLY_WINNER_COLORS[r.winner].listText}`}
-                  >
-                    {r.p1Score}-{r.p2Score} →{" "}
-                    {r.winner === 1 ? r.p1Score + 1 : r.p1Score}-
-                    {r.winner === 2 ? r.p2Score + 1 : r.p2Score}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      update({
-                        rallies: data.rallies.filter((_, j) => j !== i),
-                      });
+              {data.rallies.map((r, i) => {
+                const scoreAfterRally = applyPoint(
+                  r.p1Score,
+                  r.p2Score,
+                  r.winner,
+                );
+                return (
+                  <div
+                    key={i}
+                    onClick={() => {
+                      if (videoRef.current)
+                        videoRef.current.currentTime = r.start / data.fps;
                     }}
-                    className="text-gray-500 hover:text-red-400 ml-1 shrink-0"
+                    className={`flex items-center justify-between rounded px-2 py-1.5 text-xs cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].listBgClass}`}
                   >
-                    ✕
-                  </button>
-                </div>
-              ))}
+                    <span className="text-gray-300 w-10 shrink-0">
+                      랠리 {i + 1}
+                    </span>
+                    <span
+                      className={`font-mono font-medium ${RALLY_WINNER_COLORS[r.winner].listText}`}
+                    >
+                      {r.p1Score}-{r.p2Score} →{" "}
+                      {scoreAfterRally.player1_score}-
+                      {scoreAfterRally.player2_score}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        update({
+                          rallies: data.rallies.filter((_, j) => j !== i),
+                        });
+                      }}
+                      className="text-gray-500 hover:text-red-400 ml-1 shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
