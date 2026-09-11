@@ -3,12 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { exports as exportsApi } from "@/api";
 import { updateProject } from "@/apis/projects";
-import {
-  getPreviewStatus,
-  uploadVideo,
-  videoPreviewUrl,
-  videoStreamUrl,
-} from "@/apis/video";
+import { uploadVideo } from "@/apis/video";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions, projectsOptions } from "@/queries/projects";
@@ -18,6 +13,7 @@ import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
+import { useVideoSource } from "./hooks/useVideoSource";
 import { resolveTotalFrames } from "./media";
 import { applyPoint } from "./rally";
 
@@ -89,9 +85,6 @@ export default function Editor({ projectId }: { projectId: number }) {
   const [ytUploading, setYtUploading] = useState(false);
   const [ytUrl, setYtUrl] = useState<string | null>(null);
   const [ytPostComment, setYtPostComment] = useState(true);
-  const [previewStatus, setPreviewStatus] = useState<
-    "idle" | "processing" | "ready"
-  >("idle");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const {
     videoRef,
@@ -102,6 +95,11 @@ export default function Editor({ projectId }: { projectId: number }) {
     togglePlay,
     handleLoadedMetadata,
   } = useVideoPlayer(data.fps);
+  const {
+    hasVideo,
+    previewProcessing,
+    src: videoSrc,
+  } = useVideoSource(videoId);
 
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
   const seededRef = useRef<number | null>(null);
@@ -134,24 +132,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     markSaved(seeded); // 서버에서 막 읽어온 값이라 되쓸 필요가 없다
     setVideoId(fetchedProject.video_id ?? "");
   }, [fetchedProject, projectId, reset, markSaved]);
-
-  useEffect(() => {
-    if (!videoId) return;
-    setPreviewStatus("idle");
-    let timer: ReturnType<typeof setInterval>;
-    const check = async () => {
-      try {
-        const res = await getPreviewStatus(videoId);
-        if (res.status === "ready") {
-          setPreviewStatus("ready");
-          clearInterval(timer);
-        } else if (res.status === "processing") setPreviewStatus("processing");
-      } catch {}
-    };
-    check();
-    timer = setInterval(check, 4000);
-    return () => clearInterval(timer);
-  }, [videoId]);
 
   // 영상 업로드
   const handleFile = async (file: File) => {
@@ -417,12 +397,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     videoRef,
   ]);
 
-  const streamUrl = videoId ? videoStreamUrl(videoId) : "";
-  const videoSrc = videoId
-    ? previewStatus === "ready"
-      ? videoPreviewUrl(videoId)
-      : streamUrl
-    : "";
   const totalFrames = resolveTotalFrames(data.total_frames, duration, data.fps);
 
   return (
@@ -454,7 +428,7 @@ export default function Editor({ projectId }: { projectId: number }) {
         {/* 왼쪽: 영상 + 컨트롤 */}
         <div className="flex-1 flex flex-col p-4 gap-3">
           {/* 영상 업로드 or 플레이어 */}
-          {!streamUrl ? (
+          {!hasVideo ? (
             <label
               className="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors"
               onDragOver={(e) => e.preventDefault()}
@@ -494,7 +468,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                 className="absolute inset-0 pointer-events-none rounded-xl"
                 style={{ width: "100%", height: "100%" }}
               />
-              {previewStatus === "processing" && (
+              {previewProcessing && (
                 <div className="absolute top-2 left-2 bg-black/70 text-yellow-300 text-xs px-2 py-1 rounded">
                   프리뷰 생성 중... (Chrome에서 재생 불가 시 잠시 후 새로고침)
                 </div>
