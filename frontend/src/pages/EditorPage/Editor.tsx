@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { exports as exportsApi } from "@/api";
 import { updateProject } from "@/apis/projects";
-import { uploadVideo } from "@/apis/video";
+import type { UploadedVideo } from "@/models/video";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions, projectsOptions } from "@/queries/projects";
@@ -14,6 +14,7 @@ import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
 import { useVideoSource } from "./hooks/useVideoSource";
+import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
@@ -72,9 +73,6 @@ const INVALID_RANGE_MESSAGE =
 export default function Editor({ projectId }: { projectId: number }) {
   const { data, update, undo, redo, reset, canUndo, canRedo } =
     useProjectDraft(DEFAULT_PROJECT_DATA);
-  const [videoId, setVideoId] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadPct, setUploadPct] = useState(0);
   const [exportPct, setExportPct] = useState<number | null>(null);
   const [exportMsg, setExportMsg] = useState("");
   const [exportEta, setExportEta] = useState<number | null>(null);
@@ -85,6 +83,11 @@ export default function Editor({ projectId }: { projectId: number }) {
   const [ytUrl, setYtUrl] = useState<string | null>(null);
   const [ytPostComment, setYtPostComment] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
+  const seededRef = useRef<number | null>(null);
+  const queryClient = useQueryClient();
+
   const {
     videoRef,
     duration,
@@ -94,15 +97,12 @@ export default function Editor({ projectId }: { projectId: number }) {
     togglePlay,
     handleLoadedMetadata,
   } = useVideoPlayer(data.fps);
+
   const {
     hasVideo,
     previewProcessing,
     src: videoSrc,
-  } = useVideoSource(videoId);
-
-  const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
-  const seededRef = useRef<number | null>(null);
-  const queryClient = useQueryClient();
+  } = useVideoSource(fetchedProject?.video_id ?? "");
 
   const {
     status: saveStatus,
@@ -129,23 +129,20 @@ export default function Editor({ projectId }: { projectId: number }) {
     };
     reset(seeded); // 다른 프로젝트를 열면 이전 undo 이력도 함께 비운다
     markSaved(seeded); // 서버에서 막 읽어온 값이라 되쓸 필요가 없다
-    setVideoId(fetchedProject.video_id ?? "");
   }, [fetchedProject, projectId, reset, markSaved]);
 
-  // 영상 업로드
-  const handleFile = async (file: File) => {
-    setUploading(true);
-    try {
-      const res = await uploadVideo(file, setUploadPct);
-      setVideoId(res.video_id);
-      update({
-        video_path: res.path,
-        fps: res.fps ?? 30,
-        total_frames: res.total_frames ?? 0,
-      });
-    } finally {
-      setUploading(false);
-    }
+  // #52 작업 완료 시 불필요해질 부분
+  const handleUploaded = (video: UploadedVideo) => {
+    queryClient.setQueryData(projectOptions(projectId).queryKey, (prev) => ({
+      ...prev,
+      video_id: video.video_id,
+      video_path: video.path,
+    }));
+    update({
+      video_path: video.path,
+      fps: video.fps,
+      total_frames: video.total_frames,
+    });
   };
 
   const {
@@ -430,30 +427,7 @@ export default function Editor({ projectId }: { projectId: number }) {
         <div className="flex-1 flex flex-col p-4 gap-3">
           {/* 영상 업로드 or 플레이어 */}
           {!hasVideo ? (
-            <label
-              className="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const f = e.dataTransfer.files[0];
-                if (f) handleFile(f);
-              }}
-            >
-              <p className="text-4xl mb-2">🎬</p>
-              <p className="text-gray-400">
-                {uploading
-                  ? `업로드 중... ${uploadPct}%`
-                  : "영상 파일을 클릭하거나 드래그하여 업로드"}
-              </p>
-              <input
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={(e) =>
-                  e.target.files?.[0] && handleFile(e.target.files[0])
-                }
-              />
-            </label>
+            <VideoDropzone onUploaded={handleUploaded} />
           ) : (
             <div className="relative w-full">
               <video
