@@ -1,8 +1,9 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { videos, exports as exportsApi } from "@/api";
+import { exports as exportsApi } from "@/api";
 import { updateProject } from "@/apis/projects";
+import type { UploadedVideo } from "@/models/video";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions, projectsOptions } from "@/queries/projects";
@@ -11,6 +12,9 @@ import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
+import { useVideoPlayer } from "./hooks/useVideoPlayer";
+import { useVideoSource } from "./hooks/useVideoSource";
+import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
@@ -69,9 +73,6 @@ const INVALID_RANGE_MESSAGE =
 export default function Editor({ projectId }: { projectId: number }) {
   const { data, update, undo, redo, reset, canUndo, canRedo } =
     useProjectDraft(DEFAULT_PROJECT_DATA);
-  const [videoId, setVideoId] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadPct, setUploadPct] = useState(0);
   const [exportPct, setExportPct] = useState<number | null>(null);
   const [exportMsg, setExportMsg] = useState("");
   const [exportEta, setExportEta] = useState<number | null>(null);
@@ -81,16 +82,27 @@ export default function Editor({ projectId }: { projectId: number }) {
   const [ytUploading, setYtUploading] = useState(false);
   const [ytUrl, setYtUrl] = useState<string | null>(null);
   const [ytPostComment, setYtPostComment] = useState(true);
-  const [videoDuration, setVideoDuration] = useState(0);
-  const [previewStatus, setPreviewStatus] = useState<
-    "idle" | "processing" | "ready"
-  >("idle");
-  const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
   const seededRef = useRef<number | null>(null);
   const queryClient = useQueryClient();
+
+  const {
+    videoRef,
+    duration,
+    getCurrentFrame,
+    seekToFrame,
+    seekBy,
+    togglePlay,
+    handleLoadedMetadata,
+  } = useVideoPlayer(data.fps);
+
+  const {
+    hasVideo,
+    previewProcessing,
+    src: videoSrc,
+  } = useVideoSource(fetchedProject?.video_id ?? "");
 
   const {
     status: saveStatus,
@@ -117,48 +129,20 @@ export default function Editor({ projectId }: { projectId: number }) {
     };
     reset(seeded); // 다른 프로젝트를 열면 이전 undo 이력도 함께 비운다
     markSaved(seeded); // 서버에서 막 읽어온 값이라 되쓸 필요가 없다
-    setVideoId(fetchedProject.video_id ?? "");
   }, [fetchedProject, projectId, reset, markSaved]);
 
-  useEffect(() => {
-    if (!videoId) return;
-    setPreviewStatus("idle");
-    let timer: ReturnType<typeof setInterval>;
-    const check = async () => {
-      try {
-        const res = await videos.previewStatus(videoId);
-        if (res.status === "ready") {
-          setPreviewStatus("ready");
-          clearInterval(timer);
-        } else if (res.status === "processing") setPreviewStatus("processing");
-      } catch {}
-    };
-    check();
-    timer = setInterval(check, 4000);
-    return () => clearInterval(timer);
-  }, [videoId]);
-
-  // 영상 업로드
-  const handleFile = async (file: File) => {
-    setUploading(true);
-    try {
-      const res = await videos.upload(file, setUploadPct);
-      setVideoId(res.video_id);
-      update({
-        video_path: res.path,
-        fps: res.fps ?? 30,
-        total_frames: res.total_frames ?? 0,
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // 프레임과 시간을 오가는 지점은 여기 둘뿐이다. 랠리 쪽은 프레임으로만 말한다.
-  const getCurrentFrame = () =>
-    Math.round((videoRef.current?.currentTime || 0) * data.fps);
-  const seekToFrame = (frame: number) => {
-    if (videoRef.current) videoRef.current.currentTime = frame / data.fps;
+  // #52 작업 완료 시 불필요해질 부분
+  const handleUploaded = (video: UploadedVideo) => {
+    queryClient.setQueryData(projectOptions(projectId).queryKey, (prev) => ({
+      ...prev,
+      video_id: video.video_id,
+      video_path: video.path,
+    }));
+    update({
+      video_path: video.path,
+      fps: video.fps,
+      total_frames: video.total_frames,
+    });
   };
 
   const {
@@ -271,11 +255,7 @@ export default function Editor({ projectId }: { projectId: number }) {
       if (e.target instanceof HTMLInputElement) return;
       if (e.code === "Space") {
         e.preventDefault();
-        if (videoRef.current?.paused) {
-          videoRef.current.play();
-        } else {
-          videoRef.current?.pause();
-        }
+        togglePlay();
       }
       if (e.code === "KeyR") toggleRally();
       if (e.code === "Digit1") addScore(RallyWinner.Team1);
@@ -286,19 +266,13 @@ export default function Editor({ projectId }: { projectId: number }) {
         (e.code === "KeyY" && e.ctrlKey)
       )
         handleRedo();
-      if (e.code === "ArrowLeft") {
-        if (videoRef.current)
-          videoRef.current.currentTime -= e.shiftKey ? 10 : 5;
-      }
-      if (e.code === "ArrowRight") {
-        if (videoRef.current)
-          videoRef.current.currentTime += e.shiftKey ? 10 : 5;
-      }
+      if (e.code === "ArrowLeft") seekBy(e.shiftKey ? -10 : -5);
+      if (e.code === "ArrowRight") seekBy(e.shiftKey ? 10 : 5);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // 의존성을 필요한 최소한으로 줄이는 것은 #33에서 다룬다.
-  }, [toggleRally, addScore, handleUndo, handleRedo]);
+  }, [toggleRally, addScore, handleUndo, handleRedo, togglePlay, seekBy]);
 
   // 점수판 canvas 미리보기
   useEffect(() => {
@@ -415,15 +389,13 @@ export default function Editor({ projectId }: { projectId: number }) {
     data.tournament_name,
     data.level,
     data.match_name,
-    videoDuration,
+    duration,
+    videoRef,
   ]);
 
-  const streamUrl = videoId ? videos.streamUrl(videoId) : "";
-  const videoSrc = videoId
-    ? previewStatus === "ready"
-      ? videos.previewUrl(videoId)
-      : streamUrl
-    : "";
+  // 업로드 때 ffprobe가 프레임 수를 못 읽으면 0으로 저장되므로 재생 길이로 대신한다.
+  const totalFrames =
+    data.total_frames > 0 ? data.total_frames : Math.round(duration * data.fps);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -454,31 +426,8 @@ export default function Editor({ projectId }: { projectId: number }) {
         {/* 왼쪽: 영상 + 컨트롤 */}
         <div className="flex-1 flex flex-col p-4 gap-3">
           {/* 영상 업로드 or 플레이어 */}
-          {!streamUrl ? (
-            <label
-              className="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const f = e.dataTransfer.files[0];
-                if (f) handleFile(f);
-              }}
-            >
-              <p className="text-4xl mb-2">🎬</p>
-              <p className="text-gray-400">
-                {uploading
-                  ? `업로드 중... ${uploadPct}%`
-                  : "영상 파일을 클릭하거나 드래그하여 업로드"}
-              </p>
-              <input
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={(e) =>
-                  e.target.files?.[0] && handleFile(e.target.files[0])
-                }
-              />
-            </label>
+          {!hasVideo ? (
+            <VideoDropzone onUploaded={handleUploaded} />
           ) : (
             <div className="relative w-full">
               <video
@@ -487,16 +436,14 @@ export default function Editor({ projectId }: { projectId: number }) {
                 controls
                 className="w-full rounded-xl bg-black"
                 style={{ maxHeight: "60vh" }}
-                onLoadedMetadata={() =>
-                  setVideoDuration(videoRef.current?.duration || 0)
-                }
+                onLoadedMetadata={handleLoadedMetadata}
               />
               <canvas
                 ref={canvasRef}
                 className="absolute inset-0 pointer-events-none rounded-xl"
                 style={{ width: "100%", height: "100%" }}
               />
-              {previewStatus === "processing" && (
+              {previewProcessing && (
                 <div className="absolute top-2 left-2 bg-black/70 text-yellow-300 text-xs px-2 py-1 rounded">
                   프리뷰 생성 중... (Chrome에서 재생 불가 시 잠시 후 새로고침)
                 </div>
@@ -514,10 +461,7 @@ export default function Editor({ projectId }: { projectId: number }) {
             ].map(([label, sec]) => (
               <button
                 key={label as string}
-                onClick={() => {
-                  if (videoRef.current)
-                    videoRef.current.currentTime += sec as number;
-                }}
+                onClick={() => seekBy(sec as number)}
                 className="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors"
               >
                 {label}
@@ -526,40 +470,32 @@ export default function Editor({ projectId }: { projectId: number }) {
           </div>
 
           {/* 랠리 타임라인 */}
-          {data.rallies.length > 0 &&
-            (videoDuration > 0 || data.total_frames > 0) &&
-            (() => {
-              const totalFrames =
-                data.total_frames > 0
-                  ? data.total_frames
-                  : Math.round(videoDuration * data.fps);
-              return (
-                <div
-                  className="relative w-full h-6 bg-gray-700 rounded-lg overflow-hidden"
-                  title="랠리 타임라인 - 클릭하면 해당 구간으로 이동"
-                >
-                  {data.rallies.map((r, i) => {
-                    const left = (r.start / totalFrames) * 100;
-                    const width = Math.max(
-                      0.5,
-                      ((r.end - r.start) / totalFrames) * 100,
-                    );
-                    return (
-                      <div
-                        key={i}
-                        onClick={() => seekToFrame(r.start)}
-                        title={`랠리 ${i + 1}: ${r.p1Score}-${r.p2Score}`}
-                        className={`absolute top-0 h-full cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].timelineClass}`}
-                        style={{
-                          left: `${left}%`,
-                          width: `${width}%`,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              );
-            })()}
+          {data.rallies.length > 0 && totalFrames > 0 && (
+            <div
+              className="relative w-full h-6 bg-gray-700 rounded-lg overflow-hidden"
+              title="랠리 타임라인 - 클릭하면 해당 구간으로 이동"
+            >
+              {data.rallies.map((r, i) => {
+                const left = (r.start / totalFrames) * 100;
+                const width = Math.max(
+                  0.5,
+                  ((r.end - r.start) / totalFrames) * 100,
+                );
+                return (
+                  <div
+                    key={i}
+                    onClick={() => seekToFrame(r.start)}
+                    title={`랠리 ${i + 1}: ${r.p1Score}-${r.p2Score}`}
+                    className={`absolute top-0 h-full cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].timelineClass}`}
+                    style={{
+                      left: `${left}%`,
+                      width: `${width}%`,
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
 
           {/* 단축키 안내 */}
           <p className="text-gray-500 text-xs text-center">
@@ -729,8 +665,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                     <span
                       className={`font-mono font-medium ${RALLY_WINNER_COLORS[r.winner].listText}`}
                     >
-                      {r.p1Score}-{r.p2Score} →{" "}
-                      {scoreAfterRally.player1_score}-
+                      {r.p1Score}-{r.p2Score} → {scoreAfterRally.player1_score}-
                       {scoreAfterRally.player2_score}
                     </span>
                     <button
