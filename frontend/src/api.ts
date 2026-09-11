@@ -2,7 +2,7 @@ import type { ExportItem, AdminExport } from "@/models/export";
 import type { UserInfo, AdminUser, Stats } from "@/models/user";
 import type { LoginResponse, RegisterResponse } from "@/models/auth";
 
-const BASE = import.meta.env.VITE_API_URL || "";
+export const BASE = import.meta.env.VITE_API_URL || "";
 
 function headers() {
   const token = localStorage.getItem("token");
@@ -61,44 +61,6 @@ export const auth = {
       method: "POST",
       body: JSON.stringify({ token, new_password }),
     }),
-};
-
-export const videos = {
-  upload: async (file: File, onProgress?: (pct: number) => void) => {
-    const token = localStorage.getItem("token") || "";
-    const form = new FormData();
-    form.append("file", file);
-
-    return new Promise<{
-      video_id: string;
-      path: string;
-      filename: string;
-      fps: number;
-      total_frames: number;
-    }>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${BASE}/api/videos/upload`);
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable)
-          onProgress?.(Math.round((e.loaded / e.total) * 100));
-      };
-      xhr.onload = () => {
-        if (xhr.status < 300) resolve(JSON.parse(xhr.responseText));
-        else reject(new Error("업로드 실패"));
-      };
-      xhr.onerror = () => reject(new Error("업로드 실패"));
-      xhr.send(form);
-    });
-  },
-  streamUrl: (videoId: string) =>
-    `${BASE}/api/videos/stream/${videoId}?token=${localStorage.getItem("token") || ""}`,
-  previewUrl: (videoId: string) =>
-    `${BASE}/api/videos/preview/${videoId}?token=${localStorage.getItem("token") || ""}`,
-  previewStatus: (
-    videoId: string,
-  ): Promise<{ status: "ready" | "processing" | "not_found" }> =>
-    apiFetch(`/api/videos/preview-status/${videoId}`),
 };
 
 export const exports = {

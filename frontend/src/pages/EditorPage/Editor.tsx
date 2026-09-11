@@ -1,8 +1,14 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { videos, exports as exportsApi } from "@/api";
+import { exports as exportsApi } from "@/api";
 import { updateProject } from "@/apis/projects";
+import {
+  getPreviewStatus,
+  uploadVideo,
+  videoPreviewUrl,
+  videoStreamUrl,
+} from "@/apis/video";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions, projectsOptions } from "@/queries/projects";
@@ -126,7 +132,7 @@ export default function Editor({ projectId }: { projectId: number }) {
     let timer: ReturnType<typeof setInterval>;
     const check = async () => {
       try {
-        const res = await videos.previewStatus(videoId);
+        const res = await getPreviewStatus(videoId);
         if (res.status === "ready") {
           setPreviewStatus("ready");
           clearInterval(timer);
@@ -142,7 +148,7 @@ export default function Editor({ projectId }: { projectId: number }) {
   const handleFile = async (file: File) => {
     setUploading(true);
     try {
-      const res = await videos.upload(file, setUploadPct);
+      const res = await uploadVideo(file, setUploadPct);
       setVideoId(res.video_id);
       update({
         video_path: res.path,
@@ -418,10 +424,10 @@ export default function Editor({ projectId }: { projectId: number }) {
     videoDuration,
   ]);
 
-  const streamUrl = videoId ? videos.streamUrl(videoId) : "";
+  const streamUrl = videoId ? videoStreamUrl(videoId) : "";
   const videoSrc = videoId
     ? previewStatus === "ready"
-      ? videos.previewUrl(videoId)
+      ? videoPreviewUrl(videoId)
       : streamUrl
     : "";
 
@@ -729,8 +735,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                     <span
                       className={`font-mono font-medium ${RALLY_WINNER_COLORS[r.winner].listText}`}
                     >
-                      {r.p1Score}-{r.p2Score} →{" "}
-                      {scoreAfterRally.player1_score}-
+                      {r.p1Score}-{r.p2Score} → {scoreAfterRally.player1_score}-
                       {scoreAfterRally.player2_score}
                     </span>
                     <button
