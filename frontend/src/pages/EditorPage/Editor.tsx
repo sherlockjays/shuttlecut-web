@@ -17,6 +17,7 @@ import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
+import { useVideoPlayer } from "./hooks/useVideoPlayer";
 import { resolveTotalFrames } from "./media";
 import { applyPoint } from "./rally";
 
@@ -88,12 +89,19 @@ export default function Editor({ projectId }: { projectId: number }) {
   const [ytUploading, setYtUploading] = useState(false);
   const [ytUrl, setYtUrl] = useState<string | null>(null);
   const [ytPostComment, setYtPostComment] = useState(true);
-  const [videoDuration, setVideoDuration] = useState(0);
   const [previewStatus, setPreviewStatus] = useState<
     "idle" | "processing" | "ready"
   >("idle");
-  const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const {
+    videoRef,
+    duration,
+    getCurrentFrame,
+    seekToFrame,
+    seekBy,
+    togglePlay,
+    handleLoadedMetadata,
+  } = useVideoPlayer(data.fps);
 
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
   const seededRef = useRef<number | null>(null);
@@ -159,13 +167,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     } finally {
       setUploading(false);
     }
-  };
-
-  // 프레임과 시간을 오가는 지점은 여기 둘뿐이다. 랠리 쪽은 프레임으로만 말한다.
-  const getCurrentFrame = () =>
-    Math.round((videoRef.current?.currentTime || 0) * data.fps);
-  const seekToFrame = (frame: number) => {
-    if (videoRef.current) videoRef.current.currentTime = frame / data.fps;
   };
 
   const {
@@ -278,11 +279,7 @@ export default function Editor({ projectId }: { projectId: number }) {
       if (e.target instanceof HTMLInputElement) return;
       if (e.code === "Space") {
         e.preventDefault();
-        if (videoRef.current?.paused) {
-          videoRef.current.play();
-        } else {
-          videoRef.current?.pause();
-        }
+        togglePlay();
       }
       if (e.code === "KeyR") toggleRally();
       if (e.code === "Digit1") addScore(RallyWinner.Team1);
@@ -293,19 +290,13 @@ export default function Editor({ projectId }: { projectId: number }) {
         (e.code === "KeyY" && e.ctrlKey)
       )
         handleRedo();
-      if (e.code === "ArrowLeft") {
-        if (videoRef.current)
-          videoRef.current.currentTime -= e.shiftKey ? 10 : 5;
-      }
-      if (e.code === "ArrowRight") {
-        if (videoRef.current)
-          videoRef.current.currentTime += e.shiftKey ? 10 : 5;
-      }
+      if (e.code === "ArrowLeft") seekBy(e.shiftKey ? -10 : -5);
+      if (e.code === "ArrowRight") seekBy(e.shiftKey ? 10 : 5);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // 의존성을 필요한 최소한으로 줄이는 것은 #33에서 다룬다.
-  }, [toggleRally, addScore, handleUndo, handleRedo]);
+  }, [toggleRally, addScore, handleUndo, handleRedo, togglePlay, seekBy]);
 
   // 점수판 canvas 미리보기
   useEffect(() => {
@@ -422,7 +413,8 @@ export default function Editor({ projectId }: { projectId: number }) {
     data.tournament_name,
     data.level,
     data.match_name,
-    videoDuration,
+    duration,
+    videoRef,
   ]);
 
   const streamUrl = videoId ? videoStreamUrl(videoId) : "";
@@ -431,11 +423,7 @@ export default function Editor({ projectId }: { projectId: number }) {
       ? videoPreviewUrl(videoId)
       : streamUrl
     : "";
-  const totalFrames = resolveTotalFrames(
-    data.total_frames,
-    videoDuration,
-    data.fps,
-  );
+  const totalFrames = resolveTotalFrames(data.total_frames, duration, data.fps);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -499,9 +487,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                 controls
                 className="w-full rounded-xl bg-black"
                 style={{ maxHeight: "60vh" }}
-                onLoadedMetadata={() =>
-                  setVideoDuration(videoRef.current?.duration || 0)
-                }
+                onLoadedMetadata={handleLoadedMetadata}
               />
               <canvas
                 ref={canvasRef}
@@ -526,10 +512,7 @@ export default function Editor({ projectId }: { projectId: number }) {
             ].map(([label, sec]) => (
               <button
                 key={label as string}
-                onClick={() => {
-                  if (videoRef.current)
-                    videoRef.current.currentTime += sec as number;
-                }}
+                onClick={() => seekBy(sec as number)}
                 className="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors"
               >
                 {label}
