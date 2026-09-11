@@ -17,6 +17,7 @@ import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
+import { resolveTotalFrames } from "./media";
 import { applyPoint } from "./rally";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
@@ -430,6 +431,11 @@ export default function Editor({ projectId }: { projectId: number }) {
       ? videoPreviewUrl(videoId)
       : streamUrl
     : "";
+  const totalFrames = resolveTotalFrames(
+    data.total_frames,
+    videoDuration,
+    data.fps,
+  );
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -532,40 +538,32 @@ export default function Editor({ projectId }: { projectId: number }) {
           </div>
 
           {/* 랠리 타임라인 */}
-          {data.rallies.length > 0 &&
-            (videoDuration > 0 || data.total_frames > 0) &&
-            (() => {
-              const totalFrames =
-                data.total_frames > 0
-                  ? data.total_frames
-                  : Math.round(videoDuration * data.fps);
-              return (
-                <div
-                  className="relative w-full h-6 bg-gray-700 rounded-lg overflow-hidden"
-                  title="랠리 타임라인 - 클릭하면 해당 구간으로 이동"
-                >
-                  {data.rallies.map((r, i) => {
-                    const left = (r.start / totalFrames) * 100;
-                    const width = Math.max(
-                      0.5,
-                      ((r.end - r.start) / totalFrames) * 100,
-                    );
-                    return (
-                      <div
-                        key={i}
-                        onClick={() => seekToFrame(r.start)}
-                        title={`랠리 ${i + 1}: ${r.p1Score}-${r.p2Score}`}
-                        className={`absolute top-0 h-full cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].timelineClass}`}
-                        style={{
-                          left: `${left}%`,
-                          width: `${width}%`,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              );
-            })()}
+          {data.rallies.length > 0 && totalFrames > 0 && (
+            <div
+              className="relative w-full h-6 bg-gray-700 rounded-lg overflow-hidden"
+              title="랠리 타임라인 - 클릭하면 해당 구간으로 이동"
+            >
+              {data.rallies.map((r, i) => {
+                const left = (r.start / totalFrames) * 100;
+                const width = Math.max(
+                  0.5,
+                  ((r.end - r.start) / totalFrames) * 100,
+                );
+                return (
+                  <div
+                    key={i}
+                    onClick={() => seekToFrame(r.start)}
+                    title={`랠리 ${i + 1}: ${r.p1Score}-${r.p2Score}`}
+                    className={`absolute top-0 h-full cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].timelineClass}`}
+                    style={{
+                      left: `${left}%`,
+                      width: `${width}%`,
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
 
           {/* 단축키 안내 */}
           <p className="text-gray-500 text-xs text-center">
