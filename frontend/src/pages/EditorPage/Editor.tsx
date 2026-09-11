@@ -14,7 +14,6 @@ import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
 import { useVideoSource } from "./hooks/useVideoSource";
-import { resolveTotalFrames } from "./media";
 import { applyPoint } from "./rally";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
@@ -397,7 +396,9 @@ export default function Editor({ projectId }: { projectId: number }) {
     videoRef,
   ]);
 
-  const totalFrames = resolveTotalFrames(data.total_frames, duration, data.fps);
+  // 업로드 때 ffprobe가 프레임 수를 못 읽으면 0으로 저장되므로 재생 길이로 대신한다.
+  const totalFrames =
+    data.total_frames > 0 ? data.total_frames : Math.round(duration * data.fps);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
