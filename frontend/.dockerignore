@@ -1,0 +1,16 @@
+# Dockerfile이 `npm install` 다음에 `COPY . .` 를 하므로, 호스트의 node_modules가
+# 빌드 컨텍스트에 섞이면 컨테이너(alpine)에 설치된 모듈을 덮어써 빌드가 깨진다.
+node_modules
+dist
+
+# VITE_API_URL은 빌드 타임에 번들로 박힌다. 로컬 .env는 http://localhost:8000이라
+# 이게 딸려가면 운영 SPA가 사용자 브라우저에서 localhost를 호출하게 된다.
+# 운영은 .env 없이 빌드해 BASE=""(same-origin)로 nginx 프록시를 타야 한다.
+.env
+.env.*
+
+# 빌드에 불필요
+.git
+.gitignore
+*.log
+coverage
