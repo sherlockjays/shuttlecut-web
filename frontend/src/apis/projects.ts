@@ -8,17 +8,14 @@ import {
   type RallyWire,
 } from "@/models/project";
 
-export const listProjects = (): Promise<Project[]> =>
-  apiFetch<Project[]>("/api/projects/");
+export const listProjects = (): Promise<Project[]> => apiFetch<Project[]>("/api/projects/");
 
 // rallies 컬럼이 nullable이라 서버가 null을 줄 수 있다.
 type ProjectDetailWire = Partial<Omit<ProjectDetail, "rallies">> & {
   rallies?: RallyWire[] | null;
 };
 
-export const getProject = async (
-  id: number,
-): Promise<Partial<ProjectDetail>> => {
+export const getProject = async (id: number): Promise<Partial<ProjectDetail>> => {
   const raw = await apiFetch<ProjectDetailWire>(`/api/projects/${id}`);
   return { ...raw, rallies: (raw.rallies ?? []).map(rallyFromWire) };
 };
@@ -40,5 +37,4 @@ export const updateProject = async (
   return { ...raw, rallies: (raw.rallies ?? []).map(rallyFromWire) };
 };
 
-export const deleteProject = (id: number) =>
-  apiFetch(`/api/projects/${id}`, { method: "DELETE" });
+export const deleteProject = (id: number) => apiFetch(`/api/projects/${id}`, { method: "DELETE" });

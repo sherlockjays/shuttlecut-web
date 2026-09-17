@@ -24,9 +24,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="w-full max-w-sm bg-gray-800 rounded-2xl p-8 shadow-xl">
-        <h1 className="text-2xl font-bold text-white mb-2 text-center">
-          🏸 ShuttleCut
-        </h1>
+        <h1 className="text-2xl font-bold text-white mb-2 text-center">🏸 ShuttleCut</h1>
         <p className="text-gray-400 text-sm text-center mb-6">비밀번호 찾기</p>
 
         {sent ? (
@@ -49,8 +47,7 @@ export default function ForgotPasswordPage() {
         ) : (
           <form onSubmit={submit} className="space-y-4">
             <p className="text-gray-400 text-sm">
-              가입 시 사용한 이메일을 입력하면 비밀번호 재설정 링크를
-              보내드립니다.
+              가입 시 사용한 이메일을 입력하면 비밀번호 재설정 링크를 보내드립니다.
             </p>
             <input
               type="email"

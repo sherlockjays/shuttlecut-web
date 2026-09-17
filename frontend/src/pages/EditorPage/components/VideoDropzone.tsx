@@ -33,9 +33,7 @@ export default function VideoDropzone({
     >
       <p className="text-4xl mb-2">🎬</p>
       <p className="text-gray-400">
-        {isPending
-          ? `업로드 중... ${progress}%`
-          : "영상 파일을 클릭하거나 드래그하여 업로드"}
+        {isPending ? `업로드 중... ${progress}%` : "영상 파일을 클릭하거나 드래그하여 업로드"}
       </p>
       <input
         type="file"

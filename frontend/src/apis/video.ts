@@ -14,8 +14,7 @@ export const uploadVideo = (file: File, onProgress?: (pct: number) => void) => {
     xhr.open("POST", `${BASE}/api/videos/upload`);
     xhr.setRequestHeader("Authorization", `Bearer ${token()}`);
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable)
-        onProgress?.(Math.round((e.loaded / e.total) * 100));
+      if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100));
     };
     xhr.onload = () => {
       if (xhr.status >= 300) return reject(new Error("업로드 실패"));
@@ -36,7 +35,5 @@ export const videoStreamUrl = (videoId: string) =>
 export const videoPreviewUrl = (videoId: string) =>
   `${BASE}/api/videos/preview/${videoId}?token=${token()}`;
 
-export const getPreviewStatus = (
-  videoId: string,
-): Promise<{ status: PreviewStatus }> =>
+export const getPreviewStatus = (videoId: string): Promise<{ status: PreviewStatus }> =>
   apiFetch(`/api/videos/preview-status/${videoId}`);

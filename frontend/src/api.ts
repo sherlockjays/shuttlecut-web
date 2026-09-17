@@ -16,10 +16,7 @@ export function saveToken(token: string) {
   localStorage.setItem("token", token);
 }
 
-export async function apiFetch<T = unknown>(
-  path: string,
-  opts: RequestInit = {},
-): Promise<T> {
+export async function apiFetch<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
     headers: { ...headers(), ...(opts.headers || {}) },
@@ -48,9 +45,7 @@ export const auth = {
   me: (): Promise<UserInfo> => apiFetch<UserInfo>("/api/auth/me"),
   googleLoginUrl: () => `${BASE}/api/auth/google`,
   exchangeGoogleCode: (code: string): Promise<{ access_token?: string }> =>
-    apiFetch<{ access_token?: string }>(
-      `/api/auth/google/exchange?code=${code}`,
-    ),
+    apiFetch<{ access_token?: string }>(`/api/auth/google/exchange?code=${code}`),
   forgotPassword: (email: string) =>
     apiFetch("/api/auth/forgot-password", {
       method: "POST",
@@ -83,8 +78,7 @@ export const exports = {
       method: "POST",
       body: JSON.stringify({ post_comment: postComment }),
     }),
-  delete: (exportId: number) =>
-    apiFetch(`/api/export/${exportId}`, { method: "DELETE" }),
+  delete: (exportId: number) => apiFetch(`/api/export/${exportId}`, { method: "DELETE" }),
 };
 
 export const admin = {
@@ -102,16 +96,14 @@ export const admin = {
 export const youtube = {
   status: (): Promise<{ connected: boolean }> =>
     apiFetch<{ connected: boolean }>("/api/youtube/status"),
-  authUrl: () =>
-    `${BASE}/api/youtube/auth?token=${localStorage.getItem("token") || ""}`,
+  authUrl: () => `${BASE}/api/youtube/auth?token=${localStorage.getItem("token") || ""}`,
   disconnect: () => apiFetch("/api/youtube/disconnect", { method: "DELETE" }),
 };
 
 export const autoedit = {
   listProjects: () => apiFetch("/api/autoedit/projects"),
   getProject: (id: number) => apiFetch(`/api/autoedit/projects/${id}`),
-  deleteProject: (id: number) =>
-    apiFetch(`/api/autoedit/projects/${id}`, { method: "DELETE" }),
+  deleteProject: (id: number) => apiFetch(`/api/autoedit/projects/${id}`, { method: "DELETE" }),
   uploadVideo: (file: File) => {
     const token = localStorage.getItem("token") || "";
     const form = new FormData();
@@ -128,12 +120,7 @@ export const autoedit = {
           }),
     );
   },
-  setCourt: (
-    id: number,
-    court_points: unknown,
-    image_width: number,
-    image_height: number,
-  ) =>
+  setCourt: (id: number, court_points: unknown, image_width: number, image_height: number) =>
     apiFetch(`/api/autoedit/projects/${id}/court`, {
       method: "POST",
       body: JSON.stringify({ court_points, image_width, image_height }),

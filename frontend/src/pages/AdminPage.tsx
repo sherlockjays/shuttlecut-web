@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { admin as adminApi } from "@/api";
-import {
-  adminUsersOptions,
-  adminStatsOptions,
-  adminExportsOptions,
-} from "@/queries/admin";
+import { adminUsersOptions, adminStatsOptions, adminExportsOptions } from "@/queries/admin";
 import { STATUS_LABEL, STATUS_CLASS, STATUSES } from "@/models/export";
 import { PLANS, type Plan } from "@/models/plan";
 
@@ -24,11 +20,7 @@ export default function AdminPage() {
   const [saving, setSaving] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
-  const {
-    data: users = [],
-    isLoading: loading,
-    error: usersError,
-  } = useQuery(adminUsersOptions);
+  const { data: users = [], isLoading: loading, error: usersError } = useQuery(adminUsersOptions);
   const { data: stats } = useQuery(adminStatsOptions);
   const { data: taskExports = [] } = useQuery({
     ...adminExportsOptions,
@@ -78,11 +70,7 @@ export default function AdminPage() {
                 : "border-transparent text-gray-400 hover:text-white"
             }`}
           >
-            {t === "users"
-              ? "사용자 관리"
-              : t === "stats"
-                ? "통계"
-                : "작업현황"}
+            {t === "users" ? "사용자 관리" : t === "stats" ? "통계" : "작업현황"}
           </button>
         ))}
       </div>
@@ -110,39 +98,24 @@ export default function AdminPage() {
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr
-                    key={u.id}
-                    className="border-b border-gray-800 hover:bg-gray-800/40"
-                  >
-                    <td className="py-3 pr-4 text-white font-medium">
-                      {u.email}
-                    </td>
+                  <tr key={u.id} className="border-b border-gray-800 hover:bg-gray-800/40">
+                    <td className="py-3 pr-4 text-white font-medium">{u.email}</td>
                     <td className="py-3 pr-4">
                       <select
                         value={u.plan}
                         disabled={saving === u.id}
-                        onChange={(e) =>
-                          handlePlanChange(u.id, e.target.value as Plan)
-                        }
+                        onChange={(e) => handlePlanChange(u.id, e.target.value as Plan)}
                         className={`text-xs font-semibold px-2 py-1 rounded cursor-pointer border-0 outline-none ${PLAN_BADGE[u.plan] ?? "bg-gray-600 text-gray-200"}`}
                       >
                         {PLANS.map((p) => (
-                          <option
-                            key={p}
-                            value={p}
-                            className="bg-gray-800 text-white"
-                          >
+                          <option key={p} value={p} className="bg-gray-800 text-white">
                             {p}
                           </option>
                         ))}
                       </select>
                     </td>
-                    <td className="py-3 pr-4 text-center text-gray-300">
-                      {u.export_count}
-                    </td>
-                    <td className="py-3 pr-4 text-center text-gray-300">
-                      {u.project_count}
-                    </td>
+                    <td className="py-3 pr-4 text-center text-gray-300">{u.export_count}</td>
+                    <td className="py-3 pr-4 text-center text-gray-300">{u.project_count}</td>
                     <td className="py-3 pr-4 text-center">
                       {u.is_verified ? (
                         <span className="text-green-400 text-xs">✓</span>
@@ -155,9 +128,7 @@ export default function AdminPage() {
                       {u.youtube_connected && " / YT"}
                     </td>
                     <td className="py-3 pr-4 text-gray-400 text-xs whitespace-nowrap">
-                      {u.created_at
-                        ? new Date(u.created_at).toLocaleDateString("ko-KR")
-                        : "-"}
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString("ko-KR") : "-"}
                     </td>
                     <td className="py-3">
                       <button
@@ -182,20 +153,14 @@ export default function AdminPage() {
             <h2 className="text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
               사용자
             </h2>
-            <p className="text-3xl font-bold text-white mb-3">
-              {stats.total_users}
-            </p>
+            <p className="text-3xl font-bold text-white mb-3">{stats.total_users}</p>
             <div className="space-y-1">
               {PLANS.map((plan) => (
                 <div key={plan} className="flex justify-between text-sm">
-                  <span
-                    className={`text-xs font-semibold px-2 py-0.5 rounded ${PLAN_BADGE[plan]}`}
-                  >
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${PLAN_BADGE[plan]}`}>
                     {plan}
                   </span>
-                  <span className="text-gray-300">
-                    {stats.users_by_plan[plan] ?? 0}명
-                  </span>
+                  <span className="text-gray-300">{stats.users_by_plan[plan] ?? 0}명</span>
                 </div>
               ))}
             </div>
@@ -204,16 +169,12 @@ export default function AdminPage() {
             <h2 className="text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
               내보내기
             </h2>
-            <p className="text-3xl font-bold text-white mb-3">
-              {stats.total_exports}
-            </p>
+            <p className="text-3xl font-bold text-white mb-3">{stats.total_exports}</p>
             <div className="space-y-1">
               {STATUSES.map((status) => (
                 <div key={status} className="flex justify-between text-sm">
                   <span className="text-gray-400">{status}</span>
-                  <span className="text-gray-300">
-                    {stats.exports_by_status[status] ?? 0}건
-                  </span>
+                  <span className="text-gray-300">{stats.exports_by_status[status] ?? 0}건</span>
                 </div>
               ))}
             </div>
@@ -222,9 +183,7 @@ export default function AdminPage() {
             <h2 className="text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
               프로젝트
             </h2>
-            <p className="text-3xl font-bold text-white">
-              {stats.total_projects}
-            </p>
+            <p className="text-3xl font-bold text-white">{stats.total_projects}</p>
           </div>
         </div>
       )}
@@ -244,10 +203,7 @@ export default function AdminPage() {
             </thead>
             <tbody>
               {taskExports.map((e) => (
-                <tr
-                  key={e.id}
-                  className="border-b border-gray-800 hover:bg-gray-800/40"
-                >
+                <tr key={e.id} className="border-b border-gray-800 hover:bg-gray-800/40">
                   <td className="py-2 pr-3 text-gray-500 text-xs">{e.id}</td>
                   <td className="py-2 pr-3">
                     <span
@@ -256,14 +212,10 @@ export default function AdminPage() {
                       {STATUS_LABEL[e.status]}
                     </span>
                     {e.status === "error" && e.error_msg && (
-                      <p className="text-red-400 text-xs mt-0.5 max-w-xs truncate">
-                        {e.error_msg}
-                      </p>
+                      <p className="text-red-400 text-xs mt-0.5 max-w-xs truncate">{e.error_msg}</p>
                     )}
                   </td>
-                  <td className="py-2 pr-3 text-gray-300 text-xs">
-                    {e.user_email}
-                  </td>
+                  <td className="py-2 pr-3 text-gray-300 text-xs">{e.user_email}</td>
                   <td className="py-2 pr-3 text-gray-300 text-xs max-w-xs truncate">
                     {e.project_title}
                   </td>
@@ -284,18 +236,14 @@ export default function AdminPage() {
                     )}
                   </td>
                   <td className="py-2 text-gray-500 text-xs whitespace-nowrap">
-                    {e.created_at
-                      ? new Date(e.created_at).toLocaleString("ko-KR")
-                      : "-"}
+                    {e.created_at ? new Date(e.created_at).toLocaleString("ko-KR") : "-"}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {taskExports.length === 0 && (
-            <p className="text-gray-500 text-sm text-center py-8">
-              작업 기록이 없습니다.
-            </p>
+            <p className="text-gray-500 text-sm text-center py-8">작업 기록이 없습니다.</p>
           )}
         </div>
       )}

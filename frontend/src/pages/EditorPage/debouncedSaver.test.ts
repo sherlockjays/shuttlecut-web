@@ -174,10 +174,7 @@ const deferred = () => {
 describe("동시 저장", () => {
   it("앞선 저장이 끝나기 전에는 다음 저장을 보내지 않는다", async () => {
     const first = deferred();
-    const save = vi
-      .fn()
-      .mockReturnValueOnce(first.promise)
-      .mockResolvedValue(undefined);
+    const save = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValue(undefined);
     const { saver } = setup(save);
 
     saver.schedule("a");
@@ -198,10 +195,7 @@ describe("동시 저장", () => {
 
   it("기다리는 동안 들어온 변경은 다음 저장으로 나간다", async () => {
     const first = deferred();
-    const save = vi
-      .fn()
-      .mockReturnValueOnce(first.promise)
-      .mockResolvedValue(undefined);
+    const save = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValue(undefined);
     const { saver } = setup(save);
 
     saver.schedule("a");

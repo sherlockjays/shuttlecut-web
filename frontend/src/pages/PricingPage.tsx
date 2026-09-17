@@ -21,11 +21,7 @@ const plans = [
     badge: null as string | null,
     border: "border-gray-500",
     highlight: false,
-    features: [
-      "Free 기능 포함",
-      "YouTube 업로드",
-      "우측 상단 ShuttleCut 워터마크",
-    ],
+    features: ["Free 기능 포함", "YouTube 업로드", "우측 상단 ShuttleCut 워터마크"],
   },
   {
     name: "Standard",
@@ -45,12 +41,7 @@ const plans = [
     badge: null as string | null,
     border: "border-purple-500",
     highlight: false,
-    features: [
-      "Standard 기능 포함",
-      "워터마크 없음",
-      "YouTube 업로드",
-      "우선 처리",
-    ],
+    features: ["Standard 기능 포함", "워터마크 없음", "YouTube 업로드", "우선 처리"],
   },
   {
     name: "무제한",
@@ -60,12 +51,7 @@ const plans = [
     badge: null as string | null,
     border: "border-yellow-500",
     highlight: false,
-    features: [
-      "Premium 기능 포함",
-      "워터마크 없음",
-      "YouTube 업로드",
-      "우선 처리",
-    ],
+    features: ["Premium 기능 포함", "워터마크 없음", "YouTube 업로드", "우선 처리"],
   },
 ];
 
@@ -91,20 +77,14 @@ export default function PricingPage() {
             <h3 className="text-lg font-bold mb-1">{plan.name}</h3>
             <div className="mb-3">
               <span className="text-2xl font-bold">{plan.price}</span>
-              {plan.period && (
-                <span className="text-gray-400 text-sm">{plan.period}</span>
-              )}
+              {plan.period && <span className="text-gray-400 text-sm">{plan.period}</span>}
             </div>
             <p className="text-sm text-gray-400 mb-4">
-              내보내기:{" "}
-              <span className="text-white font-medium">{plan.exports}</span>
+              내보내기: <span className="text-white font-medium">{plan.exports}</span>
             </p>
             <ul className="space-y-2 mb-6 flex-1">
               {plan.features.map((f) => (
-                <li
-                  key={f}
-                  className="text-sm text-gray-300 flex items-start gap-2"
-                >
+                <li key={f} className="text-sm text-gray-300 flex items-start gap-2">
                   <span className="text-green-400 mt-0.5">✓</span> {f}
                 </li>
               ))}

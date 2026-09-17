@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  HISTORY_LIMIT,
-  createHistory,
-  pushHistory,
-  redoHistory,
-  undoHistory,
-} from "./history";
+import { HISTORY_LIMIT, createHistory, pushHistory, redoHistory, undoHistory } from "./history";
 
 describe("createHistory", () => {
   it("현재값만 있고 과거/미래는 비어있다", () => {

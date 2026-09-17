@@ -15,12 +15,8 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="w-full max-w-sm bg-gray-800 rounded-2xl p-8 shadow-xl">
-        <h1 className="text-2xl font-bold text-white mb-2 text-center">
-          🏸 ShuttleCut
-        </h1>
-        <p className="text-gray-400 text-sm text-center mb-6">
-          배드민턴 경기 영상 편집 서비스
-        </p>
+        <h1 className="text-2xl font-bold text-white mb-2 text-center">🏸 ShuttleCut</h1>
+        <p className="text-gray-400 text-sm text-center mb-6">배드민턴 경기 영상 편집 서비스</p>
 
         {/* 이메일 인증 배너 */}
         {verifyBanner && (
@@ -39,10 +35,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
         )}
 
         {registeredEmail ? (
-          <RegisteredNotice
-            email={registeredEmail}
-            onBack={() => setRegisteredEmail(null)}
-          />
+          <RegisteredNotice email={registeredEmail} onBack={() => setRegisteredEmail(null)} />
         ) : (
           <AuthForm onRegisterSuccess={setRegisteredEmail} />
         )}
@@ -51,11 +44,7 @@ export default function LoginPage({ verifyBanner, onClearBanner }: Props) {
   );
 }
 
-function AuthForm({
-  onRegisterSuccess,
-}: {
-  onRegisterSuccess: (email: string) => void;
-}) {
+function AuthForm({ onRegisterSuccess }: { onRegisterSuccess: (email: string) => void }) {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -140,20 +129,14 @@ function AuthForm({
           {tab === "register" && <ConsentFields onChange={setAllAgreed} />}
 
           {activeMutation.error && (
-            <p className="text-red-400 text-sm">
-              {activeMutation.error.message}
-            </p>
+            <p className="text-red-400 text-sm">{activeMutation.error.message}</p>
           )}
           <button
             type="submit"
             disabled={activeMutation.isPending || needsConsent}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg py-3 font-medium transition-colors"
           >
-            {activeMutation.isPending
-              ? "처리 중..."
-              : tab === "login"
-                ? "로그인"
-                : "회원가입"}
+            {activeMutation.isPending ? "처리 중..." : tab === "login" ? "로그인" : "회원가입"}
           </button>
         </form>
 
@@ -215,13 +198,7 @@ function AuthForm({
   );
 }
 
-function RegisteredNotice({
-  email,
-  onBack,
-}: {
-  email: string;
-  onBack: () => void;
-}) {
+function RegisteredNotice({ email, onBack }: { email: string; onBack: () => void }) {
   return (
     <div className="text-center">
       <div className="text-4xl mb-4">📧</div>
@@ -261,11 +238,7 @@ function ConsentFields({ onChange }: { onChange: (agreed: boolean) => void }) {
         />
         <span className="text-xs text-gray-400">
           (필수){" "}
-          <a
-            href="/terms"
-            target="_blank"
-            className="text-blue-400 hover:underline"
-          >
+          <a href="/terms" target="_blank" className="text-blue-400 hover:underline">
             이용약관
           </a>
           에 동의합니다.
@@ -283,11 +256,7 @@ function ConsentFields({ onChange }: { onChange: (agreed: boolean) => void }) {
         />
         <span className="text-xs text-gray-400">
           (필수){" "}
-          <a
-            href="/privacy"
-            target="_blank"
-            className="text-blue-400 hover:underline"
-          >
+          <a href="/privacy" target="_blank" className="text-blue-400 hover:underline">
             개인정보처리방침
           </a>
           에 동의합니다.

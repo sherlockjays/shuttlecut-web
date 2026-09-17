@@ -79,4 +79,3 @@ export function ResetPasswordRoute() {
   if (!token) return <Navigate to="/login" replace />;
   return <ResetPasswordPage token={token} />;
 }
-

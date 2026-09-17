@@ -20,14 +20,11 @@ export default function ExportRow({
 
   const uploadMutation = useMutation({
     mutationFn: () => exportsApi.uploadToYoutube(item.id, postComment),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
-    onError: (e: unknown) =>
-      alert(e instanceof Error ? e.message : "YouTube 업로드 실패"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
+    onError: (e: unknown) => alert(e instanceof Error ? e.message : "YouTube 업로드 실패"),
   });
 
-  const isUploading =
-    item.youtube_url === "uploading" || uploadMutation.isPending;
+  const isUploading = item.youtube_url === "uploading" || uploadMutation.isPending;
 
   return (
     <div className="bg-gray-800 rounded-xl p-4 flex items-center justify-between">
@@ -41,9 +38,7 @@ export default function ExportRow({
           <span className="font-medium truncate">{item.project_title}</span>
         </div>
         <p className="text-gray-400 text-xs">
-          {item.created_at
-            ? new Date(item.created_at).toLocaleString("ko-KR")
-            : "-"}
+          {item.created_at ? new Date(item.created_at).toLocaleString("ko-KR") : "-"}
         </p>
         {item.status === "error" && item.error_msg && (
           <p className="text-red-400 text-xs mt-1 truncate">{item.error_msg}</p>
@@ -69,9 +64,7 @@ export default function ExportRow({
               YouTube ↗
             </a>
           ) : isUploading ? (
-            <span className="text-gray-400 text-xs px-2 py-1.5">
-              업로드 중...
-            </span>
+            <span className="text-gray-400 text-xs px-2 py-1.5">업로드 중...</span>
           ) : (
             <button
               onClick={() => uploadMutation.mutate()}
