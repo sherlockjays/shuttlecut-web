@@ -106,8 +106,6 @@ POSTGRES_PASSWORD=change-me
 REDIS_PASSWORD=change-me
 ```
 
-(`GCS_BUCKET`, `GOOGLE_APPLICATION_CREDENTIALS`, `GPU_VM_NAME`은 예전 GCS/GCP 방식의 잔재로 현재 미사용이라 비워둬도 됩니다.)
-
 `GOOGLE_CLIENT_ID`/`SECRET`, `SMTP_*`는 비워둬도 로컬 개발이 깨지지는 않습니다 (SMTP는 미설정 시 발송 없이 콘솔 로그만 남기고 넘어가고, Google 로그인은 버튼을 눌렀을 때 Google 쪽에서 에러 발생)
 다만 **Google 로그인과 이메일 인증/재설정 메일 발송은 로컬에서 테스트할 수 없습니다.**
 이 두 기능까지 로컬에서 테스트하려면:
