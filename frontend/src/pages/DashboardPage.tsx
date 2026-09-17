@@ -15,16 +15,13 @@ export default function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey });
       navigate(`/editor/${res.id}`);
     },
-    onError: (e: unknown) =>
-      alert(e instanceof Error ? e.message : "프로젝트 생성 실패"),
+    onError: (e: unknown) => alert(e instanceof Error ? e.message : "프로젝트 생성 실패"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteProject(id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey }),
-    onError: (e: unknown) =>
-      alert(e instanceof Error ? e.message : "프로젝트 삭제 실패"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: projectsOptions.queryKey }),
+    onError: (e: unknown) => alert(e instanceof Error ? e.message : "프로젝트 삭제 실패"),
   });
 
   const handleDelete = (id: number) => {
@@ -69,9 +66,7 @@ export default function DashboardPage() {
             <ProjectCard
               key={p.id}
               project={p}
-              isDeleting={
-                deleteMutation.isPending && deleteMutation.variables === p.id
-              }
+              isDeleting={deleteMutation.isPending && deleteMutation.variables === p.id}
               onDelete={handleDelete}
             />
           ))}

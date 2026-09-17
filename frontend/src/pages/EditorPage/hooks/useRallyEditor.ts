@@ -73,9 +73,7 @@ export function useRallyEditor(options: Options) {
         endRally(team);
         return;
       }
-      optionsRef.current.update((prev) =>
-        applyPoint(prev.player1_score, prev.player2_score, team),
-      );
+      optionsRef.current.update((prev) => applyPoint(prev.player1_score, prev.player2_score, team));
     },
     [markStart, endRally],
   );

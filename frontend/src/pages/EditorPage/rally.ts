@@ -5,11 +5,7 @@ export const isValidRallyRange = (start: number, end: number) => end > start;
 
 // 승자 팀 점수를 1 올린다. 득점자 미지정이면 두 점수를 그대로 둔다.
 // ProjectData에 그대로 펼쳐 넣을 수 있도록 필드 이름을 맞춘다.
-export const applyPoint = (
-  p1Score: number,
-  p2Score: number,
-  winner: RallyWinner,
-) => ({
+export const applyPoint = (p1Score: number, p2Score: number, winner: RallyWinner) => ({
   player1_score: p1Score + (winner === RallyWinner.Team1 ? 1 : 0),
   player2_score: p2Score + (winner === RallyWinner.Team2 ? 1 : 0),
 });

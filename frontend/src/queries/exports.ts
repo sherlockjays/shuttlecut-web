@@ -9,10 +9,7 @@ export const exportsOptions = queryOptions({
 
 export const pollWhileUploading = <TKey extends readonly unknown[]>(
   query: Query<ExportItem[], Error, ExportItem[], TKey>,
-) =>
-  query.state.data?.some((item) => item.youtube_url === "uploading")
-    ? 3000
-    : false;
+) => (query.state.data?.some((item) => item.youtube_url === "uploading") ? 3000 : false);
 
 export const exportStatusOptions = (exportId: number) =>
   queryOptions({

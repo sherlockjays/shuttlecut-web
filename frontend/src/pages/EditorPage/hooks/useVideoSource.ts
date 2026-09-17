@@ -19,10 +19,6 @@ export function useVideoSource(videoId: string) {
   return {
     hasVideo,
     previewProcessing: data?.status === "processing",
-    src: !hasVideo
-      ? ""
-      : previewReady
-        ? videoPreviewUrl(videoId)
-        : videoStreamUrl(videoId),
+    src: !hasVideo ? "" : previewReady ? videoPreviewUrl(videoId) : videoStreamUrl(videoId),
   };
 }

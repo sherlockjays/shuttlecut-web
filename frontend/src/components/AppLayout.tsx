@@ -1,10 +1,5 @@
 import { useEffect } from "react";
-import {
-  Outlet,
-  useNavigate,
-  useLocation,
-  useSearchParams,
-} from "react-router-dom";
+import { Outlet, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { meOptions } from "@/queries/auth";
@@ -46,14 +41,9 @@ export default function AppLayout() {
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <button
-            onClick={() => navigate("/projects")}
-            className="flex items-center gap-1.5"
-          >
+          <button onClick={() => navigate("/projects")} className="flex items-center gap-1.5">
             <span className="text-lg">🏸</span>
-            <span className="text-lg font-bold text-yellow-400">
-              ShuttleCut
-            </span>
+            <span className="text-lg font-bold text-yellow-400">ShuttleCut</span>
           </button>
           <nav className="flex items-center gap-6">
             {nav.map(({ key, label }) => (
@@ -61,9 +51,7 @@ export default function AppLayout() {
                 key={key}
                 onClick={() => navigate(`/${key}`)}
                 className={`text-sm font-medium transition-colors ${
-                  activePage === key
-                    ? "text-white"
-                    : "text-gray-400 hover:text-white"
+                  activePage === key ? "text-white" : "text-gray-400 hover:text-white"
                 }`}
               >
                 {label}
@@ -87,17 +75,13 @@ export default function AppLayout() {
           <button
             onClick={() => navigate("/mypage")}
             className={`text-sm font-bold transition-colors ${
-              activePage === "mypage"
-                ? "text-yellow-300"
-                : "text-yellow-500 hover:text-yellow-300"
+              activePage === "mypage" ? "text-yellow-300" : "text-yellow-500 hover:text-yellow-300"
             }`}
           >
             MY
           </button>
           {ytConnected && (
-            <span className="text-red-400 text-xs font-medium">
-              ▶ YouTube 연결됨
-            </span>
+            <span className="text-red-400 text-xs font-medium">▶ YouTube 연결됨</span>
           )}
           <button
             onClick={logout}

@@ -25,13 +25,7 @@ export type Rally = {
 // 백엔드 API/DB에 저장되는 와이어 포맷: [start, end, p1, p2, winner]
 export type RallyWire = [number, number, number, number, number];
 
-export function rallyFromWire([
-  start,
-  end,
-  p1Score,
-  p2Score,
-  winner,
-]: RallyWire): Rally {
+export function rallyFromWire([start, end, p1Score, p2Score, winner]: RallyWire): Rally {
   return {
     start,
     end,

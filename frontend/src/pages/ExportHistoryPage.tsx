@@ -16,8 +16,7 @@ export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => exportsApi.delete(id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
   });
 
   const handleDelete = (id: number) => {

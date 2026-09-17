@@ -22,8 +22,7 @@ function ExportsTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => exportsApi.delete(id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
   });
 
   const handleDelete = (id: number) => {
@@ -89,9 +88,7 @@ function UsageTab() {
           <span className="text-gray-400 text-lg font-normal">회</span>
         </p>
       </div>
-      <p className="text-gray-500 text-xs">
-        플랜 변경은 준비 중입니다. 문의: wjdwoghk16@gmail.com
-      </p>
+      <p className="text-gray-500 text-xs">플랜 변경은 준비 중입니다. 문의: wjdwoghk16@gmail.com</p>
     </div>
   );
 }
@@ -120,9 +117,7 @@ function SettingsTab() {
         <p className="text-gray-400 text-sm mb-3">YouTube 연결</p>
         {ytConnected ? (
           <div className="flex items-center justify-between">
-            <span className="text-red-400 text-sm font-medium">
-              ▶ YouTube 연결됨
-            </span>
+            <span className="text-red-400 text-sm font-medium">▶ YouTube 연결됨</span>
             <button
               onClick={handleYtDisconnect}
               className="bg-gray-700 hover:bg-red-700 text-gray-300 hover:text-white px-3 py-1.5 rounded-lg text-sm transition-colors"

@@ -31,10 +31,7 @@ export function useVideoPlayer(fps: number) {
     else video.pause();
   }, []);
 
-  const handleLoadedMetadata = useCallback(
-    () => setDuration(videoRef.current?.duration || 0),
-    [],
-  );
+  const handleLoadedMetadata = useCallback(() => setDuration(videoRef.current?.duration || 0), []);
 
   return {
     videoRef,

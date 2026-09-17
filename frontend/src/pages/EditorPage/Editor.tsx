@@ -145,20 +145,13 @@ export default function Editor({ projectId }: { projectId: number }) {
     });
   };
 
-  const {
-    marking,
-    toggleRally,
-    addScore,
-    resetScore,
-    deleteRally,
-    onUndone,
-    onRedone,
-  } = useRallyEditor({
-    update,
-    getCurrentFrame,
-    seekToFrame,
-    onInvalidRange: () => alert(INVALID_RANGE_MESSAGE),
-  });
+  const { marking, toggleRally, addScore, resetScore, deleteRally, onUndone, onRedone } =
+    useRallyEditor({
+      update,
+      getCurrentFrame,
+      seekToFrame,
+      onInvalidRange: () => alert(INVALID_RANGE_MESSAGE),
+    });
 
   // 단축키 effect의 의존성이라 매 렌더 새로 만들면 리스너가 계속 재등록된다.
   const handleUndo = useCallback(() => {
@@ -261,10 +254,7 @@ export default function Editor({ projectId }: { projectId: number }) {
       if (e.code === "Digit1") addScore(RallyWinner.Team1);
       if (e.code === "Digit2") addScore(RallyWinner.Team2);
       if (e.code === "KeyZ" && e.ctrlKey && !e.shiftKey) handleUndo();
-      if (
-        (e.code === "KeyZ" && e.ctrlKey && e.shiftKey) ||
-        (e.code === "KeyY" && e.ctrlKey)
-      )
+      if ((e.code === "KeyZ" && e.ctrlKey && e.shiftKey) || (e.code === "KeyY" && e.ctrlKey))
         handleRedo();
       if (e.code === "ArrowLeft") seekBy(e.shiftKey ? -10 : -5);
       if (e.code === "ArrowRight") seekBy(e.shiftKey ? 10 : 5);
@@ -324,9 +314,7 @@ export default function Editor({ projectId }: { projectId: number }) {
     // 헤더
     ctx.fillStyle = t.header_bg;
     ctx.fillRect(x, y, bw, header_h);
-    const line1 = [data.match_date, data.tournament_name]
-      .filter(Boolean)
-      .join("  /  ");
+    const line1 = [data.match_date, data.tournament_name].filter(Boolean).join("  /  ");
     const line2 = [data.level, data.match_name].filter(Boolean).join("  /  ");
     const headerLines = !line1 && !line2 ? ["ShuttleCut", ""] : [line1, line2];
     ctx.fillStyle = t.header_text;
@@ -345,20 +333,12 @@ export default function Editor({ projectId }: { projectId: number }) {
       ctx.fillRect(x, y0, bw, row_h);
       ctx.fillStyle = t.name_text;
       ctx.font = `${fontMd}px sans-serif`;
-      ctx.fillText(
-        (name || "").slice(0, 18),
-        x + pad,
-        y0 + (row_h + fontMd) / 2 - 2,
-      );
+      ctx.fillText((name || "").slice(0, 18), x + pad, y0 + (row_h + fontMd) / 2 - 2);
       ctx.font = `bold ${fontScore}px sans-serif`;
       const scoreStr = String(score);
       const sw = ctx.measureText(scoreStr).width;
       ctx.fillStyle = t.score_text;
-      ctx.fillText(
-        scoreStr,
-        x + bw - sw - pad,
-        y0 + (row_h + fontScore) / 2 - 4,
-      );
+      ctx.fillText(scoreStr, x + bw - sw - pad, y0 + (row_h + fontScore) / 2 - 4);
       y0 += row_h;
     }
 
@@ -394,8 +374,7 @@ export default function Editor({ projectId }: { projectId: number }) {
   ]);
 
   // 업로드 때 ffprobe가 프레임 수를 못 읽으면 0으로 저장되므로 재생 길이로 대신한다.
-  const totalFrames =
-    data.total_frames > 0 ? data.total_frames : Math.round(duration * data.fps);
+  const totalFrames = data.total_frames > 0 ? data.total_frames : Math.round(duration * data.fps);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -409,18 +388,10 @@ export default function Editor({ projectId }: { projectId: number }) {
           onChange={(e) => update({ title: e.target.value })}
           className="bg-transparent text-white font-medium outline-none border-b border-transparent hover:border-gray-600 focus:border-blue-500 px-1"
         />
-        {saveStatus === "saved" && (
-          <span className="text-green-400 text-xs">저장됨 ✓</span>
-        )}
-        {saveStatus === "error" && (
-          <span className="text-red-400 text-xs">저장 실패 ⚠</span>
-        )}
+        {saveStatus === "saved" && <span className="text-green-400 text-xs">저장됨 ✓</span>}
+        {saveStatus === "error" && <span className="text-red-400 text-xs">저장 실패 ⚠</span>}
       </header>
-      {isError && (
-        <p className="text-red-400 text-sm px-4 pt-2">
-          프로젝트를 불러오지 못했습니다.
-        </p>
-      )}
+      {isError && <p className="text-red-400 text-sm px-4 pt-2">프로젝트를 불러오지 못했습니다.</p>}
 
       <div className="flex flex-1 overflow-hidden">
         {/* 왼쪽: 영상 + 컨트롤 */}
@@ -477,10 +448,7 @@ export default function Editor({ projectId }: { projectId: number }) {
             >
               {data.rallies.map((r, i) => {
                 const left = (r.start / totalFrames) * 100;
-                const width = Math.max(
-                  0.5,
-                  ((r.end - r.start) / totalFrames) * 100,
-                );
+                const width = Math.max(0.5, ((r.end - r.start) / totalFrames) * 100);
                 return (
                   <div
                     key={i}
@@ -499,8 +467,8 @@ export default function Editor({ projectId }: { projectId: number }) {
 
           {/* 단축키 안내 */}
           <p className="text-gray-500 text-xs text-center">
-            [Space] 재생/정지 | [R] 랠리 마킹 | [1] 1팀 득점 | [2] 2팀 득점 |
-            [Ctrl+Z] 되돌리기 | [Ctrl+Y] 다시하기 | [←→] 이동
+            [Space] 재생/정지 | [R] 랠리 마킹 | [1] 1팀 득점 | [2] 2팀 득점 | [Ctrl+Z] 되돌리기 |
+            [Ctrl+Y] 다시하기 | [←→] 이동
           </p>
         </div>
 
@@ -508,9 +476,7 @@ export default function Editor({ projectId }: { projectId: number }) {
         <div className="w-72 bg-gray-800 border-l border-gray-700 flex flex-col p-4 gap-4 overflow-y-auto">
           {/* 경기 정보 */}
           <section>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">
-              경기 정보
-            </h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">경기 정보</h3>
             <div className="space-y-2">
               {MATCH_INFO_FIELDS.map(({ key, label, placeholder }) => (
                 <div key={key}>
@@ -528,9 +494,7 @@ export default function Editor({ projectId }: { projectId: number }) {
 
           {/* 점수판 */}
           <section>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">
-              점수판
-            </h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">점수판</h3>
             {/* 크기 선택 */}
             <div className="flex items-center gap-1 mb-2">
               <span className="text-xs text-gray-500 w-8">크기</span>
@@ -571,9 +535,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                     onChange={(e) => update({ player1_name: e.target.value })}
                     className="bg-transparent text-yellow-300 font-medium text-sm w-full text-center outline-none"
                   />
-                  <span className="text-2xl font-bold text-white">
-                    {data.player1_score}
-                  </span>
+                  <span className="text-2xl font-bold text-white">{data.player1_score}</span>
                 </div>
                 <div className="flex flex-col items-center p-3 bg-red-900">
                   <input
@@ -581,9 +543,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                     onChange={(e) => update({ player2_name: e.target.value })}
                     className="bg-transparent text-yellow-300 font-medium text-sm w-full text-center outline-none"
                   />
-                  <span className="text-2xl font-bold text-white">
-                    {data.player2_score}
-                  </span>
+                  <span className="text-2xl font-bold text-white">{data.player2_score}</span>
                 </div>
               </div>
               <div className="flex gap-0">
@@ -631,9 +591,7 @@ export default function Editor({ projectId }: { projectId: number }) {
 
           {/* 랠리 마킹 */}
           <section>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">
-              랠리 마킹
-            </h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">랠리 마킹</h3>
             <button
               onClick={toggleRally}
               className={`w-full py-3 rounded-xl font-medium text-sm transition-colors ${
@@ -648,20 +606,14 @@ export default function Editor({ projectId }: { projectId: number }) {
             {/* 랠리 목록 */}
             <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
               {data.rallies.map((r, i) => {
-                const scoreAfterRally = applyPoint(
-                  r.p1Score,
-                  r.p2Score,
-                  r.winner,
-                );
+                const scoreAfterRally = applyPoint(r.p1Score, r.p2Score, r.winner);
                 return (
                   <div
                     key={i}
                     onClick={() => seekToFrame(r.start)}
                     className={`flex items-center justify-between rounded px-2 py-1.5 text-xs cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].listBgClass}`}
                   >
-                    <span className="text-gray-300 w-10 shrink-0">
-                      랠리 {i + 1}
-                    </span>
+                    <span className="text-gray-300 w-10 shrink-0">랠리 {i + 1}</span>
                     <span
                       className={`font-mono font-medium ${RALLY_WINNER_COLORS[r.winner].listText}`}
                     >
@@ -727,9 +679,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                     YouTube에서 보기 ↗
                   </a>
                 ) : ytUploading ? (
-                  <div className="text-center text-xs text-gray-400 py-2">
-                    YouTube 업로드 중...
-                  </div>
+                  <div className="text-center text-xs text-gray-400 py-2">YouTube 업로드 중...</div>
                 ) : (
                   <div className="flex flex-col gap-1.5">
                     <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none px-1">
