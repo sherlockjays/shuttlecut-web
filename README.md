@@ -26,7 +26,7 @@ NAS (Synology, 24시간 구동)
 > 로그인·영상 업로드·랠리 구간 편집·점수판 오버레이 설정·미리보기는 NAS만으로 동작합니다 (24시간 구동).
 > 하지만 **"내보내기"(최종 mp4 인코딩)는 NAS에 GPU/워커가 없어서 처리되지 않습니다** — 관리자 로컬 PC에서 네이티브 워커(`start-native-worker.ps1`)가 떠 있어야만 실제로 처리됩니다. 이 PC가 꺼져 있거나 워커 프로세스가 안 떠 있으면 내보내기 작업은 Redis 큐에 쌓인 채 계속 대기 상태로 남습니다. 현재는 워커 자동 시작 장치(서비스 등록 등)가 없어서 매번 수동으로 스크립트를 실행해야 합니다. (자세한 실행 방법은 아래 ["실제 서비스 운영 — 내보내기 워커 실행"](#실제-서비스-운영--내보내기-워커-실행) 참고)
 >
-> 배포 환경은 **local(개발자 PC) / prod(NAS)** 두 단계뿐이고 별도 dev·staging 서버는 없습니다. NAS 백엔드는 `CORS_ORIGINS`가 `https://shuttlecut.kr`만 허용해서 로컬 프론트는 직접 붙을 수 없고, 프론트 개발 시엔 로컬 백엔드를 띄워야 합니다 — 이 로컬 백엔드는 보통 NAS의 운영 DB/Redis에 그대로 연결해서 쓰므로, 로컬 개발 중 만든 데이터가 운영 DB에 그대로 들어갑니다.
+> 배포 환경은 **local(개발자 PC) / prod(NAS)** 두 단계뿐이고 별도 dev·staging 서버는 없습니다. 프론트 개발 시엔 로컬 백엔드를 띄워야 하는데(개발서버가 `/api`를 `localhost:8000`으로 프록시합니다), 이 로컬 백엔드는 보통 NAS의 운영 DB/Redis에 그대로 연결해서 쓰므로 로컬 개발 중 만든 데이터가 운영 DB에 그대로 들어갑니다.
 
 ## 기술 스택
 
@@ -82,7 +82,6 @@ worker-venv\Scripts\pip install -r backend\requirements.txt
 
 ```
 copy backend\.env.example backend\.env
-copy frontend\.env.example frontend\.env
 ```
 
 `docker-compose.yml`로 전체 스택을 띄우려면 루트에 `.env`도 필요합니다 (`${VAR}` 형태로 참조됨):
@@ -92,7 +91,6 @@ DATABASE_URL=postgresql://shuttlecut:password@postgres:5432/shuttlecut
 REDIS_URL=redis://:yourpassword@redis:6379/0
 SECRET_KEY=change-me
 STORAGE_PATH=/data/videos
-CORS_ORIGINS=http://localhost:3000
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 APP_BASE_URL=http://localhost:3000
@@ -125,7 +123,7 @@ REDIS_PASSWORD=change-me
 docker compose up -d          # frontend, backend, postgres, redis
 ```
 
-프론트는 핫리로드를 위해 개발 중엔 따로 띄우는 걸 권장합니다 (`frontend/.env`의 `VITE_API_URL=http://localhost:8000`):
+프론트는 핫리로드를 위해 개발 중엔 따로 띄우는 걸 권장합니다. `/api` 요청은 개발서버가 `localhost:8000`으로 프록시하므로 백엔드도 같이 떠 있어야 합니다:
 
 ```powershell
 cd frontend
@@ -137,12 +135,11 @@ npm run dev                   # http://localhost:5173
 
 별도 dev DB가 없기 때문에, 지금 실제로 프론트/백엔드 개발할 때 주로 쓰는 방식입니다. Postgres/Redis는 새로 띄우지 않고 NAS에 이미 떠 있는 것을 그대로 사용합니다.
 
-1. `backend/.env`에 NAS 주소로 `DATABASE_URL`/`REDIS_URL`을 지정하고, `CORS_ORIGINS=http://localhost:5173`으로 맞춥니다:
+1. `backend/.env`에 NAS 주소로 `DATABASE_URL`/`REDIS_URL`을 지정합니다:
 
    ```
    DATABASE_URL=postgresql://<NAS_DB_USER>:<PW>@<NAS_IP>:15432/shuttlecut
    REDIS_URL=redis://:<PW>@<NAS_IP>:6379/0
-   CORS_ORIGINS=http://localhost:5173
    ```
 
 2. 백엔드 서버 실행:
@@ -157,7 +154,7 @@ npm run dev                   # http://localhost:5173
    ```powershell
    cd frontend
    npm install
-   npm run dev                   # http://localhost:5173, VITE_API_URL=http://localhost:8000
+   npm run dev                   # http://localhost:5173, /api는 localhost:8000으로 프록시
    ```
 
 ⚠️ 이 방식은 운영 DB를 그대로 활용하므로, 로컬에서 만든 프로젝트/유저 데이터가 실제 운영 DB에 그대로 들어갑니다.
