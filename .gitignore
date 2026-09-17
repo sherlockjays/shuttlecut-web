@@ -13,7 +13,6 @@ frontend/.env
 backend/.env
 client_secret.json
 youtube_token.json
-.env.gcp
 .env.local-worker
 .env.native-worker
 
