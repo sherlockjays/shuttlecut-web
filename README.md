@@ -46,7 +46,6 @@ NAS (Synology, 24시간 구동)
 backend/
   main.py                     FastAPI 앱, 스키마 초기화
   Dockerfile                  백엔드 서버 이미지
-  Dockerfile.local-worker     Docker GPU 워커 이미지 (WSL2용, 레거시)
   requirements.txt
   api/routes/                 auth, videos, projects, export, youtube, admin
   core/                       exporter.py, rally_manager.py 등
@@ -54,8 +53,7 @@ backend/
 frontend/
   src/                        React SPA
 docker-compose.yml             프론트/백/DB/Redis 전체 스택
-docker-compose.local-worker.yml  Docker 기반 GPU 워커 (레거시)
-start-native-worker.ps1        Windows 네이티브 GPU 워커 실행 스크립트 (현재 실사용)
+start-native-worker.ps1        Windows 네이티브 GPU 워커 실행 스크립트
 ```
 
 ## 로컬에서 개발하기
@@ -193,9 +191,3 @@ npm run dev                   # http://localhost:5173
    ```
 
 이제 shuttlecut.kr에서 내보내기를 누르면 이 워커가 작업을 가져가 처리합니다.
-
-Docker 기반 워커(WSL2 GPU passthrough, 레거시)를 쓰려면:
-
-```powershell
-docker compose -f docker-compose.local-worker.yml up -d
-```
