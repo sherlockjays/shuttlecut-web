@@ -13,9 +13,9 @@ services:
       TZ: Asia/Seoul
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
-      SECRET_KEY: ${SECRET_KEY}
       STORAGE_PATH: ${STORAGE_PATH}
-      CORS_ORIGINS: ${CORS_ORIGINS}
+      SECRET_KEY: ${SECRET_KEY}
+      WORKER_SECRET: ${WORKER_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       APP_BASE_URL: ${APP_BASE_URL}
@@ -23,12 +23,8 @@ services:
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
-      GCS_BUCKET: ${GCS_BUCKET}
-      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
-      GPU_VM_NAME: ${GPU_VM_NAME}
     volumes:
       - video_data:/data/videos
-      - /volume1/docker/shuttlecut-web/gcs-key.json:/app/gcs-key.json:ro
     depends_on:
       - postgres
       - redis
