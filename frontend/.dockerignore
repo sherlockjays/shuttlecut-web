@@ -3,9 +3,9 @@
 node_modules
 dist
 
-# VITE_API_URL은 빌드 타임에 번들로 박힌다. 로컬 .env는 http://localhost:8000이라
-# 이게 딸려가면 운영 SPA가 사용자 브라우저에서 localhost를 호출하게 된다.
-# 운영은 .env 없이 빌드해 BASE=""(same-origin)로 nginx 프록시를 타야 한다.
+# 지금은 프론트에 VITE_ 변수가 없지만 규칙은 남긴다. VITE_ 변수는 런타임이 아니라
+# 빌드 타임에 번들로 박히므로, 누가 로컬 주소를 담은 .env를 다시 만들면 그게 딸려가
+# 운영 SPA가 사용자 브라우저에서 그 주소를 호출하게 된다.
 .env
 .env.*
 

@@ -26,7 +26,7 @@ NAS (Synology, 24시간 구동)
 > 로그인·영상 업로드·랠리 구간 편집·점수판 오버레이 설정·미리보기는 NAS만으로 동작합니다 (24시간 구동).
 > 하지만 **"내보내기"(최종 mp4 인코딩)는 NAS에 GPU/워커가 없어서 처리되지 않습니다** — 관리자 로컬 PC에서 네이티브 워커(`start-native-worker.ps1`)가 떠 있어야만 실제로 처리됩니다. 이 PC가 꺼져 있거나 워커 프로세스가 안 떠 있으면 내보내기 작업은 Redis 큐에 쌓인 채 계속 대기 상태로 남습니다. 현재는 워커 자동 시작 장치(서비스 등록 등)가 없어서 매번 수동으로 스크립트를 실행해야 합니다. (자세한 실행 방법은 아래 ["실제 서비스 운영 — 내보내기 워커 실행"](#실제-서비스-운영--내보내기-워커-실행) 참고)
 >
-> 배포 환경은 **local(개발자 PC) / prod(NAS)** 두 단계뿐이고 별도 dev·staging 서버는 없습니다. NAS 백엔드는 `CORS_ORIGINS`가 `https://shuttlecut.kr`만 허용해서 로컬 프론트는 직접 붙을 수 없고, 프론트 개발 시엔 로컬 백엔드를 띄워야 합니다 — 이 로컬 백엔드는 보통 NAS의 운영 DB/Redis에 그대로 연결해서 쓰므로, 로컬 개발 중 만든 데이터가 운영 DB에 그대로 들어갑니다.
+> 배포 환경은 **local(개발자 PC) / prod(NAS)** 두 단계뿐이고 별도 dev·staging 서버는 없습니다. 프론트 개발 시엔 로컬 백엔드를 띄워야 하는데(개발서버가 `/api`를 `localhost:8000`으로 프록시합니다), 이 로컬 백엔드는 보통 NAS의 운영 DB/Redis에 그대로 연결해서 쓰므로 로컬 개발 중 만든 데이터가 운영 DB에 그대로 들어갑니다.
 
 ## 기술 스택
 
@@ -81,23 +81,29 @@ worker-venv\Scripts\pip install -r backend\requirements.txt
 ```
 copy .env.example .env
 copy backend\.env.example backend\.env
-copy frontend\.env.example frontend\.env
 ```
 
 파일마다 읽는 주체와 시점이 다릅니다. 키 이름이 겹치더라도 한 프로세스가 두 파일을 함께 읽는 일은 없습니다.
 
 | 파일 | 읽는 주체 | 언제 쓰이나 |
 | --- | --- | --- |
-| 루트 `.env` | docker compose (`${VAR}` 치환) | 컨테이너를 띄울 때 — 방식 A, B-2 |
-| `backend/.env` | 백엔드 프로세스 (`main.py`의 `load_dotenv`) | 백엔드를 네이티브로 띄울 때 — 방식 B |
-| `frontend/.env` | Vite (빌드 타임에 번들로 인라인) | 프론트를 빌드하거나 개발서버로 띄울 때 |
+| 루트 `.env` | docker compose (`${VAR}` 치환) | 컨테이너를 띄울 때. 방식 A, B-2 |
+| `backend/.env` | 백엔드 프로세스 (`main.py`의 `load_dotenv`) | 백엔드를 네이티브로 띄울 때. 방식 B |
 
 `GOOGLE_CLIENT_ID`/`SECRET`, `SMTP_*`는 비워둬도 로컬 개발이 깨지지는 않습니다 (SMTP는 미설정 시 발송 없이 콘솔 로그만 남기고 넘어가고, Google 로그인은 버튼을 눌렀을 때 Google 쪽에서 에러 발생)
 다만 **Google 로그인과 이메일 인증/재설정 메일 발송은 로컬에서 테스트할 수 없습니다.**
 이 두 기능까지 로컬에서 테스트하려면:
 
 - NAS와 동일한 `GOOGLE_CLIENT_ID`/`SECRET`, SMTP 값을 그대로 채우고
-- Google Cloud Console의 OAuth 클라이언트에 `http://localhost:3000/api/auth/google/callback`(로컬 `APP_BASE_URL` 기준) 리다이렉트 URI를 추가로 등록해야 합니다 (안 하면 `redirect_uri_mismatch` 에러).
+- `APP_BASE_URL`을 브라우저가 실제로 SPA를 여는 주소로 맞춥니다. 방식 B는 `http://localhost:5173`, 방식 A는 `http://localhost:3000`입니다
+- Google Cloud Console의 OAuth 클라이언트에 그 주소 기준으로 리다이렉트 URI 두 개를 등록합니다 (안 하면 `redirect_uri_mismatch` 에러).
+
+  ```
+  http://localhost:5173/api/auth/google/callback
+  http://localhost:5173/api/youtube/callback
+  ```
+
+  콜백이 개발서버(5173)에 떨어져야 프록시를 타고 백엔드에 닿으면서 SPA와 같은 오리진으로 돌아옵니다.
 
 마이그레이션 도구(alembic)는 설치만 되어 있고 실제로는 안 씁니다 — 백엔드 시작 시 `init_db()`가 스키마를 자동으로 생성/보정하므로 별도 마이그레이션 커맨드는 필요 없습니다.
 
@@ -113,20 +119,19 @@ docker compose up -d          # frontend:3000, backend:8000, postgres:15432, red
 
 ### B. 네이티브 백엔드 + 프론트 (일상 개발)
 
-백엔드는 `--reload`, 프론트는 vite HMR로 돌리고 postgres/redis만 컨테이너를 씁니다. DB는 둘 중 하나를 고릅니다.
+백엔드는 `--reload`, 프론트는 vite HMR로 돌리고 postgres/redis만 컨테이너를 씁니다. 개발서버가 `/api` 요청을 `localhost:8000`으로 프록시하므로 백엔드도 같이 떠 있어야 합니다. DB는 둘 중 하나를 고릅니다.
 
-**B-1. NAS의 운영 DB/Redis 사용** — 실데이터를 봐야 할 때. `backend/.env`를 NAS 주소로 둡니다.
+**B-1. NAS의 운영 DB/Redis 사용.** 실데이터를 봐야 할 때 씁니다. `backend/.env`를 NAS 주소로 둡니다.
 
 ```
 DATABASE_URL=postgresql://<NAS_DB_USER>:<PW>@<NAS_IP>:15432/shuttlecut
 REDIS_URL=redis://:<PW>@<NAS_IP>:6379/0
-CORS_ORIGINS=http://localhost:5173
 ```
 
 > ⚠️ 로컬에서 만든 프로젝트/유저 데이터가 실제 운영 DB에 그대로 들어갑니다. 스키마 변경과 데이터 삭제는 하지 마세요.
 > ⚠️ `SECRET_KEY`를 NAS와 같은 값으로 맞춰야 합니다. 이 값에서 YouTube refresh_token 암호화 키가 파생되기 때문에, 다르면 저장된 토큰을 서로 읽지 못합니다.
 
-**B-2. 로컬 DB/Redis 사용** — 격리된 빈 DB로 시작할 때. 루트 `.env`가 필요합니다.
+**B-2. 로컬 DB/Redis 사용.** 격리된 빈 DB로 시작할 때 씁니다. 루트 `.env`가 필요합니다.
 
 ```powershell
 docker compose up -d postgres redis
@@ -137,7 +142,6 @@ docker compose up -d postgres redis
 ```
 DATABASE_URL=postgresql://shuttlecut:<PW>@localhost:15432/shuttlecut
 REDIS_URL=redis://:<PW>@localhost:6379/0
-CORS_ORIGINS=http://localhost:5173
 ```
 
 실행은 B-1, B-2가 같습니다.

@@ -84,7 +84,6 @@ CI가 없다. 검증은 전부 로컬에서 직접 돌린다.
 ## 개발 환경 함정
 
 - **별도 dev DB가 없다.** `backend/.env`의 `DATABASE_URL`/`REDIS_URL`을 NAS로 두고 로컬 백엔드를 띄우는 방식을 자주 쓰는데, 이러면 로컬에서 만든 데이터가 운영 DB에 그대로 들어간다. 스키마를 바꾸거나 데이터를 지우기 전에 지금 어느 DB를 보고 있는지 확인한다
-- 프론트를 로컬에서 띄울 때 NAS 백엔드에는 못 붙는다(`CORS_ORIGINS`가 `https://shuttlecut.kr`만 허용). 로컬 백엔드를 같이 띄우고 `CORS_ORIGINS=http://localhost:5173`으로 맞춘다
 - `backend/fonts/NanumGothicBold.ttf`는 gitignore 대상이라 직접 넣어야 한다. 없으면 오버레이 한글이 깨진다
 
 ## 알려진 문제

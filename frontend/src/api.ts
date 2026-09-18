@@ -2,8 +2,6 @@ import type { ExportItem, AdminExport } from "@/models/export";
 import type { UserInfo, AdminUser, Stats } from "@/models/user";
 import type { LoginResponse, RegisterResponse } from "@/models/auth";
 
-export const BASE = import.meta.env.VITE_API_URL || "";
-
 function headers() {
   const token = localStorage.getItem("token");
   return {
@@ -17,7 +15,7 @@ export function saveToken(token: string) {
 }
 
 export async function apiFetch<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(path, {
     ...opts,
     headers: { ...headers(), ...(opts.headers || {}) },
   });
@@ -43,7 +41,7 @@ export const auth = {
     });
   },
   me: (): Promise<UserInfo> => apiFetch<UserInfo>("/api/auth/me"),
-  googleLoginUrl: () => `${BASE}/api/auth/google`,
+  googleLoginUrl: () => "/api/auth/google",
   exchangeGoogleCode: (code: string): Promise<{ access_token?: string }> =>
     apiFetch<{ access_token?: string }>(`/api/auth/google/exchange?code=${code}`),
   forgotPassword: (email: string) =>
@@ -67,12 +65,11 @@ export const exports = {
   status: (exportId: number): Promise<ExportItem> =>
     apiFetch<ExportItem>(`/api/export/${exportId}/status`),
   wsUrl: (exportId: number) => {
-    if (BASE) return `${BASE.replace(/^http/, "ws")}/api/export/ws/${exportId}`;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     return `${proto}//${window.location.host}/api/export/ws/${exportId}`;
   },
   downloadUrl: (exportId: number) =>
-    `${BASE}/api/export/${exportId}/download?token=${localStorage.getItem("token") || ""}`,
+    `/api/export/${exportId}/download?token=${localStorage.getItem("token") || ""}`,
   uploadToYoutube: (exportId: number, postComment = true) =>
     apiFetch(`/api/export/${exportId}/youtube`, {
       method: "POST",
@@ -96,7 +93,7 @@ export const admin = {
 export const youtube = {
   status: (): Promise<{ connected: boolean }> =>
     apiFetch<{ connected: boolean }>("/api/youtube/status"),
-  authUrl: () => `${BASE}/api/youtube/auth?token=${localStorage.getItem("token") || ""}`,
+  authUrl: () => `/api/youtube/auth?token=${localStorage.getItem("token") || ""}`,
   disconnect: () => apiFetch("/api/youtube/disconnect", { method: "DELETE" }),
 };
 
@@ -108,7 +105,7 @@ export const autoedit = {
     const token = localStorage.getItem("token") || "";
     const form = new FormData();
     form.append("file", file);
-    return fetch(`${BASE}/api/autoedit/upload`, {
+    return fetch("/api/autoedit/upload", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: form,
@@ -153,7 +150,7 @@ export const autoedit = {
       body: JSON.stringify(opts),
     }),
   thumbUrl: (id: number) =>
-    `${BASE}/api/autoedit/projects/${id}/thumb?token=${localStorage.getItem("token") || ""}`,
+    `/api/autoedit/projects/${id}/thumb?token=${localStorage.getItem("token") || ""}`,
   streamUrl: (id: number) =>
-    `${BASE}/api/autoedit/projects/${id}/stream?token=${localStorage.getItem("token") || ""}`,
+    `/api/autoedit/projects/${id}/stream?token=${localStorage.getItem("token") || ""}`,
 };
