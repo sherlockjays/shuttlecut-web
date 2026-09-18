@@ -95,7 +95,15 @@ copy backend\.env.example backend\.env
 이 두 기능까지 로컬에서 테스트하려면:
 
 - NAS와 동일한 `GOOGLE_CLIENT_ID`/`SECRET`, SMTP 값을 그대로 채우고
-- Google Cloud Console의 OAuth 클라이언트에 `http://localhost:3000/api/auth/google/callback`(로컬 `APP_BASE_URL` 기준) 리다이렉트 URI를 추가로 등록해야 합니다 (안 하면 `redirect_uri_mismatch` 에러).
+- `APP_BASE_URL`을 브라우저가 실제로 SPA를 여는 주소로 맞춥니다. 방식 B는 `http://localhost:5173`, 방식 A는 `http://localhost:3000`입니다
+- Google Cloud Console의 OAuth 클라이언트에 그 주소 기준으로 리다이렉트 URI 두 개를 등록합니다 (안 하면 `redirect_uri_mismatch` 에러).
+
+  ```
+  http://localhost:5173/api/auth/google/callback
+  http://localhost:5173/api/youtube/callback
+  ```
+
+  콜백이 개발서버(5173)에 떨어져야 프록시를 타고 백엔드에 닿으면서 SPA와 같은 오리진으로 돌아옵니다.
 
 마이그레이션 도구(alembic)는 설치만 되어 있고 실제로는 안 씁니다 — 백엔드 시작 시 `init_db()`가 스키마를 자동으로 생성/보정하므로 별도 마이그레이션 커맨드는 필요 없습니다.
 
