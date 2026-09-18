@@ -17,30 +17,6 @@ router = APIRouter()
 
 PLAN_LIMITS = {"free": 2, "basic": 5, "standard": 10, "premium": 30, "unlimited": 999999, "club": 999999, "admin": 999999999}
 
-GCP_PROJECT = os.getenv("GCP_PROJECT", "shuttlecut")
-GCP_ZONE    = os.getenv("GCP_ZONE", "asia-northeast3-a")
-GPU_VM_NAME = os.getenv("GPU_VM_NAME", "")
-
-
-def _start_gpu_vm_if_needed():
-    """Start GPU VM if terminated (runs in background thread)"""
-    if not GPU_VM_NAME:
-        return
-    try:
-        from google.cloud import compute_v1
-        key_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        client = (
-            compute_v1.InstancesClient.from_service_account_json(key_file)
-            if key_file else compute_v1.InstancesClient()
-        )
-        inst = client.get(project=GCP_PROJECT, zone=GCP_ZONE, instance=GPU_VM_NAME)
-        if inst.status == "TERMINATED":
-            client.start(project=GCP_PROJECT, zone=GCP_ZONE, instance=GPU_VM_NAME)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"GPU VM start failed: {e}")
-
-
 def _build_timeline_comment(rallies: list, fps: float, player1_name: str, player2_name: str) -> str:
     """랠리 데이터로 YouTube 타임라인 댓글 생성 (내보낸 영상 기준 누적 시간, TAIL=1.5초 포함)"""
     TAIL = 1.5
@@ -62,13 +38,12 @@ def _build_timeline_comment(rallies: list, fps: float, player1_name: str, player
 
 def _run_youtube_upload(export_id: int, post_comment: bool = True):
     """NAS 백엔드에서 직접 YouTube 업로드 실행 (백그라운드 스레드)"""
-    import tempfile, logging
+    import logging
     from models.database import SessionLocal, Export, Project, User
     from core.youtube_uploader import get_youtube_service, upload_video, post_timeline_comment
 
     log = logging.getLogger(__name__)
     db = SessionLocal()
-    tmp_path = None
     try:
         export = db.query(Export).get(export_id)
         project = db.query(Project).get(export.project_id)
@@ -87,18 +62,6 @@ def _run_youtube_upload(export_id: int, post_comment: bool = True):
         youtube = get_youtube_service(decrypt_token(user.youtube_refresh_token))
 
         video_path = export.output_path
-        if video_path.startswith("gs://"):
-            from google.cloud import storage as gcs_storage
-            key_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-            tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-            tmp.close()
-            tmp_path = tmp.name
-            without_prefix = video_path[5:]
-            bucket_name, blob_name = without_prefix.split("/", 1)
-            client = gcs_storage.Client.from_service_account_json(key_file) if key_file else gcs_storage.Client()
-            client.bucket(bucket_name).blob(blob_name).download_to_filename(tmp_path)
-            video_path = tmp_path
-
         youtube_url = upload_video(youtube, video_path, title, description)
         export.youtube_url = youtube_url
         db.commit()
@@ -125,8 +88,6 @@ def _run_youtube_upload(export_id: int, post_comment: bool = True):
         except Exception:
             pass
     finally:
-        if tmp_path:
-            Path(tmp_path).unlink(missing_ok=True)
         db.close()
 
 
@@ -181,10 +142,6 @@ def start_export(
     export = Export(project_id=project.id, status="pending")
     db.add(export); db.commit(); db.refresh(export)
 
-    # GPU VM 켜기 (꺼져 있으면, non-blocking)
-    import threading
-    threading.Thread(target=_start_gpu_vm_if_needed, daemon=True).start()
-
     # Celery 작업 시작
     project_data = {
         "id": project.id,
@@ -223,24 +180,8 @@ def export_status(export_id: int, user: User = Depends(current_user), db: Sessio
     }
 
 
-def _gcs_signed_url(gcs_uri: str, attachment_name: str) -> str:
-    from google.cloud import storage as gcs_storage
-    from google.oauth2 import service_account
-    key_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    creds = service_account.Credentials.from_service_account_file(key_file)
-    without_prefix = gcs_uri[5:]
-    bucket_name, blob_name = without_prefix.split("/", 1)
-    client = gcs_storage.Client(credentials=creds)
-    blob = client.bucket(bucket_name).blob(blob_name)
-    return blob.generate_signed_url(
-        expiration=3600, method="GET", version="v4",
-        response_disposition=f'attachment; filename="{attachment_name}"',
-    )
-
-
 @router.get("/{export_id}/download")
 def download_export(export_id: int, token: str | None = None, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
     from jose import jwt, JWTError
     SECRET_KEY = os.getenv("SECRET_KEY", "changeme")
     try:
@@ -260,8 +201,6 @@ def download_export(export_id: int, token: str | None = None, db: Session = Depe
         raise HTTPException(400, "아직 완료되지 않은 내보내기입니다.")
 
     filename = f"export_{export_id}.mp4"
-    if export.output_path.startswith("gs://"):
-        return RedirectResponse(_gcs_signed_url(export.output_path, filename))
     if not Path(export.output_path).exists():
         raise HTTPException(404, "파일을 찾을 수 없습니다.")
     return FileResponse(export.output_path, media_type="video/mp4", filename=filename)
@@ -289,7 +228,7 @@ def start_youtube_upload(
         raise HTTPException(404)
     if export.status != "done" or not export.output_path:
         raise HTTPException(400, "완료된 내보내기가 아닙니다.")
-    if not export.output_path.startswith("gs://") and not Path(export.output_path).exists():
+    if not Path(export.output_path).exists():
         raise HTTPException(404, "내보내기 파일을 찾을 수 없습니다.")
 
     export.youtube_url = "uploading"
@@ -312,22 +251,11 @@ def delete_export(export_id: int, user: User = Depends(current_user), db: Sessio
 
     # 출력 파일 삭제
     if export.output_path:
-        if export.output_path.startswith("gs://"):
+        for p in [export.output_path, export.output_path.replace(".mp4", ".txt")]:
             try:
-                from google.cloud import storage as gcs_storage
-                key_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-                client = gcs_storage.Client.from_service_account_json(key_file) if key_file else gcs_storage.Client()
-                without_prefix = export.output_path[5:]
-                bucket_name, blob_name = without_prefix.split("/", 1)
-                client.bucket(bucket_name).blob(blob_name).delete()
+                Path(p).unlink(missing_ok=True)
             except Exception:
                 pass
-        else:
-            for p in [export.output_path, export.output_path.replace(".mp4", ".txt")]:
-                try:
-                    Path(p).unlink(missing_ok=True)
-                except Exception:
-                    pass
 
     db.delete(export)
     db.commit()
