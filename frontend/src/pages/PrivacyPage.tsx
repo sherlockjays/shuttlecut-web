@@ -107,11 +107,6 @@ export default function PrivacyPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-700">
                   <tr>
-                    <td className="p-3 text-gray-300">Google Cloud Platform</td>
-                    <td className="p-3 text-gray-300">영상 파일 저장 (GCS)</td>
-                    <td className="p-3 text-gray-300">이용 기간</td>
-                  </tr>
-                  <tr>
                     <td className="p-3 text-gray-300">Google LLC</td>
                     <td className="p-3 text-gray-300">Google 로그인, YouTube 업로드</td>
                     <td className="p-3 text-gray-300">이용 기간</td>
@@ -130,7 +125,7 @@ export default function PrivacyPage() {
             <li>비밀번호는 bcrypt 알고리즘으로 암호화하여 저장합니다 (원문 복구 불가).</li>
             <li>YouTube 인증 토큰은 AES 기반 암호화(Fernet)로 저장합니다.</li>
             <li>모든 통신은 HTTPS(TLS)를 통해 암호화됩니다.</li>
-            <li>영상 파일은 접근 제어된 Google Cloud Storage에 저장됩니다.</li>
+            <li>영상 파일은 접근이 통제된 자체 보관 서버에 저장됩니다.</li>
           </ul>
         </section>
 
