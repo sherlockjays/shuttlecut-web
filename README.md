@@ -81,30 +81,18 @@ worker-venv\Scripts\pip install -r backend\requirements.txt
 예시 파일을 복사해서 환경변수들을 채웁니다.
 
 ```
+copy .env.example .env
 copy backend\.env.example backend\.env
 copy frontend\.env.example frontend\.env
 ```
 
-`docker-compose.yml`로 전체 스택을 띄우려면 루트에 `.env`도 필요합니다 (`${VAR}` 형태로 참조됨):
+파일마다 읽는 주체와 시점이 다릅니다. 키 이름이 겹치더라도 한 프로세스가 두 파일을 함께 읽는 일은 없습니다.
 
-```
-DATABASE_URL=postgresql://shuttlecut:password@postgres:5432/shuttlecut
-REDIS_URL=redis://:yourpassword@redis:6379/0
-SECRET_KEY=change-me
-STORAGE_PATH=/data/videos
-CORS_ORIGINS=http://localhost:3000
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-APP_BASE_URL=http://localhost:3000
-SMTP_HOST=
-SMTP_PORT=
-SMTP_USER=
-SMTP_PASSWORD=
-POSTGRES_DB=shuttlecut
-POSTGRES_USER=shuttlecut
-POSTGRES_PASSWORD=change-me
-REDIS_PASSWORD=change-me
-```
+| 파일 | 읽는 주체 | 언제 쓰이나 |
+| --- | --- | --- |
+| 루트 `.env` | docker compose (`${VAR}` 치환) | 컨테이너를 띄울 때 — 방식 A, B-2 |
+| `backend/.env` | 백엔드 프로세스 (`main.py`의 `load_dotenv`) | 백엔드를 네이티브로 띄울 때 — 방식 B |
+| `frontend/.env` | Vite (빌드 타임에 번들로 인라인) | 프론트를 빌드하거나 개발서버로 띄울 때 |
 
 `GOOGLE_CLIENT_ID`/`SECRET`, `SMTP_*`는 비워둬도 로컬 개발이 깨지지는 않습니다 (SMTP는 미설정 시 발송 없이 콘솔 로그만 남기고 넘어가고, Google 로그인은 버튼을 눌렀을 때 Google 쪽에서 에러 발생)
 다만 **Google 로그인과 이메일 인증/재설정 메일 발송은 로컬에서 테스트할 수 없습니다.**
@@ -115,50 +103,57 @@ REDIS_PASSWORD=change-me
 
 마이그레이션 도구(alembic)는 설치만 되어 있고 실제로는 안 씁니다 — 백엔드 시작 시 `init_db()`가 스키마를 자동으로 생성/보정하므로 별도 마이그레이션 커맨드는 필요 없습니다.
 
-### A. 완전 로컬 (DB/Redis도 새로 띄우기)
+### A. 전체 스택을 컨테이너로 (운영 형상 검증)
 
-전체 스택을 처음부터 로컬에 새로 띄워서 코드를 자유롭게 테스트할 때 사용합니다.
+운영과 같은 모양(빌드된 이미지 + nginx)으로 한 번 돌려볼 때 씁니다.
 
 ```powershell
-docker compose up -d          # frontend, backend, postgres, redis
+docker compose up -d          # frontend:3000, backend:8000, postgres:15432, redis:6379
 ```
 
-프론트는 핫리로드를 위해 개발 중엔 따로 띄우는 걸 권장합니다 (`frontend/.env`의 `VITE_API_URL=http://localhost:8000`):
+**개발 중에는 권하지 않습니다.** 백엔드를 한 줄 고칠 때마다 `docker compose build backend`가 필요합니다. 이 방식으로만 드러나는 건 코드가 아니라 환경 차이(리눅스 vs 윈도우, Python 3.11 vs 로컬 버전, `requirements.txt`가 `>=` 핀이라 갈리는 의존성 버전)이므로, 배포 전 확인용으로 씁니다.
+
+### B. 네이티브 백엔드 + 프론트 (일상 개발)
+
+백엔드는 `--reload`, 프론트는 vite HMR로 돌리고 postgres/redis만 컨테이너를 씁니다. DB는 둘 중 하나를 고릅니다.
+
+**B-1. NAS의 운영 DB/Redis 사용** — 실데이터를 봐야 할 때. `backend/.env`를 NAS 주소로 둡니다.
+
+```
+DATABASE_URL=postgresql://<NAS_DB_USER>:<PW>@<NAS_IP>:15432/shuttlecut
+REDIS_URL=redis://:<PW>@<NAS_IP>:6379/0
+CORS_ORIGINS=http://localhost:5173
+```
+
+> ⚠️ 로컬에서 만든 프로젝트/유저 데이터가 실제 운영 DB에 그대로 들어갑니다. 스키마 변경과 데이터 삭제는 하지 마세요.
+> ⚠️ `SECRET_KEY`를 NAS와 같은 값으로 맞춰야 합니다. 이 값에서 YouTube refresh_token 암호화 키가 파생되기 때문에, 다르면 저장된 토큰을 서로 읽지 못합니다.
+
+**B-2. 로컬 DB/Redis 사용** — 격리된 빈 DB로 시작할 때. 루트 `.env`가 필요합니다.
+
+```powershell
+docker compose up -d postgres redis
+```
+
+`backend/.env`의 주소를 로컬로 두고, 비밀번호는 루트 `.env`의 값과 맞춥니다.
+
+```
+DATABASE_URL=postgresql://shuttlecut:<PW>@localhost:15432/shuttlecut
+REDIS_URL=redis://:<PW>@localhost:6379/0
+CORS_ORIGINS=http://localhost:5173
+```
+
+실행은 B-1, B-2가 같습니다.
+
+```powershell
+cd backend
+..\worker-venv\Scripts\uvicorn main:app --reload --port 8000
+```
 
 ```powershell
 cd frontend
 npm install
 npm run dev                   # http://localhost:5173
 ```
-
-### B. 로컬 백엔드/프론트 + NAS의 운영 DB/Redis 사용 (실제로 자주 쓰는 방식)
-
-별도 dev DB가 없기 때문에, 지금 실제로 프론트/백엔드 개발할 때 주로 쓰는 방식입니다. Postgres/Redis는 새로 띄우지 않고 NAS에 이미 떠 있는 것을 그대로 사용합니다.
-
-1. `backend/.env`에 NAS 주소로 `DATABASE_URL`/`REDIS_URL`을 지정하고, `CORS_ORIGINS=http://localhost:5173`으로 맞춥니다:
-
-   ```
-   DATABASE_URL=postgresql://<NAS_DB_USER>:<PW>@<NAS_IP>:15432/shuttlecut
-   REDIS_URL=redis://:<PW>@<NAS_IP>:6379/0
-   CORS_ORIGINS=http://localhost:5173
-   ```
-
-2. 백엔드 서버 실행:
-
-   ```powershell
-   cd backend
-   ..\worker-venv\Scripts\uvicorn main:app --reload --port 8000
-   ```
-
-3. 프론트엔드 개발 서버 실행 (새 터미널):
-
-   ```powershell
-   cd frontend
-   npm install
-   npm run dev                   # http://localhost:5173, VITE_API_URL=http://localhost:8000
-   ```
-
-⚠️ 이 방식은 운영 DB를 그대로 활용하므로, 로컬에서 만든 프로젝트/유저 데이터가 실제 운영 DB에 그대로 들어갑니다.
 
 ### 서비스별 실행 명령 요약
 

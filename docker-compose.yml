@@ -11,14 +11,14 @@ services:
       - "8000:8000"
     environment:
       TZ: Asia/Seoul
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      STORAGE_PATH: ${STORAGE_PATH}
-      SECRET_KEY: ${SECRET_KEY}
-      WORKER_SECRET: ${WORKER_SECRET}
+      DATABASE_URL: ${DATABASE_URL:?루트 .env에 없다}
+      REDIS_URL: ${REDIS_URL:?루트 .env에 없다}
+      STORAGE_PATH: ${STORAGE_PATH:?루트 .env에 없다}
+      SECRET_KEY: ${SECRET_KEY:?없으면 changeme로 JWT를 서명하게 된다}
+      WORKER_SECRET: ${WORKER_SECRET:?없으면 워커 요청이 전부 403이 되어 내보내기가 멈춘다}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      APP_BASE_URL: ${APP_BASE_URL}
+      APP_BASE_URL: ${APP_BASE_URL:?없으면 옛 DDNS 주소로 폴백해 로그인·메일 링크가 깨진다}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
@@ -34,9 +34,9 @@ services:
     ports:
       - "15432:5432"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?루트 .env에 없다}
+      POSTGRES_USER: ${POSTGRES_USER:?루트 .env에 없다}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?비어 있으면 postgres가 초기화를 거부한다}
     volumes:
       - pg_data:/var/lib/postgresql/data
 
@@ -44,7 +44,7 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD:?비어 있으면 인증 없는 redis가 뜬다}
 
 volumes:
   pg_data:
