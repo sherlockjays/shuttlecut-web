@@ -32,7 +32,7 @@ docker compose up -d        # frontend:3000, backend:8000, postgres:15432, redis
 
 PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다. `frontend`/`backend` 체크는 필수라 통과하지 못하면 머지가 막힌다.
 
-- 프론트 job: `npm ci` → `npm run build` → `npm run lint` → `npm run test`
+- 프론트 job: `npm ci` → `npm run build` → `npm run lint` → `npm run format:check` → `npm run test`
 - 백엔드 job: `python -m compileall backend` → `docker build ./backend`
 - 바뀐 쪽만 돈다. 프론트만 고친 PR에서 백엔드 job은 스킵되고, 스킵은 통과로 보고된다
 
@@ -40,6 +40,7 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 
 - 프론트엔드를 고쳤으면 PR 전에 `npm run build`, `npm run lint`, `npm run test`
 - `npm run build`는 `tsc -b`를 포함한다. 타입 에러가 빌드를 막는다
+- 포맷이 어긋나면 `npm run format`으로 고친다. CI는 `format:check`로 검사만 한다
 - Node 버전은 `frontend/package.json`의 `engines`가 유일한 출처다. `.npmrc`의 `engine-strict`가 로컬 `npm install`을 막고, CI의 `setup-node`가 같은 값을 읽는다. 올릴 때 한 곳만 고치면 된다
 - 백엔드에는 테스트가 없다. CI는 문법 오류와 이미지 빌드 가능 여부까지만 본다. 동작 확인은 띄워서 한다
 - vitest가 `environment: "node"`라 DOM이 없다. 테스트는 순수 로직 모듈에만 있고, 컴포넌트 테스트를 쓰려면 jsdom 설정부터 추가해야 한다
