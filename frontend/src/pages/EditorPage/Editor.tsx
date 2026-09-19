@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { exports as exportsApi } from "@/api";
 import { updateProject } from "@/apis/projects";
+import { videoStreamUrl } from "@/apis/video";
 import type { UploadedVideo } from "@/models/video";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportStatusOptions } from "@/queries/exports";
@@ -13,7 +14,6 @@ import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
-import { useVideoSource } from "./hooks/useVideoSource";
 import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
 
@@ -88,6 +88,10 @@ export default function Editor({ projectId }: { projectId: number }) {
   const seededRef = useRef<number | null>(null);
   const queryClient = useQueryClient();
 
+  const videoId = fetchedProject?.video_id ?? "";
+  const hasVideo = videoId !== "";
+  const videoSrc = hasVideo ? videoStreamUrl(videoId) : "";
+
   const {
     videoRef,
     duration,
@@ -97,12 +101,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     togglePlay,
     handleLoadedMetadata,
   } = useVideoPlayer(data.fps);
-
-  const {
-    hasVideo,
-    previewProcessing,
-    src: videoSrc,
-  } = useVideoSource(fetchedProject?.video_id ?? "");
 
   const {
     status: saveStatus,
@@ -414,11 +412,6 @@ export default function Editor({ projectId }: { projectId: number }) {
                 className="absolute inset-0 pointer-events-none rounded-xl"
                 style={{ width: "100%", height: "100%" }}
               />
-              {previewProcessing && (
-                <div className="absolute top-2 left-2 bg-black/70 text-yellow-300 text-xs px-2 py-1 rounded">
-                  프리뷰 생성 중... (Chrome에서 재생 불가 시 잠시 후 새로고침)
-                </div>
-              )}
             </div>
           )}
 

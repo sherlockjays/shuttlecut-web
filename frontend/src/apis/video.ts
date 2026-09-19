@@ -1,7 +1,6 @@
-import { apiFetch } from "@/api";
-import type { PreviewStatus, UploadedVideo } from "@/models/video";
+import type { UploadedVideo } from "@/models/video";
 
-// 스트리밍/프리뷰는 <video src>로 직접 열리므로 헤더를 못 싣는다. 토큰이 쿼리로 가는 건 #36에서 다룬다.
+// 스트리밍은 <video src>로 직접 열리므로 헤더를 못 싣는다. 토큰이 쿼리로 가는 건 #36에서 다룬다.
 const token = () => localStorage.getItem("token") || "";
 
 // 진행률을 받아야 해서 fetch가 아니라 XHR을 쓴다.
@@ -30,9 +29,3 @@ export const uploadVideo = (file: File, onProgress?: (pct: number) => void) => {
 };
 
 export const videoStreamUrl = (videoId: string) => `/api/videos/stream/${videoId}?token=${token()}`;
-
-export const videoPreviewUrl = (videoId: string) =>
-  `/api/videos/preview/${videoId}?token=${token()}`;
-
-export const getPreviewStatus = (videoId: string): Promise<{ status: PreviewStatus }> =>
-  apiFetch(`/api/videos/preview-status/${videoId}`);
