@@ -48,6 +48,27 @@ CI가 없다. 검증은 전부 로컬에서 직접 돌린다.
 
 - **DB 컬럼 추가**: `models/database.py`의 Column과 [main.py](backend/main.py) startup의 `ALTER TABLE ... ADD COLUMN`. alembic은 설치만 되어 있고 안 쓴다. `init_db()`가 `create_all`을 돌리고 기존 테이블은 ALTER 문으로 때운다(실패하면 조용히 rollback)
 - **점수판 색**: 에디터 미리보기는 [theme.ts](frontend/src/models/theme.ts)의 `CANVAS_THEMES`(hex), 실제 렌더링은 [exporter.py](backend/core/exporter.py)의 `THEMES`(RGB 튜플). 한쪽만 고치면 미리보기와 결과물이 갈라진다
+- **의존성**: [requirements.txt](backend/requirements.txt)를 고치면 NAS 백엔드 재빌드와 워커 PC `worker-venv` 재설치를 **둘 다** 해야 한다. 아래 참고
+
+### 의존성을 올릴 때
+
+`requirements.txt`는 `==`로 고정되어 있다. 같은 커밋을 언제 빌드해도 같은 결과물이 나와야 배포 태그로 롤백할 수 있기 때문이다.
+
+버전을 올릴 때는 한 기계에서만 올리면 안 된다. 워커는 백엔드와 같은 ORM 모델·같은 `core.exporter`를 쓰는데, NAS는 도커 빌드로 설치하고 워커는 `worker-venv`에 pip로 직접 설치해서 갱신 경로가 갈라져 있다.
+
+```powershell
+# 1. requirements.txt 수정 후, 워커를 멈추고 (진행 중 작업 없는지 먼저 확인)
+worker-venv\Scripts\celery.exe -A workers.tasks.celery inspect active
+worker-venv\Scripts\celery.exe -A workers.tasks.celery control shutdown
+
+# 2. 워커 venv 재설치
+worker-venv\Scripts\pip.exe install -r backend\requirements.txt
+
+# 3. NAS 백엔드 재빌드 (배포 절차대로)
+# 4. 양쪽 pip freeze를 대조해서 같은지 확인
+```
+
+전이 의존성(`starlette` 등)은 고정 대상이 아니라 여전히 뜰 수 있다. 완전한 lock이 필요해지면 별도 도구를 검토한다.
 
 ## 깨지기 쉬운 계약
 
