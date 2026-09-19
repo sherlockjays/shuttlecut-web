@@ -1,0 +1,26 @@
+# Dockerfile이 `COPY . .` 를 하는데 .gitignore는 도커 빌드에 영향을 주지 않는다.
+# 여기서 막지 않으면 빌드 컨텍스트에 있는 것이 전부 이미지로 들어간다.
+
+# 로컬 .env에는 SECRET_KEY와 운영 DATABASE_URL이 들어 있다. 이미지에 구워지면
+# 컨테이너의 load_dotenv()가 그 파일을 읽어, compose가 주입하지 않은 키를 조용히 채운다.
+# override=False라 compose가 준 값은 이기지만, compose에 없는 키는 이쪽이 이긴다.
+.env
+.env.*
+
+# 호스트에서 만들어진 바이트코드. 컨테이너 파이썬과 버전이 다를 수 있다
+**/__pycache__
+**/*.pyc
+**/*.pyo
+
+# backend/ 안에 가상환경을 만든 경우 대비. 이미지에는 requirements.txt로 설치한다
+venv
+.venv
+
+# 빌드에 불필요
+.git
+.gitignore
+*.log
+
+# fonts/ 는 제외하지 않는다. .gitignore 대상이지만 NanumGothicBold.ttf가 없으면
+# 점수판 오버레이의 한글이 깨지므로 이미지에 반드시 들어가야 한다.
+# .gitignore를 그대로 복사해 이 파일을 만들면 여기서 깨진다.
