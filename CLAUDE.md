@@ -36,25 +36,14 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 - 백엔드 job: `python -m compileall backend` → `docker build ./backend`
 - 바뀐 쪽만 돈다. 프론트만 고친 PR에서 백엔드 job은 스킵되고, 스킵은 통과로 보고된다
 
-**그래도 로컬에서 먼저 돌린다.** CI는 놓친 것을 잡는 그물이지 검증을 대신해 주지 않는다. 러너를 왕복하며 고치는 것보다 손에서 끝내는 쪽이 빠르다.
+**CI에 맡기지 말고 로컬에서 먼저 돌린다.**
 
-- 프론트엔드를 고쳤으면 PR 전에 `npm run build`, `npm run lint`, `npm run test`
-- `npm run build`는 `tsc -b`를 포함한다. 타입 에러가 빌드를 막는다
-- 포맷이 어긋나면 `npm run format`으로 고친다. CI는 `format:check`로 검사만 한다
-- Node 버전은 `frontend/package.json`의 `engines`가 유일한 출처다. `.npmrc`의 `engine-strict`가 로컬 `npm install`을 막고, CI의 `setup-node`가 같은 값을 읽는다. 올릴 때 한 곳만 고치면 된다
 - 백엔드에는 테스트가 없다. CI는 문법 오류와 이미지 빌드 가능 여부까지만 본다. 동작 확인은 띄워서 한다
 - vitest가 `environment: "node"`라 DOM이 없다. 테스트는 순수 로직 모듈에만 있고, 컴포넌트 테스트를 쓰려면 jsdom 설정부터 추가해야 한다
 - 테스트 파일은 소스 옆에 둔다. `__tests__` 디렉터리를 만들지 않는다
 
-### ⚠️ 워크플로에 `paths:` 필터를 넣지 않는다
-
-필수 체크로 걸린 워크플로가 path 필터 때문에 실행되지 않으면, 그 체크는 실패가 아니라 **Pending으로 남는다.** PR은 오지 않을 보고를 영원히 기다린다.
-
-그래서 `ci.yml`은 `changes` job을 항상 돌려 변경 범위를 판정하고, 각 job의 `if:`로 거른다. `if:`로 스킵된 job은 Success로 보고되므로 머지가 막히지 않는다. 필터에 `ci.yml` 자신을 넣어 둔 것도 같은 이유다. 빼면 워크플로만 고친 PR이 한 번도 실행되지 않은 채 머지된다.
-
 ## 코드 규칙
 
-- `tsconfig.app.json`에 `noUnusedLocals`/`noUnusedParameters`/`verbatimModuleSyntax`/`erasableSyntaxOnly`가 켜져 있다. 안 쓰는 변수 하나, `import type`을 빼먹은 타입 전용 import 하나가 빌드를 막는다
 - 새 API 코드는 `apis/`(타입 있는 fetcher, 와이어 변환)와 `queries/`(queryOptions만)에 쓴다. `api.ts`는 레거시이고 옮겨가는 중이다
 - 백엔드에는 `pyproject.toml`도 `ruff.toml`도 `pytest.ini`도 없다. ruff나 pytest가 깔려 있다고 가정하지 않는다
 

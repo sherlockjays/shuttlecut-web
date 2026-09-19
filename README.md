@@ -54,6 +54,7 @@ frontend/
   src/                        React SPA
 docker-compose.yml             프론트/백/DB/Redis 전체 스택
 start-native-worker.ps1        Windows 네이티브 GPU 워커 실행 스크립트
+.github/workflows/ci.yml       PR 검증 (프론트 빌드·린트·포맷·테스트, 백엔드 이미지 빌드)
 ```
 
 ## 로컬에서 개발하기
@@ -61,7 +62,7 @@ start-native-worker.ps1        Windows 네이티브 GPU 워커 실행 스크립�
 ### 사전 준비물
 
 - Docker Desktop
-- Node.js (프론트 개발 시)
+- Node.js 24 (프론트 개발 시) — `frontend/package.json`의 `engines`가 `^24.0.0`으로 고정되어 있고 `engine-strict`가 켜져 있어, 다른 메이저 버전에서는 `npm install`이 거부됩니다
 - Python 3.11 (백엔드/워커 개발 시)
 - ffmpeg — PATH에 등록되어 있어야 함
 - `backend/fonts/NanumGothicBold.ttf` — 오버레이 텍스트 렌더링용 폰트. gitignore 대상이라 직접 받아서 넣어야 함 (없으면 기본 폰트로 대체되어 한글이 깨질 수 있음)
@@ -115,7 +116,7 @@ copy backend\.env.example backend\.env
 docker compose up -d          # frontend:3000, backend:8000, postgres:15432, redis:6379
 ```
 
-**개발 중에는 권하지 않습니다.** 백엔드를 한 줄 고칠 때마다 `docker compose build backend`가 필요합니다. 이 방식으로만 드러나는 건 코드가 아니라 환경 차이(리눅스 vs 윈도우, Python 3.11 vs 로컬 버전, `requirements.txt`가 `>=` 핀이라 갈리는 의존성 버전)이므로, 배포 전 확인용으로 씁니다.
+**개발 중에는 권하지 않습니다.** 백엔드를 한 줄 고칠 때마다 `docker compose build backend`가 필요합니다. 이 방식으로만 드러나는 건 코드가 아니라 환경 차이(리눅스 vs 윈도우, 컨테이너의 Python 3.11 vs 로컬 `worker-venv` 버전, apt로 깔리는 ffmpeg·libgl 등 시스템 패키지)이므로, 배포 전 확인용으로 씁니다.
 
 ### B. 네이티브 백엔드 + 프론트 (일상 개발)
 
@@ -167,6 +168,19 @@ npm run dev                   # http://localhost:5173
 | backend (venv)    | `cd backend && ..\worker-venv\Scripts\uvicorn main:app --reload --port 8000` | 8000                       |
 | postgres          | `docker compose up -d postgres`                                              | 15432 (컨테이너 내부 5432) |
 | redis             | `docker compose up -d redis`                                                 | 6379                       |
+
+### 검증
+
+PR을 올리면 `.github/workflows/ci.yml`이 자동으로 돕니다. 프론트는 빌드·린트·포맷·테스트를, 백엔드는 파이썬 문법 검사와 도커 이미지 빌드를 확인합니다. 바뀐 쪽만 돌고, 통과하지 못하면 머지가 막힙니다.
+
+러너 왕복은 2분쯤 걸리므로 올리기 전에 로컬에서 먼저 돌리는 편이 빠릅니다.
+
+```powershell
+cd frontend
+npm run build; npm run lint; npm run format:check; npm run test
+```
+
+포맷이 어긋났다면 `npm run format`으로 고칩니다.
 
 ## 실제 서비스 운영 — 내보내기 워커 실행
 
