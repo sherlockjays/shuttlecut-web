@@ -30,17 +30,20 @@ docker compose up -d        # frontend:3000, backend:8000, postgres:15432, redis
 
 ## 검증
 
-CI가 없다. 검증은 전부 로컬에서 직접 돌린다.
+PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다. `frontend`/`backend` 체크는 필수라 통과하지 못하면 머지가 막힌다.
 
-- 프론트엔드를 고쳤으면 PR 전에 `npm run build`, `npm run lint`, `npm run test`
-- `npm run build`는 `tsc -b`를 포함한다. 타입 에러가 빌드를 막는다
-- 백엔드에는 테스트가 없다. 띄워서 확인한다
+- 프론트 job: `npm ci` → `npm run build` → `npm run lint` → `npm run format:check` → `npm run test`
+- 백엔드 job: `python -m compileall backend` → `docker build ./backend`
+- 바뀐 쪽만 돈다. 프론트만 고친 PR에서 백엔드 job은 스킵되고, 스킵은 통과로 보고된다
+
+**CI에 맡기지 말고 로컬에서 먼저 돌린다.**
+
+- 백엔드에는 테스트가 없다. CI는 문법 오류와 이미지 빌드 가능 여부까지만 본다. 동작 확인은 띄워서 한다
 - vitest가 `environment: "node"`라 DOM이 없다. 테스트는 순수 로직 모듈에만 있고, 컴포넌트 테스트를 쓰려면 jsdom 설정부터 추가해야 한다
 - 테스트 파일은 소스 옆에 둔다. `__tests__` 디렉터리를 만들지 않는다
 
 ## 코드 규칙
 
-- `tsconfig.app.json`에 `noUnusedLocals`/`noUnusedParameters`/`verbatimModuleSyntax`/`erasableSyntaxOnly`가 켜져 있다. 안 쓰는 변수 하나, `import type`을 빼먹은 타입 전용 import 하나가 빌드를 막는다
 - 새 API 코드는 `apis/`(타입 있는 fetcher, 와이어 변환)와 `queries/`(queryOptions만)에 쓴다. `api.ts`는 레거시이고 옮겨가는 중이다
 - 백엔드에는 `pyproject.toml`도 `ruff.toml`도 `pytest.ini`도 없다. ruff나 pytest가 깔려 있다고 가정하지 않는다
 

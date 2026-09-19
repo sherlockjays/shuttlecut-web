@@ -34,8 +34,8 @@ export default function AdminPage() {
     try {
       await adminApi.updateUser(uid, { plan });
       queryClient.invalidateQueries({ queryKey: adminUsersOptions.queryKey });
-    } catch (e: any) {
-      alert("변경 실패: " + e.message);
+    } catch (e: unknown) {
+      alert("변경 실패: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setSaving(null);
     }
@@ -47,8 +47,8 @@ export default function AdminPage() {
     try {
       await adminApi.updateUser(uid, { export_count: 0 });
       queryClient.invalidateQueries({ queryKey: adminUsersOptions.queryKey });
-    } catch (e: any) {
-      alert("초기화 실패: " + e.message);
+    } catch (e: unknown) {
+      alert("초기화 실패: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setSaving(null);
     }

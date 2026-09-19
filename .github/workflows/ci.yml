@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # 어느 쪽이 바뀌었는지 판정만 한다. 이 job은 항상 돈다.
+  # 워크플로/job 레벨 `paths:` 필터를 쓰면 안 된다. 워크플로가 실행되지 않으면
+  # 연결된 체크가 Pending으로 남아 필수 체크를 요구하는 PR이 영원히 머지되지 않는다.
+  # job 레벨 `if:`로 거르면 스킵된 job이 Success로 보고되므로 안전하다.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          # ci.yml 자신을 양쪽에 넣어, 이 파일을 고치는 PR에서 두 job이 모두 돌게 한다
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+
+  # workflow_dispatch에는 비교 대상이 없어 paths-filter가 전부 false를 낸다.
+  # 손으로 돌릴 때는 무조건 실행되도록 이벤트 이름으로 열어 둔다.
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      # 액션 입력의 경로는 working-directory와 무관하게 리포지토리 루트 기준이다
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/package.json
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Dockerfile 베이스와 같은 3.11이어야 문법 판정이 갈리지 않는다
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      # Dockerfile은 COPY만 하고 파이썬을 한 줄도 실행하지 않는다. 문법 오류가 있어도
+      # 빌드는 성공하고 NAS에서 기동할 때야 드러나므로, 여기서 먼저 잡는다
+      - run: python -m compileall -q backend
+      - run: docker build -t shuttlecut-backend:ci ./backend

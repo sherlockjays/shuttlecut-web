@@ -183,6 +183,8 @@ export default function Editor({ projectId }: { projectId: number }) {
   useEffect(() => {
     if (!ytUploading || !exportStatus) return;
     if (exportStatus.youtube_url && exportStatus.youtube_url !== "uploading") {
+      // #31에서 내보내기/업로드 훅을 분리할 때 이 effect째 정리한다
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setYtUrl(exportStatus.youtube_url);
       setYtUploading(false);
     } else if (!exportStatus.youtube_url) {
@@ -219,8 +221,8 @@ export default function Editor({ projectId }: { projectId: number }) {
     let res;
     try {
       res = await exportsApi.start(projectId);
-    } catch (e: any) {
-      setExportMsg(e.message || "내보내기 실패");
+    } catch (e: unknown) {
+      setExportMsg(e instanceof Error ? e.message : "내보내기 실패");
       setTimeout(() => setExportPct(null), 3000);
       return;
     }
