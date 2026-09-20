@@ -105,10 +105,22 @@ worker-venv\Scripts\pip.exe install -r backend\requirements.txt
 - 진행률은 워커가 Redis 채널 `export_progress:{export_id}`에 publish하고 백엔드가 `/api/export/ws/{export_id}`로 중계한다. WS 핸들러가 연결 시점에 DB status를 먼저 확인하는 이유는, 연결 전에 끝난 작업의 pub/sub 메시지를 놓치기 때문이다
 - 내보내기 동작을 고칠 땐 `workers/tasks.py`를 고친다. `core/exporter.py`에도 ffmpeg 처리가 따로 있지만 실제 내보내기는 그쪽을 타지 않는다
 
+## 배포
+
+사람이 읽을 절차는 [README](README.md)의 "배포" 절에 있다. 여기엔 어기면 안 되는 것만 적는다.
+
+- **운영에 뭐가 떠 있는지 추측하지 않는다.** NAS 배포 디렉터리 `/volume1/docker/shuttlecut-web/`는 이 저장소의 git 체크아웃이다. `git -C /volume1/docker/shuttlecut-web rev-parse HEAD`로 답이 나온다
+- **배포 대상은 셋이고(NAS 백엔드, NAS 프론트엔드, 워커 PC) 셋이 같은 커밋이어야 한다.** 워커가 `backend/` 패키지를 직접 import하기 때문이다. 순서는 **백엔드 → 워커 → 프론트엔드**
+- **체크아웃 디렉터리에 추적되지 않는 파일을 만들지 않는다.** 루트 `.env` 하나만 예외다. `git status`가 비어 있는 것이 배포 상태의 유일한 확인 수단이라, 덤프나 로그를 여기 두면 그 수단이 죽는다. DB 덤프는 `/volume1/docker/shuttlecut-backups/`
+- **`git status`에 내용 차이 없는 변경이 뜨면 코드를 의심하기 전에 파일 모드를 본다.** Synology ACL이 붙은 디렉터리는 그 아래 파일을 755로 만드는데 git blob은 644라 전부 수정으로 잡힌다. `git diff --stat`이 `0 insertions, 0 deletions`면 그것이다. 대응은 [README](README.md)의 배포 절에 있다
+- **재빌드 전에 현재 이미지에 `rollback-YYYYMMDD` 태그를 붙인다.** 이미지가 전부 `latest` 단일 태그라 재빌드하면 옛 이미지가 dangling으로 밀린다
+- **롤백은 소스가 아니라 이미지를 되돌리는 것이다.** compose가 `build:`를 쓰므로 돌고 있는 컨테이너는 소스 디렉터리를 참조하지 않는다. 체크아웃을 옛 커밋으로 돌려봐야 아무 일도 안 일어난다
+- 배포한 커밋에 `deploy-YYYYMMDD` annotated 태그를 찍고 push한다. 운영에 올라간 적 없는 커밋에는 찍지 않는다. release 브랜치와 GitHub Releases는 쓰지 않는다
+
 ## 개발 환경 함정
 
 - **별도 dev DB가 없다.** `backend/.env`의 `DATABASE_URL`/`REDIS_URL`을 NAS로 두고 로컬 백엔드를 띄우는 방식을 자주 쓰는데, 이러면 로컬에서 만든 데이터가 운영 DB에 그대로 들어간다. 스키마를 바꾸거나 데이터를 지우기 전에 지금 어느 DB를 보고 있는지 확인한다
-- `backend/fonts/NanumGothicBold.ttf`는 gitignore 대상이라 직접 넣어야 한다. 없으면 오버레이 한글이 깨진다
+- `backend/fonts/NanumGothicBold.ttf`는 gitignore 대상이라 직접 넣어야 한다. 이게 필요한 건 **워커 PC**다. NAS 백엔드 이미지는 Dockerfile이 apt로 `fonts-nanum`을 깔아 [exporter.py](backend/core/exporter.py)의 폰트 후보 2순위가 잡히지만, 윈도우에는 그 경로가 없어 3순위인 이 파일로 떨어진다. 없으면 기본 폰트로 대체되어 오버레이 한글이 깨진다
 
 ## 알려진 문제
 
