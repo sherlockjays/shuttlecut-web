@@ -238,6 +238,21 @@ git -C /volume1/docker/shuttlecut-web status --porcelain   # 비어 있어야 �
 
 이 디렉터리에서 추적되지 않는 파일은 루트 `.env` 하나뿐입니다. 로그·덤프·테스트 데이터를 여기에 만들면 `git status`가 더러워져서 위 확인이 의미를 잃습니다. DB 덤프는 `/volume1/docker/shuttlecut-backups/`에 둡니다.
 
+NAS의 `git`은 DSM 패키지 센터의 Synology 공식 **Git Server** 패키지에서 옵니다. 설치하면 `/usr/bin/git`이 `/var/packages/Git/target/bin/git`을 가리키는 심볼릭 링크로 생겨 PATH에서 바로 잡힙니다. 저장소가 public이라 클론에 인증 설정이 따로 필요 없습니다.
+
+> ⚠️ **`git status`에 내용 차이 없는 변경이 잔뜩 뜬다면 파일 권한부터 의심합니다.**
+> File Station이나 SMB로 복사한 디렉터리에는 Synology ACL이 상속 속성과 함께 붙는 경우가 있습니다. 그러면 그 아래 파일이 755로 만들어지는데 git blob은 644라, 내용이 같아도 전부 수정된 것으로 잡힙니다. `ls -l`에서 권한 끝의 `+`가 ACL이 붙어 있다는 표시입니다.
+>
+> 체크아웃 전환 때 `frontend/`에 실제로 이 상태였고 한 번 걷어냈습니다. 지금은 트리 전체에 ACL이 없고, 배포가 `git checkout`이라 다시 붙을 일도 없습니다. 아래는 그래도 증상이 재현될 때를 위한 기록입니다.
+>
+> ```bash
+> git diff --stat                                    # 0 insertions, 0 deletions 면 모드 차이입니다
+> chmod 755 <ACL이 붙은 디렉터리>                      # Synology에서 chmod는 ACL을 제거합니다
+> git diff --summary | grep "mode change" | sed "s/.* //" | xargs chmod 644
+> ```
+>
+> 디렉터리의 ACL부터 걷어내야 합니다. 파일 권한만 고치면 다음 배포에서 새로 생기는 파일이 다시 755가 됩니다.
+
 ### 배포 절차
 
 아래 NAS 쪽 명령은 SSH로 접속해서 실행합니다. Synology에서는 `docker`·`docker-compose`가 PATH에 없고 도커 소켓 접근에 관리자 권한이 필요하므로, 실제로는 `sudo`와 함께 `/var/packages/ContainerManager/target/usr/bin/` 아래의 실행 파일을 직접 부릅니다. 아래에서는 읽기 편하도록 `docker`, `docker-compose`로 줄여 씁니다.
