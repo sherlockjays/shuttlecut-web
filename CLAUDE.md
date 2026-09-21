@@ -113,8 +113,9 @@ worker-venv\Scripts\pip.exe install -r backend\requirements.txt
 - **배포 대상은 셋이고(NAS 백엔드, NAS 프론트엔드, 워커 PC) 셋이 같은 커밋이어야 한다.** 워커가 `backend/` 패키지를 직접 import하기 때문이다. 순서는 **백엔드 → 워커 → 프론트엔드**
 - **체크아웃 디렉터리에 추적되지 않는 파일을 만들지 않는다.** 루트 `.env` 하나만 예외다. `git status`가 비어 있는 것이 배포 상태의 유일한 확인 수단이라, 덤프나 로그를 여기 두면 그 수단이 죽는다. DB 덤프는 `/volume1/docker/shuttlecut-backups/`
 - **`git status`에 내용 차이 없는 변경이 뜨면 코드를 의심하기 전에 파일 모드를 본다.** Synology ACL이 붙은 디렉터리는 그 아래 파일을 755로 만드는데 git blob은 644라 전부 수정으로 잡힌다. `git diff --stat`이 `0 insertions, 0 deletions`면 그것이다. 대응은 [README](README.md)의 배포 절에 있다
-- **재빌드 전에 현재 이미지에 `rollback-YYYYMMDD` 태그를 붙인다.** 이미지가 전부 `latest` 단일 태그라 재빌드하면 옛 이미지가 dangling으로 밀린다
-- **롤백은 소스가 아니라 이미지를 되돌리는 것이다.** compose가 `build:`를 쓰므로 돌고 있는 컨테이너는 소스 디렉터리를 참조하지 않는다. 체크아웃을 옛 커밋으로 돌려봐야 아무 일도 안 일어난다
+- **이미지 태그는 배포 커밋의 SHA다.** 루트 `.env`의 `IMAGE_TAG`가 운영에 떠 있는 이미지의 단일 진실이고, 배포는 이 값을 바꾸는 일이다. 체크아웃 직후 `sed`로 `HEAD`에서 읽어 채운다. 손으로 SHA를 적지 않는다. 이미지는 직전 3개까지만 남긴다
+- **롤백은 소스가 아니라 이미지를 되돌리는 것이다.** compose가 `build:`를 쓰므로 돌고 있는 컨테이너는 소스 디렉터리를 참조하지 않는다. 체크아웃을 옛 커밋으로 돌려봐야 아무 일도 안 일어난다. `.env`의 `IMAGE_TAG`를 옛 SHA로 바꾸고 `up -d --no-build`가 전부다
+- **롤백에 `--no-build`를 빼면 안 된다.** 요청한 이미지가 없을 때 compose가 현재 소스를 빌드해 그 옛 SHA 이름을 붙인다. 장애 코드가 다시 뜨는데 명령은 성공으로 끝나고, 이미지 저장소에 거짓 이름이 남는다
 - 배포한 커밋에 `deploy-YYYYMMDD` annotated 태그를 찍고 push한다. 운영에 올라간 적 없는 커밋에는 찍지 않는다. release 브랜치와 GitHub Releases는 쓰지 않는다
 
 ## 개발 환경 함정

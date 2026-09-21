@@ -91,6 +91,8 @@ copy backend\.env.example backend\.env
 | 루트 `.env` | docker compose (`${VAR}` 치환) | 컨테이너를 띄울 때. 방식 A, B-2 |
 | `backend/.env` | 백엔드 프로세스 (`main.py`의 `load_dotenv`) | 백엔드를 네이티브로 띄울 때. 방식 B |
 
+루트 `.env`의 `IMAGE_TAG`는 **빌드된 이미지에 붙일 이름**입니다. 로컬은 `dev` 그대로 두면 됩니다. NAS에서는 배포하는 커밋의 SHA가 들어가고 배포 절차가 `git`에서 읽어 채우므로, 기계마다 값이 다른 것이 정상입니다. 이 키가 빠져 있으면 `up`뿐 아니라 `ps`·`logs`·`config`까지 전부 멈추는데, 어느 키를 넣어야 하는지 알려주며 멈춥니다.
+
 `GOOGLE_CLIENT_ID`/`SECRET`, `SMTP_*`는 비워둬도 로컬 개발이 깨지지는 않습니다 (SMTP는 미설정 시 발송 없이 콘솔 로그만 남기고 넘어가고, Google 로그인은 버튼을 눌렀을 때 Google 쪽에서 에러 발생)
 다만 **Google 로그인과 이메일 인증/재설정 메일 발송은 로컬에서 테스트할 수 없습니다.**
 이 두 기능까지 로컬에서 테스트하려면:
@@ -257,17 +259,15 @@ NAS의 `git`은 DSM 패키지 센터의 Synology 공식 **Git Server** 패키지
 
 아래 NAS 쪽 명령은 SSH로 접속해서 실행합니다. Synology에서는 `docker`·`docker-compose`가 PATH에 없고 도커 소켓 접근에 관리자 권한이 필요하므로, 실제로는 `sudo`와 함께 `/var/packages/ContainerManager/target/usr/bin/` 아래의 실행 파일을 직접 부릅니다. 아래에서는 읽기 편하도록 `docker`, `docker-compose`로 줄여 씁니다.
 
-**1. 안전장치.** 재빌드하기 전에 합니다. 이미지가 전부 `latest` 단일 태그라, 재빌드하면 지금 돌고 있는 이미지가 이름 없는 dangling 상태로 밀려나고 `docker image prune` 한 번에 사라집니다. 되돌릴 대상에 미리 이름을 붙여둬야 합니다.
+**1. DB 덤프.**
 
 ```bash
-# DB 덤프 (redirect를 sudo bash -c 안쪽에 둬야 합니다)
+# redirect를 sudo bash -c 안쪽에 둬야 합니다
 sudo bash -c "docker exec shuttlecut-web-postgres-1 pg_dump -U shuttlecut -d shuttlecut \
   > /volume1/docker/shuttlecut-backups/db-$(date +%Y%m%d).sql"
-
-# 지금 운영 이미지에 롤백 태그
-docker tag shuttlecut-web-backend:latest  shuttlecut-web-backend:rollback-$(date +%Y%m%d)
-docker tag shuttlecut-web-frontend:latest shuttlecut-web-frontend:rollback-$(date +%Y%m%d)
 ```
+
+이미지에는 따로 손댈 것이 없습니다. 이미지 이름에 커밋 SHA가 붙어 있어서 지금 돌고 있는 이미지가 재빌드로 밀려나지 않습니다. 되돌릴 대상은 이미 이름을 갖고 있습니다.
 
 **2. 소스 갱신과 확인.** 무엇이 나가는지 먼저 보고 받습니다.
 
@@ -277,10 +277,14 @@ git fetch origin main
 git log --oneline HEAD..origin/main        # 이번에 나가는 커밋
 git diff --stat HEAD..origin/main          # 바뀌는 파일
 git checkout -f main && git reset --hard origin/main
+sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$(git rev-parse --short=12 HEAD)|" .env
+grep IMAGE_TAG .env                        # 새 커밋의 SHA가 들어갔는지
 docker-compose config --quiet              # .env에 빠진 키가 없는지 확인
 ```
 
-마지막 줄이 중요합니다. `docker-compose.yml`이 `${VAR:?메시지}` 형태로 값을 요구하므로, 루트 `.env`에 키가 빠져 있으면 컨테이너를 만들기 전에 어느 키인지 알려주며 멈춥니다. `--quiet`를 붙이는 이유는 이 명령이 해석된 비밀값을 전부 화면에 찍기 때문입니다.
+`sed` 줄이 이번 배포의 이미지 이름을 정합니다. SHA를 손으로 적지 않고 `HEAD`에서 읽으므로 체크아웃한 커밋과 이미지 이름이 어긋날 수 없습니다. **체크아웃과 `sed`는 붙여서 실행합니다.** 그 사이에 compose 명령을 끼워 넣으면 새 compose 파일이 옛 `IMAGE_TAG`를 보게 됩니다.
+
+마지막 줄도 중요합니다. `docker-compose.yml`이 `${VAR:?메시지}` 형태로 값을 요구하므로, 루트 `.env`에 키가 빠져 있으면 컨테이너를 만들기 전에 어느 키인지 알려주며 멈춥니다. `--quiet`를 붙이는 이유는 이 명령이 해석된 비밀값을 전부 화면에 찍기 때문입니다.
 
 **3. 백엔드.** 빌드가 실패해도 기존 컨테이너는 계속 돌기 때문에 서비스 영향 없이 시도할 수 있습니다.
 
@@ -314,14 +318,42 @@ git tag -a deploy-$(date +%Y%m%d) -m "배포 내용 한 줄"
 git push origin deploy-$(date +%Y%m%d)
 ```
 
-### 롤백
+이 태그는 2단계에서 이미지에 붙인 SHA 태그와 역할이 다릅니다. 이미지 태그는 빌드하는 순간 compose가 자동으로 붙이고 "이 이미지 안에 무슨 코드가 들었나"를 말합니다. `deploy-` 태그는 검증이 끝난 뒤 사람이 찍고 "언제 운영에 올라갔나"를 말합니다. 그래서 올렸다가 되돌린 배포에는 `deploy-` 태그를 찍지 않습니다.
 
-`docker-compose.yml`이 `image:`가 아니라 `build:`를 쓰기 때문에, **이미 돌고 있는 컨테이너는 소스 디렉터리를 전혀 참조하지 않습니다.** 소스는 이미 빌드된 이미지 안에 들어가 있습니다. 그래서 되돌릴 때 체크아웃을 옛 커밋으로 돌릴 필요가 없고, 태그를 붙여둔 이미지를 다시 `latest`로 가리키면 끝입니다. 재빌드가 없어 수십 초면 됩니다.
+`git push`는 태그를 GitHub에 올리는 것이고 배포와는 무관합니다. 배포는 3~5단계에서 이미 끝났습니다.
+
+### 이미지 보관
+
+배포할 때마다 SHA 태그가 하나씩 늘어납니다. 백엔드 이미지가 1.4GB쯤 되므로 **직전 3개까지만 남기고 지웁니다.** 그보다 오래된 버전으로 돌아가야 하는 상황이면 이미 롤백이 아니라 다른 문제입니다.
 
 ```bash
-docker tag shuttlecut-web-backend:rollback-YYYYMMDD  shuttlecut-web-backend:latest
-docker tag shuttlecut-web-frontend:rollback-YYYYMMDD shuttlecut-web-frontend:latest
-docker-compose up -d --force-recreate backend frontend
+docker images shuttlecut-web-backend    # 어떤 SHA가 남아 있는지
+docker image rm shuttlecut-web-backend:<오래된 SHA> shuttlecut-web-frontend:<오래된 SHA>
 ```
 
-DB는 되돌리지 않아도 보통 괜찮습니다. 스키마 변경이 `ADD COLUMN`뿐이라 구버전 코드가 새 컬럼을 무시하고 동작합니다. 데이터까지 되돌려야 하는 상황이면 안전장치에서 뜬 덤프를 씁니다.
+지금 `.env`가 가리키는 태그는 지우면 안 됩니다. 돌고 있는 컨테이너가 쓰는 이미지라 도커가 거부하긴 하지만, 지우기 전에 `grep IMAGE_TAG .env`로 확인하는 편이 빠릅니다.
+
+### 롤백
+
+`docker-compose.yml`이 `build:`를 쓰기 때문에 **이미 돌고 있는 컨테이너는 소스 디렉터리를 전혀 참조하지 않습니다.** 소스는 이미 빌드된 이미지 안에 들어가 있습니다. 그래서 되돌릴 때 체크아웃을 옛 커밋으로 돌릴 필요가 없습니다. `.env`가 가리키는 이미지를 바꾸면 끝이고, 재빌드가 없어 수 초면 됩니다.
+
+```bash
+cd /volume1/docker/shuttlecut-web
+
+# 1. 되돌릴 이미지가 실제로 남아 있는지 먼저 봅니다
+docker images shuttlecut-web-backend
+
+# 2. 목록에서 고른 SHA로 바꿉니다. 여기서는 값을 직접 지정합니다
+sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=<되돌릴 SHA>|" .env
+
+# 3. --no-build를 반드시 붙입니다
+docker-compose up -d --no-build backend frontend
+docker inspect --format '{{.Config.Image}}' shuttlecut-web-backend-1
+```
+
+> ⚠️ **`--no-build`를 빼면 롤백이 실패하는 대신 조용히 잘못된 일을 합니다.**
+> compose는 요청한 이미지가 없으면 **현재 소스를 빌드해서 그 이름을 붙입니다.** 롤백 상황에서는 체크아웃이 장애 난 커밋에 있으므로, 되돌릴 이미지가 이미 지워졌다면 장애 코드가 그대로 다시 뜨고 명령은 성공으로 끝납니다. 게다가 그 이미지에 옛 SHA 이름이 박혀서, 앞으로 누가 그 SHA로 되돌려도 계속 장애 코드가 뜹니다.
+>
+> `--no-build`를 붙이면 `No such image`와 종료코드 1로 멈추고, **돌고 있는 컨테이너는 건드리지 않습니다.** 서비스가 내려가지 않은 채 "되돌릴 대상이 없다"는 사실만 알게 되므로 다른 SHA를 고르면 됩니다.
+
+DB는 되돌리지 않아도 보통 괜찮습니다. 스키마 변경이 `ADD COLUMN`뿐이라 구버전 코드가 새 컬럼을 무시하고 동작합니다. 데이터까지 되돌려야 하는 상황이면 1단계에서 뜬 덤프를 씁니다.
