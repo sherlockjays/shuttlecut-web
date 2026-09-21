@@ -17,6 +17,9 @@ DOCKER_BIN="${DOCKER_BIN:-/var/packages/ContainerManager/target/usr/bin/docker}"
 COMPOSE_BIN="${COMPOSE_BIN:-/var/packages/ContainerManager/target/usr/bin/docker-compose}"
 BACKEND_CONTAINER=shuttlecut-web-backend-1
 FRONTEND_CONTAINER=shuttlecut-web-frontend-1
+
+# 배포 로그는 페이저를 타면 안 된다. NAS에는 less가 아예 없다.
+export GIT_PAGER=cat
 HEALTH_URL=http://127.0.0.1:8000/api/health
 FRONTEND_URL=http://127.0.0.1:3000/
 

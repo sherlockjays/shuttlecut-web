@@ -36,6 +36,10 @@ COMPOSE_BIN="${COMPOSE_BIN:-/var/packages/ContainerManager/target/usr/bin/docker
 BACKUP_DIR="${SHUTTLECUT_BACKUP_DIR:-/volume1/docker/shuttlecut-backups}"
 BACKEND_CONTAINER=shuttlecut-web-backend-1
 POSTGRES_CONTAINER=shuttlecut-web-postgres-1
+
+# 배포 로그는 페이저를 타면 안 된다. 출력이 한 화면을 넘으면 입력을 기다리며 멈춘다.
+# NAS에는 less가 아예 없어서 git이 매번 에러를 찍기도 한다.
+export GIT_PAGER=cat
 HEALTH_URL=http://127.0.0.1:8000/api/health
 FRONTEND_URL=http://127.0.0.1:3000/
 KEEP_IMAGES=3
