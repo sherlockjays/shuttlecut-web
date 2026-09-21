@@ -109,6 +109,8 @@ worker-venv\Scripts\pip.exe install -r backend\requirements.txt
 
 사람이 읽을 절차는 [README](README.md)의 "배포" 절에 있다. 여기엔 어기면 안 되는 것만 적는다.
 
+배포와 롤백은 NAS에서 `scripts/deploy-nas.sh`와 `scripts/rollback-nas.sh`로 한다. 아래 규칙 중 순서·검증·`--no-build`는 이 둘이 강제하므로, 손으로 할 때만 직접 지키면 된다.
+
 - **운영에 뭐가 떠 있는지 추측하지 않는다.** NAS 배포 디렉터리 `/volume1/docker/shuttlecut-web/`는 이 저장소의 git 체크아웃이다. `git -C /volume1/docker/shuttlecut-web rev-parse HEAD`로 답이 나온다
 - **배포 대상은 셋이고(NAS 백엔드, NAS 프론트엔드, 워커 PC) 셋이 같은 커밋이어야 한다.** 워커가 `backend/` 패키지를 직접 import하기 때문이다. 순서는 **백엔드 → 워커 → 프론트엔드**
 - **체크아웃 디렉터리에 추적되지 않는 파일을 만들지 않는다.** 루트 `.env` 하나만 예외다. `git status`가 비어 있는 것이 배포 상태의 유일한 확인 수단이라, 덤프나 로그를 여기 두면 그 수단이 죽는다. DB 덤프는 `/volume1/docker/shuttlecut-backups/`

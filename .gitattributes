@@ -1,1 +1,5 @@
 * text=auto
+
+# NAS에서 실행되는 셸 스크립트다. CRLF로 체크아웃되면 bash가 '\r'을 명령의 일부로
+# 읽어 전부 깨지므로, 윈도우에서도 LF를 유지한다.
+*.sh text eol=lf
