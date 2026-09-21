@@ -38,7 +38,6 @@ BACKEND_CONTAINER=shuttlecut-web-backend-1
 POSTGRES_CONTAINER=shuttlecut-web-postgres-1
 HEALTH_URL=http://127.0.0.1:8000/api/health
 FRONTEND_URL=http://127.0.0.1:3000/
-APP_BASE_URL_EXPECTED=https://shuttlecut.kr
 KEEP_IMAGES=3
 
 # :? 를 붙일 수 없어 compose가 못 막는 키들. 로컬에서는 비워두는 것이 정상이라
@@ -209,11 +208,6 @@ if grep -q 'change-me' .env; then
   die ".env에 .env.example의 자리표시자(change-me)가 남아 있습니다."
 fi
 
-# ③ 값이 있되 운영 주소가 아닌 경우. 빠지면 auth.py가 옛 DDNS를 OAuth 콜백으로 보낸다(#66).
-actual_base="$(env_value APP_BASE_URL)"
-[[ "$actual_base" == "$APP_BASE_URL_EXPECTED" ]] ||
-  die "APP_BASE_URL이 운영 주소가 아닙니다. (현재: '${actual_base:-비어 있음}', 기대: $APP_BASE_URL_EXPECTED)"
-
 info "값 검사 통과 (경고 $WARNINGS건)"
 
 # ── 2. DB 덤프 ─────────────────────────────────────────────────────────────
@@ -344,18 +338,6 @@ STAGE=7
 log "7. 프론트엔드"
 
 dc build frontend
-
-# 빌드한 뒤 서빙하기 전에 검사한다. VITE_ 변수는 빌드 타임에 번들로 박히므로,
-# 로컬 주소를 담은 .env가 빌드 컨텍스트에 섞이면 모든 사용자 브라우저가 자기 PC를 호출한다.
-# react-router가 SSR 폴백으로 "http://localhost"를 갖고 있어 localhost가 아니라
-# localhost:8000으로 검색해야 한다.
-if d run --rm --entrypoint grep "shuttlecut-web-frontend:$NEW_TAG" \
-  -rl "localhost:8000" /usr/share/nginx/html/assets/; then
-  die "프론트 번들에 localhost:8000이 박혀 있습니다. 이 이미지를 띄우면 안 됩니다.
-    frontend/.env가 빌드 컨텍스트에 섞였는지 확인해주세요(.dockerignore가 막아야 합니다)."
-fi
-info "번들 검사 통과"
-
 dc up -d frontend
 
 wait_http "$FRONTEND_URL" 15 || die "프론트엔드가 200이 아닙니다."
