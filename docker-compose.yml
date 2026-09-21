@@ -2,11 +2,13 @@ services:
 
   frontend:
     build: ./frontend
+    image: 'shuttlecut-web-frontend:${IMAGE_TAG:?IMAGE_TAG를 root .env에 넣어주세요. (로컬 환경: "dev", NAS 환경: 배포 커밋의 SHA)}'
     ports:
       - "3000:80"
 
   backend:
     build: ./backend
+    image: 'shuttlecut-web-backend:${IMAGE_TAG:?IMAGE_TAG를 root .env에 넣어주세요. (로컬 환경: "dev", NAS 환경: 배포 커밋의 SHA)}'
     ports:
       - "8000:8000"
     environment:
