@@ -52,6 +52,9 @@ backend/
   workers/tasks.py            Celery 태스크 (run_export)
 frontend/
   src/                        React SPA
+scripts/
+  deploy-nas.sh               NAS 배포 (NAS에서 실행)
+  rollback-nas.sh             NAS 롤백 (NAS에서 실행)
 docker-compose.yml             프론트/백/DB/Redis 전체 스택
 start-native-worker.ps1        Windows 네이티브 GPU 워커 실행 스크립트
 .github/workflows/ci.yml       PR 검증 (프론트 빌드·린트·포맷·테스트, 백엔드 이미지 빌드)
@@ -259,6 +262,20 @@ NAS의 `git`은 DSM 패키지 센터의 Synology 공식 **Git Server** 패키지
 
 아래 NAS 쪽 명령은 SSH로 접속해서 실행합니다. Synology에서는 `docker`·`docker-compose`가 PATH에 없고 도커 소켓 접근에 관리자 권한이 필요하므로, 실제로는 `sudo`와 함께 `/var/packages/ContainerManager/target/usr/bin/` 아래의 실행 파일을 직접 부릅니다. 아래에서는 읽기 편하도록 `docker`, `docker-compose`로 줄여 씁니다.
 
+#### 스크립트로
+
+```bash
+cd /volume1/docker/shuttlecut-web
+bash scripts/deploy-nas.sh           # origin/main을 배포합니다
+bash scripts/deploy-nas.sh --help    # 옵션
+```
+
+아래 "손으로 할 때"의 절차를 순서대로 실행하고 각 단계를 검증합니다. `backend/`가 바뀐 배포에서는 워커를 갱신할 차례에 멈춰서 기다리고, 안 바뀌었으면 그 단계를 건너뜁니다.
+
+끝나면 롤백 명령과 `deploy-` 태그 명령을 출력합니다. **태그 명령은 로컬에서 실행합니다.** NAS에서는 태그를 만들 수 없습니다.
+
+#### 손으로 할 때
+
 **1. DB 덤프.**
 
 ```bash
@@ -326,16 +343,34 @@ git push origin deploy-$(date +%Y%m%d)
 
 배포할 때마다 SHA 태그가 하나씩 늘어납니다. 백엔드 이미지가 1.4GB쯤 되므로 **직전 3개까지만 남기고 지웁니다.** 그보다 오래된 버전으로 돌아가야 하는 상황이면 이미 롤백이 아니라 다른 문제입니다.
 
+배포 스크립트가 끝에 정리 대상 SHA를 보여줍니다. `--prune`을 붙이면 확인을 받고 지웁니다.
+
 ```bash
 docker images shuttlecut-web-backend    # 어떤 SHA가 남아 있는지
 docker image rm shuttlecut-web-backend:<오래된 SHA> shuttlecut-web-frontend:<오래된 SHA>
 ```
+
+> ⚠️ **`docker image prune`을 쓰면 안 됩니다.** 이 NAS의 dangling 이미지에는 다른 스택의 것이 섞여 있습니다.
 
 지금 `.env`가 가리키는 태그는 지우면 안 됩니다. 돌고 있는 컨테이너가 쓰는 이미지라 도커가 거부하긴 하지만, 지우기 전에 `grep IMAGE_TAG .env`로 확인하는 편이 빠릅니다.
 
 ### 롤백
 
 `docker-compose.yml`이 `build:`를 쓰기 때문에 **이미 돌고 있는 컨테이너는 소스 디렉터리를 전혀 참조하지 않습니다.** 소스는 이미 빌드된 이미지 안에 들어가 있습니다. 그래서 되돌릴 때 체크아웃을 옛 커밋으로 돌릴 필요가 없습니다. `.env`가 가리키는 이미지를 바꾸면 끝이고, 재빌드가 없어 수 초면 됩니다.
+
+#### 스크립트로
+
+```bash
+cd /volume1/docker/shuttlecut-web
+bash scripts/rollback-nas.sh                # 남아 있는 이미지 목록을 보여줍니다
+bash scripts/rollback-nas.sh <되돌릴 SHA>
+```
+
+인자에 기본값이 없습니다. 되돌릴 이미지가 남아 있지 않으면 아무것도 건드리지 않고 멈춥니다.
+
+> ⚠️ **되돌린 상태에서 `docker-compose build`를 돌리면 안 됩니다.** 체크아웃이 장애 난 커밋에 있어서 되돌린 SHA 이름에 장애 코드가 박힙니다. 돌아가는 길은 고친 커밋을 다시 배포하는 것입니다.
+
+#### 손으로 할 때
 
 ```bash
 cd /volume1/docker/shuttlecut-web
