@@ -304,30 +304,17 @@ fi
 STAGE=6
 if ((BACKEND_CHANGED)) && ((!SKIP_WORKER_PAUSE)); then
   log "6. 워커"
-  reqs_line=""
-  if ((REQS_CHANGED)); then
-    reqs_line="      worker-venv\\Scripts\\pip.exe install -r backend\\requirements.txt"
-  fi
   cat <<EOF
     워커는 도커가 아니라 자기 PC의 소스를 직접 실행합니다. celery는 시작할 때
     import한 모듈을 메모리에 들고 있으므로, 재시작해야 새 코드가 반영됩니다.
 
-    맞춰야 할 커밋: $NEW_SHA
+    워커 PC의 워커 전용 체크아웃에서:
+      scripts\\deploy-worker.ps1 $NEW_SHA
 
-    워커 PC에서:
-      worker-venv\\Scripts\\celery.exe -A workers.tasks.celery inspect active
-      worker-venv\\Scripts\\celery.exe -A workers.tasks.celery control shutdown
-$reqs_line
-      (체크아웃을 위 커밋으로 맞춘 뒤)
-      .\\start-native-worker.ps1
-
-    진행 중인 작업이 있으면 inspect active에 뜹니다. --pool=solo라 한 번에 하나씩
-    처리하는데 그것이 20분짜리 인코딩일 수 있습니다. 강제로 죽이면 그 작업은 날아갑니다.
-
-    주의: 워커는 지금 개발 체크아웃에서 돌고 있습니다. start-native-worker.ps1이
-    자기 파일 위치를 \$ROOT로 잡아 \$ROOT\\backend를 PYTHONPATH에 넣기 때문입니다.
-    git checkout을 그대로 실행하면 작업 중인 브랜치에서 튕겨 나옵니다.
-    작업 브랜치를 먼저 확인하세요. 전용 체크아웃 분리는 이슈 #79입니다.
+    진행 중인 인코딩이 끝나기를 기다린 뒤 celery를 내리고, 체크아웃을 맞추고,
+    requirements.txt가 바뀌었으면 worker-venv를 재설치하고, 다시 띄웁니다.
+    --pool=solo라 한 번에 한 작업만 처리하는데 그것이 20분짜리 인코딩일 수 있어
+    기다리는 시간이 길 수 있습니다.
 EOF
   [[ -t 0 ]] || die "워커 단계에서 입력을 받을 수 없습니다. --skip-worker-pause를 쓰거나 터미널에서 실행해주세요."
   read -r -p "    워커를 갱신했으면 Enter를 눌러주세요. " || true
