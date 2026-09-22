@@ -18,11 +18,12 @@ npm run test                # vitest run
 npx vitest run src/pages/EditorPage/rally.test.ts    # 파일 하나만
 npx vitest run -t "이미 저장된 값"                    # 케이스 이름으로
 
-# 백엔드 (backend/). worker-venv는 백엔드/워커 공용이다
-..\worker-venv\Scripts\uvicorn main:app --reload --port 8000
+# 백엔드 (backend/)
+venv\Scripts\uvicorn main:app --reload --port 8000
 
-# 내보내기 워커 (리포지토리 루트, .env.native-worker 필요)
-.\start-native-worker.ps1
+# 내보내기 워커. 개발 체크아웃이 아니라 워커 전용 체크아웃에서 띄운다
+.\start-native-worker.ps1                  # 기동
+.\scripts\deploy-worker.ps1 <SHA>          # 배포 커밋으로 맞추고 재기동
 
 # 전체 스택
 docker compose up -d        # frontend:3000, backend:8000, postgres:15432, redis:6379
@@ -51,7 +52,8 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 
 - **DB 컬럼 추가**: `models/database.py`의 Column과 [main.py](backend/main.py) startup의 `ALTER TABLE ... ADD COLUMN`. alembic은 설치만 되어 있고 안 쓴다. `init_db()`가 `create_all`을 돌리고 기존 테이블은 ALTER 문으로 때운다(실패하면 조용히 rollback)
 - **점수판 색**: 에디터 미리보기는 [theme.ts](frontend/src/models/theme.ts)의 `CANVAS_THEMES`(hex), 실제 렌더링은 [exporter.py](backend/core/exporter.py)의 `THEMES`(RGB 튜플). 한쪽만 고치면 미리보기와 결과물이 갈라진다
-- **의존성**: [requirements.txt](backend/requirements.txt)를 고치면 NAS 백엔드 재빌드와 워커 PC `worker-venv` 재설치를 **둘 다** 해야 한다. 아래 참고
+- **파이썬 버전**: [.python-version](.python-version)과 [Dockerfile](backend/Dockerfile)의 `FROM python:3.11-slim`. `requirements.txt`는 패키지를 고정하지만 인터프리터는 고정하지 않는다. 어긋나면 numpy·opencv 같은 C 확장이 같은 버전이어도 ABI가 다른 바이너리가 된다. 한쪽만 고치면 워커와 NAS가 갈라진다
+- **의존성**: [requirements.txt](backend/requirements.txt)를 고치면 NAS 백엔드 재빌드와 워커 `worker-venv` 재설치를 **둘 다** 해야 한다. 아래 참고
 
 ### 의존성을 올릴 때
 
@@ -60,15 +62,11 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 버전을 올릴 때는 한 기계에서만 올리면 안 된다. 워커는 백엔드와 같은 ORM 모델·같은 `core.exporter`를 쓰는데, NAS는 도커 빌드로 설치하고 워커는 `worker-venv`에 pip로 직접 설치해서 갱신 경로가 갈라져 있다.
 
 ```powershell
-# 1. requirements.txt 수정 후, 워커를 멈추고 (진행 중 작업 없는지 먼저 확인)
-worker-venv\Scripts\celery.exe -A workers.tasks.celery inspect active
-worker-venv\Scripts\celery.exe -A workers.tasks.celery control shutdown
-
-# 2. 워커 venv 재설치
-worker-venv\Scripts\pip.exe install -r backend\requirements.txt
-
-# 3. NAS 백엔드 재빌드 (배포 절차대로)
-# 4. 양쪽 pip freeze를 대조해서 같은지 확인
+# 1. NAS 백엔드 재빌드 (배포 절차대로)
+# 2. 워커: deploy-worker.ps1이 requirements.txt 변경을 감지해 pip까지 돌린다
+#    (큐 대기 → 종료 → 체크아웃 → pip → 재기동)
+.\scripts\deploy-worker.ps1 <배포 SHA>
+# 3. 양쪽 pip freeze를 대조해서 같은지 확인
 ```
 
 전이 의존성(`starlette` 등)은 고정 대상이 아니라 여전히 뜰 수 있다. 완전한 lock이 필요해지면 별도 도구를 검토한다.
@@ -100,6 +98,8 @@ worker-venv\Scripts\pip.exe install -r backend\requirements.txt
 
 - NAS(Synology)에 프론트/백엔드/Postgres/Redis가 떠 있고, mp4 인코딩만 GPU가 달린 별도 Windows PC의 네이티브 Celery 워커가 처리한다
 - 내보내기가 큐에서 안 빠지면 코드를 의심하기 전에 워커 PC가 켜져 있는지부터 확인한다. 꺼져 있으면 작업은 Redis 큐에 쌓인 채 대기한다
+- **워커는 개발 체크아웃과 분리된 전용 체크아웃에서 돈다.** [start-native-worker.ps1](start-native-worker.ps1)이 자기 파일 위치의 `backend/`를 실행하므로, 개발 체크아웃에서 띄우면 그때 체크아웃된 브랜치 코드가 운영 내보내기를 처리한다. 워커 체크아웃은 배포 SHA에 detached로 고정하고, `git -C <워커> rev-parse HEAD`가 "워커가 도는 커밋"의 답이다
+- 워커 체크아웃을 가르는 표식은 `.env.native-worker`다. 이 파일이 없는 체크아웃에서는 `start-native-worker.ps1`과 `scripts/deploy-worker.ps1`이 둘 다 멈춘다
 - **워커와 NAS는 파일시스템을 공유하지 않는다.** 워커는 원본을 `GET /api/internal/video`로 받고 결과물을 `POST /api/internal/export/{id}`로 올린다
 - 이 두 엔드포인트는 JWT가 아니라 `X-Worker-Secret`으로 인증하고, 경로가 `STORAGE_PATH` 아래인지 검사한다([internal.py](backend/api/routes/internal.py))
 - 진행률은 워커가 Redis 채널 `export_progress:{export_id}`에 publish하고 백엔드가 `/api/export/ws/{export_id}`로 중계한다. WS 핸들러가 연결 시점에 DB status를 먼저 확인하는 이유는, 연결 전에 끝난 작업의 pub/sub 메시지를 놓치기 때문이다
@@ -109,10 +109,11 @@ worker-venv\Scripts\pip.exe install -r backend\requirements.txt
 
 사람이 읽을 절차는 [README](README.md)의 "배포" 절에 있다. 여기엔 어기면 안 되는 것만 적는다.
 
-배포와 롤백은 NAS에서 `scripts/deploy-nas.sh`와 `scripts/rollback-nas.sh`로 한다. 아래 규칙 중 순서·검증·`--no-build`는 이 둘이 강제하므로, 손으로 할 때만 직접 지키면 된다.
+NAS는 `scripts/deploy-nas.sh`와 `scripts/rollback-nas.sh`로, 워커는 `scripts/deploy-worker.ps1`로 한다. 아래 규칙 중 순서·검증·`--no-build`는 이들이 강제하므로, 손으로 할 때만 직접 지키면 된다.
 
-- **운영에 뭐가 떠 있는지 추측하지 않는다.** NAS 배포 디렉터리 `/volume1/docker/shuttlecut-web/`는 이 저장소의 git 체크아웃이다. `git -C /volume1/docker/shuttlecut-web rev-parse HEAD`로 답이 나온다
+- **운영에 뭐가 떠 있는지 추측하지 않는다.** 셋 다 git 체크아웃이라 명령으로 답이 나온다. NAS는 `git -C /volume1/docker/shuttlecut-web rev-parse HEAD`, 워커는 워커 전용 체크아웃에서 같은 명령
 - **배포 대상은 셋이고(NAS 백엔드, NAS 프론트엔드, 워커 PC) 셋이 같은 커밋이어야 한다.** 워커가 `backend/` 패키지를 직접 import하기 때문이다. 순서는 **백엔드 → 워커 → 프론트엔드**
+- **워커 체크아웃은 detached로 배포 SHA에 고정한다.** 브랜치를 따라가면 고정이 깨진다. `deploy-worker.ps1`이 `--detach`로 강제한다
 - **체크아웃 디렉터리에 추적되지 않는 파일을 만들지 않는다.** 루트 `.env` 하나만 예외다. `git status`가 비어 있는 것이 배포 상태의 유일한 확인 수단이라, 덤프나 로그를 여기 두면 그 수단이 죽는다. DB 덤프는 `/volume1/docker/shuttlecut-backups/`
 - **`git status`에 내용 차이 없는 변경이 뜨면 코드를 의심하기 전에 파일 모드를 본다.** Synology ACL이 붙은 디렉터리는 그 아래 파일을 755로 만드는데 git blob은 644라 전부 수정으로 잡힌다. `git diff --stat`이 `0 insertions, 0 deletions`면 그것이다. 대응은 [README](README.md)의 배포 절에 있다
 - **이미지 태그는 배포 커밋의 SHA다.** 루트 `.env`의 `IMAGE_TAG`가 운영에 떠 있는 이미지의 단일 진실이고, 배포는 이 값을 바꾸는 일이다. 체크아웃 직후 `sed`로 `HEAD`에서 읽어 채운다. 손으로 SHA를 적지 않는다. 이미지는 직전 3개까지만 남긴다
@@ -123,7 +124,8 @@ worker-venv\Scripts\pip.exe install -r backend\requirements.txt
 ## 개발 환경 함정
 
 - **별도 dev DB가 없다.** `backend/.env`의 `DATABASE_URL`/`REDIS_URL`을 NAS로 두고 로컬 백엔드를 띄우는 방식을 자주 쓰는데, 이러면 로컬에서 만든 데이터가 운영 DB에 그대로 들어간다. 스키마를 바꾸거나 데이터를 지우기 전에 지금 어느 DB를 보고 있는지 확인한다
-- `backend/fonts/NanumGothicBold.ttf`는 gitignore 대상이라 직접 넣어야 한다. 이게 필요한 건 **워커 PC**다. NAS 백엔드 이미지는 Dockerfile이 apt로 `fonts-nanum`을 깔아 [exporter.py](backend/core/exporter.py)의 폰트 후보 2순위가 잡히지만, 윈도우에는 그 경로가 없어 3순위인 이 파일로 떨어진다. 없으면 기본 폰트로 대체되어 오버레이 한글이 깨진다
+- `backend/fonts/NanumGothicBold.ttf`는 gitignore 대상이라 직접 넣어야 한다. 이게 필요한 건 **워커 전용 체크아웃**이다. NAS 백엔드 이미지는 Dockerfile이 apt로 `fonts-nanum`을 깔아 [exporter.py](backend/core/exporter.py)의 폰트 후보 2순위가 잡히지만, 윈도우에는 그 경로가 없어 3순위인 이 파일로 떨어진다. 없으면 기본 폰트로 대체되어 오버레이 한글이 깨진다
+- **`.ps1`은 UTF-8 BOM으로 저장한다.** 워커 PC에는 Windows PowerShell 5.1만 있는데(`pwsh` 없음), BOM이 없으면 스크립트를 ANSI로 읽어 한글 출력이 전부 깨진다. 편집 후 첫 3바이트가 `EF BB BF`인지 확인한다
 
 ## 알려진 문제
 

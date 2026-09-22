@@ -55,8 +55,11 @@ frontend/
 scripts/
   deploy-nas.sh               NAS 배포 (NAS에서 실행)
   rollback-nas.sh             NAS 롤백 (NAS에서 실행)
+  deploy-worker.ps1           워커 배포 (워커 전용 체크아웃에서 실행)
 docker-compose.yml             프론트/백/DB/Redis 전체 스택
 start-native-worker.ps1        Windows 네이티브 GPU 워커 실행 스크립트
+.python-version                워커·로컬 venv가 써야 할 파이썬 버전
+.env.native-worker.example     워커 환경변수 템플릿
 .github/workflows/ci.yml       PR 검증 (프론트 빌드·린트·포맷·테스트, 백엔드 이미지 빌드)
 ```
 
@@ -66,17 +69,19 @@ start-native-worker.ps1        Windows 네이티브 GPU 워커 실행 스크립�
 
 - Docker Desktop
 - Node.js 24 (프론트 개발 시) — `frontend/package.json`의 `engines`가 `^24.0.0`으로 고정되어 있고 `engine-strict`가 켜져 있어, 다른 메이저 버전에서는 `npm install`이 거부됩니다
-- Python 3.11 (백엔드/워커 개발 시)
+- Python — 버전은 `.python-version`에 적혀 있습니다. `backend/Dockerfile`의 베이스 이미지와 같은 값이어야 합니다
 - ffmpeg — PATH에 등록되어 있어야 함
 - `backend/fonts/NanumGothicBold.ttf` — 오버레이 텍스트 렌더링용 폰트. gitignore 대상이라 직접 받아서 넣어야 함 (없으면 기본 폰트로 대체되어 한글이 깨질 수 있음)
 - GPU는 선택사항입니다. NVIDIA GPU가 없다면 워커 실행 시 `ENABLE_GPU=0`으로 두면 `libx264` CPU 인코딩으로 동작합니다 (느릴 뿐, 기능은 동일). GPU로 돌리려면 NVIDIA 드라이버 + CUDA 12.6이 필요합니다.
 
-백엔드 서버 또는 워커를 로컬에서 돌리려면 가상환경이 필요합니다. `worker-venv/`는 gitignore 대상이라 새 환경에서는 직접 만들어야 합니다 (백엔드와 워커가 같은 `requirements.txt`를 쓰므로 하나만 만들어서 공용으로 씁니다):
+백엔드 서버를 로컬에서 돌리려면 가상환경이 필요합니다. gitignore 대상이라 새 환경에서는 직접 만들어야 합니다.
 
 ```powershell
-python -m venv worker-venv
-worker-venv\Scripts\pip install -r backend\requirements.txt
+py -3.11 -m venv backend\venv
+backend\venv\Scripts\pip install -r backend\requirements.txt
 ```
+
+> 워커용 venv는 여기가 아니라 **워커 전용 체크아웃**에 따로 만듭니다. 아래 "내보내기 워커 실행" 절을 보세요. 같은 `requirements.txt`를 쓰지만, 개발 체크아웃은 브랜치를 오가고 워커 체크아웃은 배포 커밋에 고정되어야 해서 분리합니다.
 
 ### 환경변수 설정
 
@@ -121,7 +126,7 @@ copy backend\.env.example backend\.env
 docker compose up -d          # frontend:3000, backend:8000, postgres:15432, redis:6379
 ```
 
-**개발 중에는 권하지 않습니다.** 백엔드를 한 줄 고칠 때마다 `docker compose build backend`가 필요합니다. 이 방식으로만 드러나는 건 코드가 아니라 환경 차이(리눅스 vs 윈도우, 컨테이너의 Python 3.11 vs 로컬 `worker-venv` 버전, apt로 깔리는 ffmpeg·libgl 등 시스템 패키지)이므로, 배포 전 확인용으로 씁니다.
+**개발 중에는 권하지 않습니다.** 백엔드를 한 줄 고칠 때마다 `docker compose build backend`가 필요합니다. 이 방식으로만 드러나는 건 코드가 아니라 환경 차이(리눅스 vs 윈도우, 컨테이너와 로컬 venv의 Python 버전, apt로 깔리는 ffmpeg·libgl 등 시스템 패키지)이므로, 배포 전 확인용으로 씁니다.
 
 ### B. 네이티브 백엔드 + 프론트 (일상 개발)
 
@@ -154,7 +159,7 @@ REDIS_URL=redis://:<PW>@localhost:6379/0
 
 ```powershell
 cd backend
-..\worker-venv\Scripts\uvicorn main:app --reload --port 8000
+venv\Scripts\uvicorn main:app --reload --port 8000
 ```
 
 ```powershell
@@ -170,7 +175,7 @@ npm run dev                   # http://localhost:5173
 | frontend (dev)    | `cd frontend && npm run dev`                                                 | 5173                       |
 | frontend (docker) | `docker compose up -d frontend`                                              | 3000                       |
 | backend (docker)  | `docker compose up -d backend`                                               | 8000                       |
-| backend (venv)    | `cd backend && ..\worker-venv\Scripts\uvicorn main:app --reload --port 8000` | 8000                       |
+| backend (venv)    | `cd backend && venv\Scripts\uvicorn main:app --reload --port 8000` | 8000                       |
 | postgres          | `docker compose up -d postgres`                                              | 15432 (컨테이너 내부 5432) |
 | redis             | `docker compose up -d redis`                                                 | 6379                       |
 
@@ -193,37 +198,48 @@ npm run build; npm run lint; npm run format:check; npm run test
 
 > ⚠️ **워커는 NAS와 같은 네트워크(같은 공유기 아래)에 있는 PC에서만 돌릴 수 있습니다.** `DATABASE_URL`/`REDIS_URL`에 쓰이는 `192.168.0.2`는 사설 IP라 인터넷 전체에서 유일한 주소가 아니라서, 같은 로컬 네트워크 밖에서는 이 주소로 접속할 방법이 없습니다 (포트포워딩을 별도로 열지 않는 한). 즉 지금은 집 밖의 다른 PC나 클라우드에서는 이 방식으로 워커를 돌릴 수 없고, 워커를 옮기려면 같은 네트워크의 다른 GPU PC를 쓰거나 Tailscale 같은 VPN으로 그 PC를 가상으로 같은 네트워크에 넣어야 합니다.
 
-1. `.env.native-worker` 파일을 직접 만듭니다 (gitignore 대상, `backend/.env.example` 참고해서 아래 키를 채움):
+### 워커는 전용 체크아웃에서 돌립니다
 
-   ```
-   DATABASE_URL=postgresql://<NAS_DB_USER>:<PW>@<NAS_IP>:15432/shuttlecut
-   REDIS_URL=redis://:<PW>@<NAS_IP>:6379/0
-   STORAGE_PATH=C:/tmp/shuttlecut
-   NAS_BACKEND_URL=http://<NAS_IP>:8000
-   WORKER_SECRET=<NAS와 공유하는 워커 인증 시크릿>
-   ENABLE_GPU=1        # GPU 없으면 0
-   ENABLE_OPENCL=1
-   ENABLE_NVDEC=1
+**개발하는 체크아웃에서 워커를 띄우면 안 됩니다.** `start-native-worker.ps1`은 자기 파일이 있는 디렉터리의 `backend/`를 실행하므로, 개발 체크아웃에서 띄우면 지금 체크아웃된 브랜치의 코드가 운영 내보내기를 처리하게 됩니다. 반대로 워커를 배포 커밋에 맞추려고 `git checkout`을 하면 작업 중이던 브랜치에서 튕겨 나옵니다.
+
+그래서 워커 PC에는 개발용과 별개로 **배포 커밋에 고정된 체크아웃을 하나 더** 둡니다. 이 체크아웃의 `HEAD`가 곧 "워커가 어느 커밋을 도나"의 답입니다.
+
+```powershell
+git clone https://github.com/sherlockjays/shuttlecut-web.git shuttlecut-worker
+cd shuttlecut-worker
+git checkout --detach <배포 커밋>
+```
+
+### 세팅
+
+1. `.env.native-worker.example`을 `.env.native-worker`로 복사하고 값을 채웁니다 (gitignore 대상이라 커밋되지 않습니다). 어떤 키가 필요한지는 그 파일에 적혀 있습니다.
+
+2. `backend/fonts/NanumGothicBold.ttf`를 넣습니다. gitignore 대상이라 클론에 따라오지 않습니다. **없으면 점수판 오버레이의 한글이 깨집니다.** NAS 백엔드 이미지는 Dockerfile이 apt로 `fonts-nanum`을 깔지만 윈도우에는 그 경로가 없습니다.
+
+3. venv를 만듭니다. **파이썬 버전은 `.python-version`에 적힌 것을 씁니다.** NAS 백엔드 컨테이너와 같은 버전이어야 numpy·opencv 같은 C 확장이 같은 바이너리가 됩니다. `requirements.txt`는 패키지를 고정하지만 인터프리터는 고정해주지 않습니다.
+
+   ```powershell
+   py -3.11 -m venv worker-venv
+   worker-venv\Scripts\pip.exe install -r backend\requirements.txt
    ```
 
-2. `worker-venv`가 없다면 위 "사전 준비물"의 venv 생성 커맨드를 먼저 실행합니다.
-3. 워커 실행:
+4. 워커 실행:
 
    ```powershell
    .\start-native-worker.ps1
    ```
 
-이제 shuttlecut.kr에서 내보내기를 누르면 이 워커가 작업을 가져가 처리합니다.
+이제 shuttlecut.kr에서 내보내기를 누르면 이 워커가 작업을 가져가 처리합니다. 창 제목과 기동 로그에 지금 실행 중인 커밋이 표시됩니다.
 
 ## 배포
 
 ### 배포 대상은 셋입니다
 
-| 대상       | 기계     | 방식                                 |
-| ---------- | -------- | ------------------------------------ |
-| 백엔드     | NAS      | `docker-compose build` + `up -d`     |
-| 프론트엔드 | NAS      | `docker-compose build` + `up -d`     |
-| 워커       | 워커 PC  | git 체크아웃 갱신 + celery 재시작    |
+| 대상       | 기계     | 방식                                              |
+| ---------- | -------- | ------------------------------------------------- |
+| 백엔드     | NAS      | `docker-compose build` + `up -d`                   |
+| 프론트엔드 | NAS      | `docker-compose build` + `up -d`                   |
+| 워커       | 워커 PC  | 전용 체크아웃에서 `scripts\deploy-worker.ps1`      |
 
 PostgreSQL과 Redis는 공식 이미지를 그대로 쓰기 때문에 배포 대상이 아닙니다. 우리 코드가 들어가지 않습니다.
 
@@ -311,16 +327,23 @@ curl http://192.168.0.2:8000/api/health
 docker logs shuttlecut-web-backend-1 --tail=50
 ```
 
-**4. 워커.** 워커 PC에서 합니다. `--pool=solo`라 한 번에 한 작업만 처리하는데 그게 20분짜리 인코딩일 수 있으므로, 진행 중인 작업이 없는지 먼저 확인하고 정상 종료시킵니다.
+**4. 워커.** 워커 PC의 **워커 전용 체크아웃**에서 합니다.
 
 ```powershell
-worker-venv\Scripts\celery.exe -A workers.tasks.celery inspect active
-worker-venv\Scripts\celery.exe -A workers.tasks.celery control shutdown
-git checkout <배포 커밋>
-.\start-native-worker.ps1
+scripts\deploy-worker.ps1 <배포 커밋>
 ```
 
-`requirements.txt`가 바뀐 배포라면 재시작 전에 `worker-venv\Scripts\pip install -r backend\requirements.txt`를 돌려야 합니다. NAS는 도커 빌드가 알아서 해주지만 워커는 네이티브라 아무도 해주지 않습니다.
+진행 중인 인코딩이 끝나기를 기다린 뒤 celery를 내리고, 체크아웃을 맞추고, `requirements.txt`가 바뀌었으면 `worker-venv`를 재설치하고, 다시 띄웁니다. `--pool=solo`라 한 번에 한 작업만 처리하는데 그게 20분짜리 인코딩일 수 있어서 기다리는 시간이 길 수 있습니다. 한도를 넘겨도 **진행 중인 작업을 죽이지는 않고** 중단합니다.
+
+개발 체크아웃을 대상으로 실행하면 작업 브랜치가 날아가므로, 스크립트는 `.env.native-worker`가 있는지로 워커 체크아웃인지 판별하고 없으면 시작하지 않습니다.
+
+끝나면 워커가 도는 커밋을 명령으로 확인할 수 있습니다.
+
+```powershell
+git -C <워커 체크아웃> rev-parse HEAD   # NAS 백엔드와 같아야 합니다
+```
+
+손으로 해야 한다면 순서는 `inspect active`로 진행 중 작업 확인 → `control shutdown` → `git checkout --detach <배포 커밋>` → (필요시 pip) → `.\start-native-worker.ps1`입니다. `taskkill`은 권한이 거부되는 경우가 있어 쓰지 않습니다.
 
 **5. 프론트엔드.**
 
