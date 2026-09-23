@@ -101,8 +101,7 @@ copy backend\.env.example backend\.env
 
 루트 `.env`의 `IMAGE_TAG`는 **빌드된 이미지에 붙일 이름**입니다. 로컬은 `dev` 그대로 두면 됩니다. NAS에서는 배포하는 커밋의 SHA가 들어가고 배포 절차가 `git`에서 읽어 채우므로, 기계마다 값이 다른 것이 정상입니다. 이 키가 빠져 있으면 `up`뿐 아니라 `ps`·`logs`·`config`까지 전부 멈추는데, 어느 키를 넣어야 하는지 알려주며 멈춥니다.
 
-`GOOGLE_CLIENT_ID`/`SECRET`, `SMTP_*`는 비워둬도 로컬 개발이 깨지지는 않습니다 (SMTP는 미설정 시 발송 없이 콘솔 로그만 남기고 넘어가고, Google 로그인은 버튼을 눌렀을 때 Google 쪽에서 에러 발생)
-다만 **Google 로그인과 이메일 인증/재설정 메일 발송은 로컬에서 테스트할 수 없습니다.**
+**Google 로그인과 이메일 인증/재설정 메일 발송은 `GOOGLE_*`·`SMTP_*`를 비워두면 로컬에서 테스트할 수 없습니다.**
 이 두 기능까지 로컬에서 테스트하려면:
 
 - NAS와 동일한 `GOOGLE_CLIENT_ID`/`SECRET`, SMTP 값을 그대로 채우고
