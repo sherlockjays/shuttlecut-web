@@ -1,12 +1,11 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { exportDownloadUrl, uploadToYoutube } from "@/apis/exports";
+import { exportDownloadUrl } from "@/apis/exports";
 import { updateProject } from "@/apis/projects";
 import { videoStreamUrl } from "@/apis/video";
 import type { UploadedVideo } from "@/models/video";
 import { youtubeStatusOptions } from "@/queries/youtube";
-import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions, projectsOptions } from "@/queries/projects";
 import { RallyWinner, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
@@ -15,6 +14,7 @@ import { useExport } from "./hooks/useExport";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
+import { useYoutubeUpload } from "./hooks/useYoutubeUpload";
 import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
 
@@ -76,8 +76,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     useProjectDraft(DEFAULT_PROJECT_DATA);
   const { data: yt } = useQuery(youtubeStatusOptions);
   const ytConnected = yt?.connected ?? false;
-  const [ytUploading, setYtUploading] = useState(false);
-  const [ytUrl, setYtUrl] = useState<string | null>(null);
   const [ytPostComment, setYtPostComment] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -121,6 +119,12 @@ export default function Editor({ projectId }: { projectId: number }) {
     start: handleExport,
     reset: resetExport,
   } = useExport({ projectId, flush: flushSave });
+
+  const {
+    state: ytState,
+    upload: uploadYoutube,
+    reset: resetYoutube,
+  } = useYoutubeUpload({ onStartFailed: (message) => alert(message) });
 
   useEffect(() => {
     if (!fetchedProject || seededRef.current === projectId) return;
@@ -173,38 +177,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     const m = Math.floor(sec / 60),
       s = sec % 60;
     return m > 0 ? `약 ${m}분 ${s}초 남음` : `약 ${s}초 남음`;
-  };
-
-  const { data: exportStatus } = useQuery({
-    ...exportStatusOptions(exportId!),
-    refetchInterval: (query) => {
-      const url = query.state.data?.youtube_url;
-      return url && url !== "uploading" ? false : 3000;
-    },
-    enabled: ytUploading && exportId != null,
-  });
-
-  useEffect(() => {
-    if (!ytUploading || !exportStatus) return;
-    if (exportStatus.youtube_url && exportStatus.youtube_url !== "uploading") {
-      // #31에서 내보내기/업로드 훅을 분리할 때 이 effect째 정리한다
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setYtUrl(exportStatus.youtube_url);
-      setYtUploading(false);
-    } else if (!exportStatus.youtube_url) {
-      setYtUploading(false);
-    }
-  }, [exportStatus, ytUploading]);
-
-  const startYoutubeUpload = async () => {
-    if (!exportId) return;
-    setYtUploading(true);
-    try {
-      await uploadToYoutube(exportId, ytPostComment);
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "YouTube 업로드 실패");
-      setYtUploading(false);
-    }
   };
 
   // 단축키
@@ -641,26 +613,31 @@ export default function Editor({ projectId }: { projectId: number }) {
                   <button
                     onClick={() => {
                       resetExport();
-                      setYtUrl(null);
+                      resetYoutube();
                     }}
                     className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl transition-colors"
                   >
                     다시
                   </button>
                 </div>
-                {ytUrl ? (
+                {ytState.kind === "done" ? (
                   <a
-                    href={ytUrl}
+                    href={ytState.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-xl text-sm font-medium transition-colors text-center"
                   >
                     YouTube에서 보기 ↗
                   </a>
-                ) : ytUploading ? (
+                ) : ytState.kind === "uploading" ? (
                   <div className="text-center text-xs text-gray-400 py-2">YouTube 업로드 중...</div>
                 ) : (
                   <div className="flex flex-col gap-1.5">
+                    {ytState.kind === "failed" && (
+                      <p className="text-center text-xs text-red-400">
+                        YouTube 업로드에 실패했습니다. 다시 시도해주세요.
+                      </p>
+                    )}
                     <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none px-1">
                       <input
                         type="checkbox"
@@ -671,7 +648,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                       타임라인 댓글 자동 게시
                     </label>
                     <button
-                      onClick={startYoutubeUpload}
+                      onClick={() => uploadYoutube(exportId, ytPostComment)}
                       disabled={!ytConnected}
                       title={
                         ytConnected
