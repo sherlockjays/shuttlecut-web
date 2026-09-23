@@ -1,4 +1,4 @@
-import type { ExportItem, AdminExport } from "@/models/export";
+import type { AdminExport } from "@/models/export";
 import type { UserInfo, AdminUser, Stats } from "@/models/user";
 import type { LoginResponse, RegisterResponse } from "@/models/auth";
 
@@ -54,28 +54,6 @@ export const auth = {
       method: "POST",
       body: JSON.stringify({ token, new_password }),
     }),
-};
-
-export const exports = {
-  list: (): Promise<ExportItem[]> => apiFetch<ExportItem[]>("/api/export/"),
-  start: (projectId: number): Promise<{ export_id: number }> =>
-    apiFetch<{ export_id: number }>(`/api/export/${projectId}`, {
-      method: "POST",
-    }),
-  status: (exportId: number): Promise<ExportItem> =>
-    apiFetch<ExportItem>(`/api/export/${exportId}/status`),
-  wsUrl: (exportId: number) => {
-    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${proto}//${window.location.host}/api/export/ws/${exportId}`;
-  },
-  downloadUrl: (exportId: number) =>
-    `/api/export/${exportId}/download?token=${localStorage.getItem("token") || ""}`,
-  uploadToYoutube: (exportId: number, postComment = true) =>
-    apiFetch(`/api/export/${exportId}/youtube`, {
-      method: "POST",
-      body: JSON.stringify({ post_comment: postComment }),
-    }),
-  delete: (exportId: number) => apiFetch(`/api/export/${exportId}`, { method: "DELETE" }),
 };
 
 export const admin = {

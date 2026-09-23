@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { exports as exportsApi } from "@/api";
+import { deleteExport } from "@/apis/exports";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportsOptions, pollWhileUploading } from "@/queries/exports";
 import ExportRow from "@/pages/ExportRow";
@@ -15,7 +15,7 @@ export default function ExportHistoryPage({ onBack }: { onBack: () => void }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => exportsApi.delete(id),
+    mutationFn: (id: number) => deleteExport(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
   });
 

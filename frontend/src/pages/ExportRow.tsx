@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { exports as exportsApi } from "@/api";
+import { exportDownloadUrl, uploadToYoutube } from "@/apis/exports";
 import { exportsOptions } from "@/queries/exports";
 import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export";
 
@@ -19,7 +19,7 @@ export default function ExportRow({
   const queryClient = useQueryClient();
 
   const uploadMutation = useMutation({
-    mutationFn: () => exportsApi.uploadToYoutube(item.id, postComment),
+    mutationFn: () => uploadToYoutube(item.id, postComment),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
     onError: (e: unknown) => alert(e instanceof Error ? e.message : "YouTube 업로드 실패"),
   });
@@ -47,7 +47,7 @@ export default function ExportRow({
       <div className="flex gap-2 ml-4 shrink-0">
         {item.status === "done" && (
           <a
-            href={exportsApi.downloadUrl(item.id)}
+            href={exportDownloadUrl(item.id)}
             className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
           >
             다운로드

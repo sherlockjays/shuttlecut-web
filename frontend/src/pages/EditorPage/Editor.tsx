@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { exports as exportsApi } from "@/api";
+import { exportDownloadUrl, exportWsUrl, startExport, uploadToYoutube } from "@/apis/exports";
 import { updateProject } from "@/apis/projects";
 import { videoStreamUrl } from "@/apis/video";
 import type { UploadedVideo } from "@/models/video";
@@ -196,14 +196,14 @@ export default function Editor({ projectId }: { projectId: number }) {
     if (!exportDoneId) return;
     setYtUploading(true);
     try {
-      await exportsApi.uploadToYoutube(exportDoneId, ytPostComment);
+      await uploadToYoutube(exportDoneId, ytPostComment);
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "YouTube 업로드 실패");
       setYtUploading(false);
     }
   };
 
-  const startExport = async () => {
+  const handleExport = async () => {
     // 백엔드가 DB에서 읽어 영상을 만들므로, 미저장 변경사항을 먼저 반영해야 한다.
     try {
       await flushSave();
@@ -220,13 +220,13 @@ export default function Editor({ projectId }: { projectId: number }) {
     setExportDoneId(null);
     let res;
     try {
-      res = await exportsApi.start(projectId);
+      res = await startExport(projectId);
     } catch (e: unknown) {
       setExportMsg(e instanceof Error ? e.message : "내보내기 실패");
       setTimeout(() => setExportPct(null), 3000);
       return;
     }
-    const ws = new WebSocket(exportsApi.wsUrl(res.export_id));
+    const ws = new WebSocket(exportWsUrl(res.export_id));
     ws.onmessage = (e) => {
       const d = JSON.parse(e.data);
       setExportPct(d.pct);
@@ -664,7 +664,7 @@ export default function Editor({ projectId }: { projectId: number }) {
               <div className="flex flex-col gap-2">
                 <div className="flex gap-2">
                   <a
-                    href={exportsApi.downloadUrl(exportDoneId)}
+                    href={exportDownloadUrl(exportDoneId)}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium transition-colors text-center"
                   >
                     다운로드
@@ -718,7 +718,7 @@ export default function Editor({ projectId }: { projectId: number }) {
               </div>
             ) : (
               <button
-                onClick={startExport}
+                onClick={handleExport}
                 disabled={data.rallies.length === 0}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white py-3 rounded-xl font-medium transition-colors"
               >

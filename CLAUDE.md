@@ -144,7 +144,7 @@ NAS는 `scripts/deploy-nas.sh`와 `scripts/rollback-nas.sh`로, 워커는 `scrip
 
 ## 알려진 문제
 
-- JWT는 `localStorage`에 두고 `Authorization` 헤더로 보낸다. 다만 `<video src>`와 다운로드 링크는 헤더를 못 실어서 토큰이 쿼리스트링으로 간다(`videoStreamUrl`, `exports.downloadUrl`, `youtube.authUrl`). 이슈 #36에서 다룬다
+- JWT는 `localStorage`에 두고 `Authorization` 헤더로 보낸다. 다만 `<video src>`와 다운로드 링크는 헤더를 못 실어서 토큰이 쿼리스트링으로 간다(`videoStreamUrl`, `exportDownloadUrl`, `youtube.authUrl`). 이슈 #36에서 다룬다
 - `autoedit`은 백엔드 라우터가 모델 부재로 main.py에서 주석 처리되어 있는데 `api.ts`에는 클라이언트 스텁이 남아 있다. 아직 동작하지 않는다
 
 ## 작업 흐름
