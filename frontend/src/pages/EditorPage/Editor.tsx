@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { exportDownloadUrl, exportWsUrl, startExport, uploadToYoutube } from "@/apis/exports";
+import { exportDownloadUrl, uploadToYoutube } from "@/apis/exports";
 import { updateProject } from "@/apis/projects";
 import { videoStreamUrl } from "@/apis/video";
 import type { UploadedVideo } from "@/models/video";
@@ -11,6 +11,7 @@ import { projectOptions, projectsOptions } from "@/queries/projects";
 import { RallyWinner, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
+import { useExport } from "./hooks/useExport";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
@@ -73,10 +74,6 @@ const INVALID_RANGE_MESSAGE =
 export default function Editor({ projectId }: { projectId: number }) {
   const { data, update, undo, redo, reset, canUndo, canRedo } =
     useProjectDraft(DEFAULT_PROJECT_DATA);
-  const [exportPct, setExportPct] = useState<number | null>(null);
-  const [exportMsg, setExportMsg] = useState("");
-  const [exportEta, setExportEta] = useState<number | null>(null);
-  const [exportDoneId, setExportDoneId] = useState<number | null>(null);
   const { data: yt } = useQuery(youtubeStatusOptions);
   const ytConnected = yt?.connected ?? false;
   const [ytUploading, setYtUploading] = useState(false);
@@ -117,6 +114,13 @@ export default function Editor({ projectId }: { projectId: number }) {
     },
     () => alert("자동저장에 실패했습니다. 연결 상태를 확인해주세요."),
   );
+
+  const {
+    phase: exportPhase,
+    exportId,
+    start: handleExport,
+    reset: resetExport,
+  } = useExport({ projectId, flush: flushSave });
 
   useEffect(() => {
     if (!fetchedProject || seededRef.current === projectId) return;
@@ -172,12 +176,12 @@ export default function Editor({ projectId }: { projectId: number }) {
   };
 
   const { data: exportStatus } = useQuery({
-    ...exportStatusOptions(exportDoneId!),
+    ...exportStatusOptions(exportId!),
     refetchInterval: (query) => {
       const url = query.state.data?.youtube_url;
       return url && url !== "uploading" ? false : 3000;
     },
-    enabled: ytUploading && exportDoneId != null,
+    enabled: ytUploading && exportId != null,
   });
 
   useEffect(() => {
@@ -193,55 +197,14 @@ export default function Editor({ projectId }: { projectId: number }) {
   }, [exportStatus, ytUploading]);
 
   const startYoutubeUpload = async () => {
-    if (!exportDoneId) return;
+    if (!exportId) return;
     setYtUploading(true);
     try {
-      await uploadToYoutube(exportDoneId, ytPostComment);
+      await uploadToYoutube(exportId, ytPostComment);
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "YouTube 업로드 실패");
       setYtUploading(false);
     }
-  };
-
-  const handleExport = async () => {
-    // 백엔드가 DB에서 읽어 영상을 만들므로, 미저장 변경사항을 먼저 반영해야 한다.
-    try {
-      await flushSave();
-    } catch {
-      setExportPct(0);
-      setExportMsg("저장에 실패해 내보내기를 중단했습니다.");
-      setTimeout(() => setExportPct(null), 3000);
-      return;
-    }
-
-    setExportPct(0);
-    setExportMsg("시작 중...");
-    setExportEta(null);
-    setExportDoneId(null);
-    let res;
-    try {
-      res = await startExport(projectId);
-    } catch (e: unknown) {
-      setExportMsg(e instanceof Error ? e.message : "내보내기 실패");
-      setTimeout(() => setExportPct(null), 3000);
-      return;
-    }
-    const ws = new WebSocket(exportWsUrl(res.export_id));
-    ws.onmessage = (e) => {
-      const d = JSON.parse(e.data);
-      setExportPct(d.pct);
-      setExportMsg(d.msg);
-      setExportEta(d.eta ?? null);
-      if (d.status === "done") {
-        ws.close();
-        setExportDoneId(res.export_id);
-        setTimeout(() => setExportPct(null), 500);
-      } else if (d.status === "error") {
-        ws.close();
-        setExportEta(null);
-        setTimeout(() => setExportPct(null), 3000);
-      }
-    };
   };
 
   // 단축키
@@ -647,31 +610,37 @@ export default function Editor({ projectId }: { projectId: number }) {
 
           {/* 내보내기 */}
           <section className="mt-auto">
-            {exportPct !== null ? (
+            {exportPhase.kind === "starting" ||
+            exportPhase.kind === "running" ||
+            exportPhase.kind === "failed" ? (
               <div>
                 <div className="flex justify-between text-xs text-gray-400 mb-1">
-                  <span>{exportMsg}</span>
-                  <span>{exportEta !== null ? fmtEta(exportEta) : ""}</span>
+                  <span>{exportPhase.kind === "starting" ? "시작 중..." : exportPhase.msg}</span>
+                  <span>
+                    {exportPhase.kind === "running" && exportPhase.eta !== null
+                      ? fmtEta(exportPhase.eta)
+                      : ""}
+                  </span>
                 </div>
                 <div className="w-full bg-gray-700 rounded-full h-2">
                   <div
                     className="bg-blue-500 h-2 rounded-full transition-all"
-                    style={{ width: `${exportPct}%` }}
+                    style={{ width: `${exportPhase.kind === "running" ? exportPhase.pct : 0}%` }}
                   />
                 </div>
               </div>
-            ) : exportDoneId !== null ? (
+            ) : exportPhase.kind === "done" && exportId !== null ? (
               <div className="flex flex-col gap-2">
                 <div className="flex gap-2">
                   <a
-                    href={exportDownloadUrl(exportDoneId)}
+                    href={exportDownloadUrl(exportId)}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium transition-colors text-center"
                   >
                     다운로드
                   </a>
                   <button
                     onClick={() => {
-                      setExportDoneId(null);
+                      resetExport();
                       setYtUrl(null);
                     }}
                     className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl transition-colors"

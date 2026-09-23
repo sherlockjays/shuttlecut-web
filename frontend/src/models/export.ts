@@ -37,6 +37,15 @@ export type ExportStatusResponse = {
   error_msg: string | null;
 };
 
+// 워커가 Redis 채널에 발행하고 백엔드가 WS로 중계하는 진행률 메시지.
+// 백엔드가 DB 상태를 보고 바로 보내는 완료/오류 메시지에는 eta가 없다.
+export type ExportProgressMessage = {
+  status: "processing" | "done" | "error";
+  pct: number;
+  msg: string;
+  eta?: number | null;
+};
+
 export type AdminExport = {
   id: number;
   status: ExportStatus;
