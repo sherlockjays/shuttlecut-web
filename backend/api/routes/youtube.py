@@ -1,5 +1,4 @@
 """YouTube OAuth 2.0 연동 - 계정 연결 / 콜백 / 상태 확인"""
-import os
 import uuid
 
 import redis as _redis
@@ -10,29 +9,33 @@ from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
 from api.routes.auth import current_user, SECRET_KEY, ALGORITHM
-from core.config import require_env
+from core.config import optional_env, require_env, GOOGLE_AUTH_URI, GOOGLE_TOKEN_URI
 from core.crypto import encrypt_token
 from models.database import User, get_db
 
 router = APIRouter()
 
+_r = _redis.from_url(require_env("REDIS_URL"))
+APP_BASE_URL = require_env("APP_BASE_URL")
+
+# YouTube 연동은 선택값이다. 둘 중 하나라도 비면 503으로 거절한다
+GOOGLE_CLIENT_ID = optional_env("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = optional_env("GOOGLE_CLIENT_SECRET")
+
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.force-ssl",
 ]
-_r = _redis.from_url(require_env("REDIS_URL"))
-
-APP_BASE_URL = require_env("APP_BASE_URL")
 
 
 def _make_flow():
     return Flow.from_client_config(
         {
             "web": {
-                "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
-                "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "auth_uri": GOOGLE_AUTH_URI,
+                "token_uri": GOOGLE_TOKEN_URI,
                 "redirect_uris": [f"{APP_BASE_URL}/api/youtube/callback"],
             }
         },
@@ -57,8 +60,8 @@ def youtube_auth(token: str = Query(...), db: Session = Depends(get_db)):
             raise HTTPException(401)
     except JWTError:
         raise HTTPException(401, "인증이 필요합니다.")
-    if not os.getenv("GOOGLE_CLIENT_ID"):
-        raise HTTPException(503, "YouTube 연동이 설정되지 않았습니다. GOOGLE_CLIENT_ID를 확인하세요.")
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(503, "YouTube 연동이 설정되지 않았습니다. GOOGLE_CLIENT_ID와 GOOGLE_CLIENT_SECRET을 확인하세요.")
     flow = _make_flow()
     state = str(uuid.uuid4())
     _r.setex(f"yt_state:{state}", 600, str(user.id))  # 10분 TTL

@@ -1,4 +1,3 @@
-import os
 import re
 import uuid
 import secrets
@@ -17,7 +16,7 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 
-from core.config import require_env
+from core.config import optional_env, require_env, GOOGLE_AUTH_URI, GOOGLE_TOKEN_URI
 from models.database import get_db, User
 
 router = APIRouter()
@@ -28,9 +27,14 @@ oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 _r = _redis.from_url(require_env("REDIS_URL"))
 
 SECRET_KEY = require_env("SECRET_KEY")
+APP_BASE_URL = require_env("APP_BASE_URL")
+
+# Google 로그인은 선택값이다. 둘 중 하나라도 비면 503으로 거절한다
+GOOGLE_CLIENT_ID = optional_env("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = optional_env("GOOGLE_CLIENT_SECRET")
+
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24 * 7
-APP_BASE_URL = require_env("APP_BASE_URL")
 
 GOOGLE_LOGIN_SCOPES = [
     "openid",
@@ -61,10 +65,10 @@ def _make_google_login_flow():
     return Flow.from_client_config(
         {
             "web": {
-                "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
-                "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "auth_uri": GOOGLE_AUTH_URI,
+                "token_uri": GOOGLE_TOKEN_URI,
                 "redirect_uris": [f"{APP_BASE_URL}/api/auth/google/callback"],
             }
         },
@@ -131,8 +135,8 @@ def me(user: User = Depends(current_user)):
 
 @router.get("/google")
 def google_login():
-    if not os.getenv("GOOGLE_CLIENT_ID"):
-        raise HTTPException(503, "Google 로그인이 설정되지 않았습니다.")
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(503, "Google 로그인이 설정되지 않았습니다. GOOGLE_CLIENT_ID와 GOOGLE_CLIENT_SECRET을 확인하세요.")
     flow = _make_google_login_flow()
     state = str(uuid.uuid4())
     verifier = secrets.token_urlsafe(96)
