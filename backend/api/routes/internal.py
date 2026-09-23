@@ -1,17 +1,18 @@
 """워커 전용 내부 API - 원본 영상 다운로드, 내보내기 결과 업로드 (공유 시크릿 인증)"""
-import os
 from pathlib import Path
 from fastapi import APIRouter, Header, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 
+from core.config import require_env
+
 router = APIRouter()
-STORAGE = Path(os.getenv("STORAGE_PATH", "/data/videos")).resolve()
-WORKER_SECRET = os.getenv("WORKER_SECRET", "")
+STORAGE = Path(require_env("STORAGE_PATH")).resolve()
+WORKER_SECRET = require_env("WORKER_SECRET")
 CHUNK = 1024 * 1024 * 4
 
 
 def _check_secret(x_worker_secret: str | None):
-    if not WORKER_SECRET or x_worker_secret != WORKER_SECRET:
+    if x_worker_secret != WORKER_SECRET:
         raise HTTPException(403)
 
 

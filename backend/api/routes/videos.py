@@ -5,11 +5,12 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from core.config import require_env
 from models.database import get_db, User
 from api.routes.auth import current_user
 
 router = APIRouter()
-STORAGE = Path(os.getenv("STORAGE_PATH", "/data/videos"))
+STORAGE = Path(require_env("STORAGE_PATH"))
 CHUNK = 1024 * 1024  # 1MB
 
 

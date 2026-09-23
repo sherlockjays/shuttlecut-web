@@ -10,6 +10,7 @@ from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
 from api.routes.auth import current_user, SECRET_KEY, ALGORITHM
+from core.config import require_env
 from core.crypto import encrypt_token
 from models.database import User, get_db
 
@@ -19,11 +20,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.force-ssl",
 ]
-_r = _redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
+_r = _redis.from_url(require_env("REDIS_URL"))
+
+APP_BASE_URL = require_env("APP_BASE_URL")
 
 
 def _make_flow():
-    base_url = os.getenv("APP_BASE_URL", "https://wjdwoghk.synology.me")
     return Flow.from_client_config(
         {
             "web": {
@@ -31,11 +33,11 @@ def _make_flow():
                 "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [f"{base_url}/api/youtube/callback"],
+                "redirect_uris": [f"{APP_BASE_URL}/api/youtube/callback"],
             }
         },
         scopes=SCOPES,
-        redirect_uri=f"{base_url}/api/youtube/callback",
+        redirect_uri=f"{APP_BASE_URL}/api/youtube/callback",
     )
 
 
@@ -80,9 +82,8 @@ def youtube_callback(
     db: Session = Depends(get_db),
 ):
     """Google 인증 후 콜백 - refresh_token을 DB에 저장"""
-    base_url = os.getenv("APP_BASE_URL", "https://wjdwoghk.synology.me")
     if error:
-        return RedirectResponse(f"{base_url}/?youtube_error=1")
+        return RedirectResponse(f"{APP_BASE_URL}/?youtube_error=1")
     if not code or not state:
         raise HTTPException(400, "잘못된 요청입니다.")
 
@@ -107,7 +108,7 @@ def youtube_callback(
     user.youtube_refresh_token = encrypt_token(raw_token) if raw_token else None
     db.commit()
 
-    return RedirectResponse(f"{base_url}/?youtube_connected=1")
+    return RedirectResponse(f"{APP_BASE_URL}/?youtube_connected=1")
 
 
 @router.delete("/disconnect")

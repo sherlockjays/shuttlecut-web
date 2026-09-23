@@ -9,7 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from models.database import get_db, User, Project, Export
-from api.routes.auth import current_user
+from api.routes.auth import current_user, SECRET_KEY, ALGORITHM
+from core.config import require_env
 from core.crypto import decrypt_token
 from workers.tasks import run_export
 
@@ -183,9 +184,8 @@ def export_status(export_id: int, user: User = Depends(current_user), db: Sessio
 @router.get("/{export_id}/download")
 def download_export(export_id: int, token: str | None = None, db: Session = Depends(get_db)):
     from jose import jwt, JWTError
-    SECRET_KEY = os.getenv("SECRET_KEY", "changeme")
     try:
-        payload = jwt.decode(token or "", SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(token or "", SECRET_KEY, algorithms=[ALGORITHM])
         user = db.query(User).get(int(payload["sub"]))
         if not user:
             raise HTTPException(401)
@@ -279,7 +279,7 @@ async def export_ws(websocket: WebSocket, export_id: int, db: Session = Depends(
         await websocket.close()
         return
 
-    r = aioredis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
+    r = aioredis.from_url(require_env("REDIS_URL"))
     channel = f"export_progress:{export_id}"
 
     async with r.pubsub() as ps:

@@ -17,6 +17,7 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 
+from core.config import require_env
 from models.database import get_db, User
 
 router = APIRouter()
@@ -24,12 +25,12 @@ pwd_ctx = CryptContext(schemes=["bcrypt"])
 
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-_r = _redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
+_r = _redis.from_url(require_env("REDIS_URL"))
 
-SECRET_KEY = os.getenv("SECRET_KEY", "changeme")
+SECRET_KEY = require_env("SECRET_KEY")
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24 * 7
-APP_BASE_URL = os.getenv("APP_BASE_URL", "https://wjdwoghk.synology.me")
+APP_BASE_URL = require_env("APP_BASE_URL")
 
 GOOGLE_LOGIN_SCOPES = [
     "openid",

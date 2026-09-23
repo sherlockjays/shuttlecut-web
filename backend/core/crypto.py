@@ -1,14 +1,16 @@
 """토큰 암호화/복호화 유틸 (YouTube refresh_token 등 민감 데이터 보호)"""
-import os
 import hashlib
 import base64
 
 from cryptography.fernet import Fernet, InvalidToken
 
+from core.config import require_env
+
+SECRET_KEY = require_env("SECRET_KEY")
+
 
 def _get_fernet() -> Fernet:
-    secret = os.getenv("SECRET_KEY", "changeme")
-    key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest())
+    key = base64.urlsafe_b64encode(hashlib.sha256(SECRET_KEY.encode()).digest())
     return Fernet(key)
 
 

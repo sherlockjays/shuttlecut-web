@@ -8,12 +8,23 @@ from pathlib import Path
 from celery import Celery
 from sqlalchemy.orm import Session
 
-REDIS_URL      = os.getenv("REDIS_URL", "redis://redis:6379/0")
+from core.config import require_env
+
+REDIS_URL      = require_env("REDIS_URL")
 USE_GPU        = os.getenv("ENABLE_GPU", "0") == "1"
 ENABLE_OPENCL  = os.getenv("ENABLE_OPENCL", "1") == "1"
 ENABLE_NVDEC   = os.getenv("ENABLE_NVDEC", "1") == "1"
-NAS_BACKEND_URL = os.getenv("NAS_BACKEND_URL", "")
-WORKER_SECRET  = os.getenv("WORKER_SECRET", "")
+WORKER_SECRET  = require_env("WORKER_SECRET")
+
+
+def _nas_backend_url() -> str:
+    """워커에서만 필요하다.
+
+    NAS 백엔드도 이 모듈을 import하므로(export.py의 run_export) 모듈 최상단에서
+    요구하면 백엔드가 뜨지 못한다. 실제로 쓰는 시점에 읽는다.
+    """
+    return require_env("NAS_BACKEND_URL")
+
 
 celery = Celery("shuttlecut", broker=REDIS_URL, backend=REDIS_URL)
 r = redis.from_url(REDIS_URL)
@@ -25,7 +36,7 @@ def _download_remote_video(video_path: str, tmpdir: str) -> str:
     ext = Path(video_path).suffix or ".mp4"
     local_path = f"{tmpdir}/source{ext}"
     with httpx.stream(
-        "GET", f"{NAS_BACKEND_URL}/api/internal/video",
+        "GET", f"{_nas_backend_url()}/api/internal/video",
         params={"path": video_path},
         headers={"X-Worker-Secret": WORKER_SECRET},
         timeout=300,
@@ -42,7 +53,7 @@ def _upload_export_remote(local_path: str, export_id: int) -> str:
     import httpx
     with open(local_path, "rb") as f:
         resp = httpx.post(
-            f"{NAS_BACKEND_URL}/api/internal/export/{export_id}",
+            f"{_nas_backend_url()}/api/internal/export/{export_id}",
             headers={"X-Worker-Secret": WORKER_SECRET},
             files={"file": (f"export_{export_id}.mp4", f, "video/mp4")},
             timeout=600,
@@ -177,12 +188,11 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
     p2n        = pd.get("player2_name", "2팀")
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # NAS HTTP 다운로드 (워커 로컬에 캐시)
-        if NAS_BACKEND_URL:
-            _publish(export_id, 12, "영상 다운로드 중...", eta=None)
-            t0 = time.time()
-            video_path = _download_remote_video(video_path, tmpdir)
-            log.warning(f"[TIMING] NAS 다운로드: {time.time()-t0:.1f}s")
+        # NAS HTTP 다운로드 (워커 로컬에 캐시). 워커와 NAS는 파일시스템을 공유하지 않는다
+        _publish(export_id, 12, "영상 다운로드 중...", eta=None)
+        t0 = time.time()
+        video_path = _download_remote_video(video_path, tmpdir)
+        log.warning(f"[TIMING] NAS 다운로드: {time.time()-t0:.1f}s")
 
         t0 = time.time()
         duration = _probe_duration(video_path)
@@ -347,16 +357,15 @@ def run_export(export_id: int, project_data: dict):
             for r in (project_data.get("rallies") or [])
         ]
 
-        output_dir = Path(os.getenv("STORAGE_PATH", "/data/videos")) / "exports"
+        output_dir = Path(require_env("STORAGE_PATH")) / "exports"
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = str(output_dir / f"export_{export_id}.mp4")
 
         _publish(export_id, 10, "영상 처리 시작...", eta=None)
         _run_ffmpeg_export(export_id, rallies, project_data, output_path, _start)
 
-        if NAS_BACKEND_URL:
-            _publish(export_id, 98, "NAS 업로드 중...", eta=None)
-            output_path = _upload_export_remote(output_path, export_id)
+        _publish(export_id, 98, "NAS 업로드 중...", eta=None)
+        output_path = _upload_export_remote(output_path, export_id)
 
         export.status = "done"
         export.output_path = output_path
