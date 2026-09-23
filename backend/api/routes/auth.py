@@ -35,7 +35,16 @@ GOOGLE_CLIENT_SECRET = optional_env("GOOGLE_CLIENT_SECRET")
 
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24 * 7
+MIN_PASSWORD_LENGTH = 8
+EMAIL_VERIFY_TTL_SEC = 60 * 60 * 24      # 메일 본문의 "24시간 후 만료"와 같이 고친다
+PASSWORD_RESET_TTL_SEC = 60 * 60         # 메일 본문의 "1시간 후 만료"와 같이 고친다
+OAUTH_STATE_TTL_SEC = 60 * 10            # 동의 화면에 머무는 시간
+AUTH_CODE_TTL_SEC = 30                   # 콜백 직후 프런트가 즉시 교환한다
+PKCE_VERIFIER_BYTES = 96
+AUTH_CODE_BYTES = 32
 
+GOOGLE_CALLBACK_URI = f"{APP_BASE_URL}/api/auth/google/callback"
+GOOGLE_USERINFO_URI = "https://www.googleapis.com/oauth2/v2/userinfo"
 GOOGLE_LOGIN_SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
@@ -69,11 +78,11 @@ def _make_google_login_flow():
                 "client_secret": GOOGLE_CLIENT_SECRET,
                 "auth_uri": GOOGLE_AUTH_URI,
                 "token_uri": GOOGLE_TOKEN_URI,
-                "redirect_uris": [f"{APP_BASE_URL}/api/auth/google/callback"],
+                "redirect_uris": [GOOGLE_CALLBACK_URI],
             }
         },
         scopes=GOOGLE_LOGIN_SCOPES,
-        redirect_uri=f"{APP_BASE_URL}/api/auth/google/callback",
+        redirect_uri=GOOGLE_CALLBACK_URI,
     )
 
 
@@ -88,8 +97,8 @@ def register(body: RegisterBody, background_tasks: BackgroundTasks, db: Session 
     email = body.email.strip().lower()
     if not EMAIL_RE.match(email):
         raise HTTPException(status_code=400, detail="유효하지 않은 이메일 형식입니다.")
-    if len(body.password) < 8:
-        raise HTTPException(status_code=400, detail="비밀번호는 8자 이상이어야 합니다.")
+    if len(body.password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(status_code=400, detail=f"비밀번호는 {MIN_PASSWORD_LENGTH}자 이상이어야 합니다.")
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="이미 사용 중인 이메일입니다.")
     body.email = email
@@ -97,7 +106,7 @@ def register(body: RegisterBody, background_tasks: BackgroundTasks, db: Session 
     db.add(user); db.commit(); db.refresh(user)
 
     token = str(uuid.uuid4())
-    _r.setex(f"email_verify:{token}", 86400, str(user.id))
+    _r.setex(f"email_verify:{token}", EMAIL_VERIFY_TTL_SEC, str(user.id))
 
     def _send():
         from core.email import send_verification_email
@@ -139,12 +148,12 @@ def google_login():
         raise HTTPException(503, "Google 로그인이 설정되지 않았습니다. GOOGLE_CLIENT_ID와 GOOGLE_CLIENT_SECRET을 확인하세요.")
     flow = _make_google_login_flow()
     state = str(uuid.uuid4())
-    verifier = secrets.token_urlsafe(96)
+    verifier = secrets.token_urlsafe(PKCE_VERIFIER_BYTES)
     challenge = base64.urlsafe_b64encode(
         hashlib.sha256(verifier.encode()).digest()
     ).rstrip(b"=").decode()
-    _r.setex(f"google_login_state:{state}", 600, "1")
-    _r.setex(f"google_login_verifier:{state}", 600, verifier)
+    _r.setex(f"google_login_state:{state}", OAUTH_STATE_TTL_SEC, "1")
+    _r.setex(f"google_login_verifier:{state}", OAUTH_STATE_TTL_SEC, verifier)
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         prompt="select_account",
@@ -179,7 +188,7 @@ def google_callback(
     # Google에서 사용자 정보 가져오기
     with httpx.Client() as client:
         resp = client.get(
-            "https://www.googleapis.com/oauth2/v2/userinfo",
+            GOOGLE_USERINFO_URI,
             headers={"Authorization": f"Bearer {credentials.token}"},
         )
     userinfo = resp.json()
@@ -205,8 +214,8 @@ def google_callback(
     db.refresh(user)
 
     # JWT를 URL에 직접 노출하지 않고 30초짜리 one-time code 경유
-    code = secrets.token_urlsafe(32)
-    _r.setex(f"google_auth_code:{code}", 30, make_token(user.id))
+    code = secrets.token_urlsafe(AUTH_CODE_BYTES)
+    _r.setex(f"google_auth_code:{code}", AUTH_CODE_TTL_SEC, make_token(user.id))
     return RedirectResponse(f"{APP_BASE_URL}/?google_code={code}")
 
 
@@ -246,7 +255,7 @@ def forgot_password(body: ForgotPasswordBody, background_tasks: BackgroundTasks,
     user = db.query(User).filter(User.email == body.email).first()
     if user and user.hashed_pw:
         token = str(uuid.uuid4())
-        _r.setex(f"pw_reset:{token}", 3600, str(user.id))
+        _r.setex(f"pw_reset:{token}", PASSWORD_RESET_TTL_SEC, str(user.id))
 
         def _send():
             from core.email import send_reset_email
@@ -273,8 +282,8 @@ def reset_password(body: ResetPasswordBody, db: Session = Depends(get_db)):
     user = db.query(User).get(int(user_id))
     if not user:
         raise HTTPException(status_code=404)
-    if len(body.new_password) < 8:
-        raise HTTPException(status_code=400, detail="비밀번호는 8자 이상이어야 합니다.")
+    if len(body.new_password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(status_code=400, detail=f"비밀번호는 {MIN_PASSWORD_LENGTH}자 이상이어야 합니다.")
     user.hashed_pw = pwd_ctx.hash(body.new_password)
     db.commit()
     _r.delete(f"pw_reset:{body.token}")

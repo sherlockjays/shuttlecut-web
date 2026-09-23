@@ -22,6 +22,8 @@ APP_BASE_URL = require_env("APP_BASE_URL")
 GOOGLE_CLIENT_ID = optional_env("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = optional_env("GOOGLE_CLIENT_SECRET")
 
+OAUTH_STATE_TTL_SEC = 60 * 10   # 동의 화면에 머무는 시간
+YOUTUBE_CALLBACK_URI = f"{APP_BASE_URL}/api/youtube/callback"
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.force-ssl",
@@ -36,11 +38,11 @@ def _make_flow():
                 "client_secret": GOOGLE_CLIENT_SECRET,
                 "auth_uri": GOOGLE_AUTH_URI,
                 "token_uri": GOOGLE_TOKEN_URI,
-                "redirect_uris": [f"{APP_BASE_URL}/api/youtube/callback"],
+                "redirect_uris": [YOUTUBE_CALLBACK_URI],
             }
         },
         scopes=SCOPES,
-        redirect_uri=f"{APP_BASE_URL}/api/youtube/callback",
+        redirect_uri=YOUTUBE_CALLBACK_URI,
     )
 
 
@@ -64,7 +66,7 @@ def youtube_auth(token: str = Query(...), db: Session = Depends(get_db)):
         raise HTTPException(503, "YouTube 연동이 설정되지 않았습니다. GOOGLE_CLIENT_ID와 GOOGLE_CLIENT_SECRET을 확인하세요.")
     flow = _make_flow()
     state = str(uuid.uuid4())
-    _r.setex(f"yt_state:{state}", 600, str(user.id))  # 10분 TTL
+    _r.setex(f"yt_state:{state}", OAUTH_STATE_TTL_SEC, str(user.id))
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         prompt="consent",
@@ -73,7 +75,7 @@ def youtube_auth(token: str = Query(...), db: Session = Depends(get_db)):
     # google_auth_oauthlib 신버전은 PKCE code_verifier를 자동 생성 → callback에서 재사용
     code_verifier = getattr(flow, "code_verifier", None)
     if code_verifier:
-        _r.setex(f"yt_verifier:{state}", 600, code_verifier)
+        _r.setex(f"yt_verifier:{state}", OAUTH_STATE_TTL_SEC, code_verifier)
     return RedirectResponse(auth_url)
 
 

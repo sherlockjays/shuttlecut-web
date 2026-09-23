@@ -17,6 +17,7 @@ from workers.tasks import run_export
 router = APIRouter()
 
 PLAN_LIMITS = {"free": 2, "basic": 5, "standard": 10, "premium": 30, "unlimited": 999999, "club": 999999, "admin": 999999999}
+UNKNOWN_PLAN_LIMIT = PLAN_LIMITS["free"]
 
 def _build_timeline_comment(rallies: list, fps: float, player1_name: str, player2_name: str) -> str:
     """랠리 데이터로 YouTube 타임라인 댓글 생성 (내보낸 영상 기준 누적 시간, TAIL=1.5초 포함)"""
@@ -130,7 +131,7 @@ def start_export(
         db.commit()
 
     # 요금제 제한 확인
-    limit = PLAN_LIMITS.get(user.plan, 3)
+    limit = PLAN_LIMITS.get(user.plan, UNKNOWN_PLAN_LIMIT)
     if user.export_count >= limit:
         raise HTTPException(403, f"이번 달 내보내기 한도({limit}회)에 도달했습니다.")
 
