@@ -1,17 +1,20 @@
-import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-APP_BASE_URL = os.getenv("APP_BASE_URL", "https://wjdwoghk.synology.me")
+from core.config import optional_env, require_env
+
+# SMTP는 기능 단위로 선택값이다. 켤 거면 네 개가 다 있어야 한다
+SMTP_HOST = optional_env("SMTP_HOST")
+SMTP_PORT = optional_env("SMTP_PORT")
+SMTP_USER = optional_env("SMTP_USER")
+SMTP_PASSWORD = optional_env("SMTP_PASSWORD")
+
+APP_BASE_URL = require_env("APP_BASE_URL")
 
 
 def send_email(to: str, subject: str, html: str):
-    if not SMTP_USER or not SMTP_PASSWORD:
+    if not (SMTP_HOST and SMTP_PORT and SMTP_USER and SMTP_PASSWORD):
         print(f"[EMAIL] SMTP 미설정 — to={to} subject={subject}")
         return
     msg = MIMEMultipart("alternative")
@@ -19,7 +22,7 @@ def send_email(to: str, subject: str, html: str):
     msg["From"] = f"ShuttleCut <{SMTP_USER}>"
     msg["To"] = to
     msg.attach(MIMEText(html, "html", "utf-8"))
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+    with smtplib.SMTP(SMTP_HOST, int(SMTP_PORT)) as server:
         server.ehlo()
         server.starttls()
         server.login(SMTP_USER, SMTP_PASSWORD)

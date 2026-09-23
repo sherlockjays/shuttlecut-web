@@ -1,12 +1,14 @@
 """Celery task for automatic rally analysis - runs on local PC GPU worker"""
-import os, logging, sys
+import logging, sys
 from celery import Celery
 from sqlalchemy.orm import Session
 
 sys.path.insert(0, "/app")
 log = logging.getLogger(__name__)
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+from core.config import require_env
+
+REDIS_URL = require_env("REDIS_URL")
 celery = Celery("shuttlecut_autoedit", broker=REDIS_URL, backend=REDIS_URL)
 
 # Route auto_analysis tasks to the dedicated GPU worker queue

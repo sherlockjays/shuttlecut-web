@@ -1,5 +1,4 @@
 """YouTube OAuth 2.0 연동 - 계정 연결 / 콜백 / 상태 확인"""
-import os
 import uuid
 
 import redis as _redis
@@ -10,32 +9,40 @@ from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
 from api.routes.auth import current_user, SECRET_KEY, ALGORITHM
+from core.config import optional_env, require_env, GOOGLE_AUTH_URI, GOOGLE_TOKEN_URI
 from core.crypto import encrypt_token
 from models.database import User, get_db
 
 router = APIRouter()
 
+_r = _redis.from_url(require_env("REDIS_URL"))
+APP_BASE_URL = require_env("APP_BASE_URL")
+
+# YouTube 연동은 선택값이다. 둘 중 하나라도 비면 503으로 거절한다
+GOOGLE_CLIENT_ID = optional_env("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = optional_env("GOOGLE_CLIENT_SECRET")
+
+OAUTH_STATE_TTL_SEC = 60 * 10   # 동의 화면에 머무는 시간
+YOUTUBE_CALLBACK_URI = f"{APP_BASE_URL}/api/youtube/callback"
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.force-ssl",
 ]
-_r = _redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
 
 
 def _make_flow():
-    base_url = os.getenv("APP_BASE_URL", "https://wjdwoghk.synology.me")
     return Flow.from_client_config(
         {
             "web": {
-                "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
-                "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [f"{base_url}/api/youtube/callback"],
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "auth_uri": GOOGLE_AUTH_URI,
+                "token_uri": GOOGLE_TOKEN_URI,
+                "redirect_uris": [YOUTUBE_CALLBACK_URI],
             }
         },
         scopes=SCOPES,
-        redirect_uri=f"{base_url}/api/youtube/callback",
+        redirect_uri=YOUTUBE_CALLBACK_URI,
     )
 
 
@@ -55,11 +62,11 @@ def youtube_auth(token: str = Query(...), db: Session = Depends(get_db)):
             raise HTTPException(401)
     except JWTError:
         raise HTTPException(401, "인증이 필요합니다.")
-    if not os.getenv("GOOGLE_CLIENT_ID"):
-        raise HTTPException(503, "YouTube 연동이 설정되지 않았습니다. GOOGLE_CLIENT_ID를 확인하세요.")
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(503, "YouTube 연동이 설정되지 않았습니다. GOOGLE_CLIENT_ID와 GOOGLE_CLIENT_SECRET을 확인하세요.")
     flow = _make_flow()
     state = str(uuid.uuid4())
-    _r.setex(f"yt_state:{state}", 600, str(user.id))  # 10분 TTL
+    _r.setex(f"yt_state:{state}", OAUTH_STATE_TTL_SEC, str(user.id))
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         prompt="consent",
@@ -68,7 +75,7 @@ def youtube_auth(token: str = Query(...), db: Session = Depends(get_db)):
     # google_auth_oauthlib 신버전은 PKCE code_verifier를 자동 생성 → callback에서 재사용
     code_verifier = getattr(flow, "code_verifier", None)
     if code_verifier:
-        _r.setex(f"yt_verifier:{state}", 600, code_verifier)
+        _r.setex(f"yt_verifier:{state}", OAUTH_STATE_TTL_SEC, code_verifier)
     return RedirectResponse(auth_url)
 
 
@@ -80,9 +87,8 @@ def youtube_callback(
     db: Session = Depends(get_db),
 ):
     """Google 인증 후 콜백 - refresh_token을 DB에 저장"""
-    base_url = os.getenv("APP_BASE_URL", "https://wjdwoghk.synology.me")
     if error:
-        return RedirectResponse(f"{base_url}/?youtube_error=1")
+        return RedirectResponse(f"{APP_BASE_URL}/?youtube_error=1")
     if not code or not state:
         raise HTTPException(400, "잘못된 요청입니다.")
 
@@ -107,7 +113,7 @@ def youtube_callback(
     user.youtube_refresh_token = encrypt_token(raw_token) if raw_token else None
     db.commit()
 
-    return RedirectResponse(f"{base_url}/?youtube_connected=1")
+    return RedirectResponse(f"{APP_BASE_URL}/?youtube_connected=1")
 
 
 @router.delete("/disconnect")
