@@ -42,9 +42,12 @@ export default function ScoreboardOverlay({ scoreboard, videoSize }: Props) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // 비트맵은 실제 화면 픽셀 수로 잡고 좌표계는 CSS 픽셀로 둔다. 고해상도 화면에서 글자가 흐려지지 않는다.
     // 크기를 대입하면 비트맵이 비워지므로 따로 지우지 않는다.
-    canvas.width = displaySize.width;
-    canvas.height = displaySize.height;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(displaySize.width * dpr);
+    canvas.height = Math.round(displaySize.height * dpr);
+    ctx.scale(dpr, dpr);
 
     const layout = getScoreboardLayout({
       display: displaySize,
