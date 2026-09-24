@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { exports as exportsApi, youtube as youtubeApi } from "@/api";
+import { youtube as youtubeApi } from "@/api";
+import { deleteExport } from "@/apis/exports";
 import { meOptions } from "@/queries/auth";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { exportsOptions, pollWhileUploading } from "@/queries/exports";
@@ -21,7 +22,7 @@ function ExportsTab() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => exportsApi.delete(id),
+    mutationFn: (id: number) => deleteExport(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
   });
 

@@ -1,12 +1,9 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { exports as exportsApi } from "@/api";
 import { updateProject } from "@/apis/projects";
 import { videoStreamUrl } from "@/apis/video";
 import type { UploadedVideo } from "@/models/video";
-import { youtubeStatusOptions } from "@/queries/youtube";
-import { exportStatusOptions } from "@/queries/exports";
 import { projectOptions, projectsOptions } from "@/queries/projects";
 import { RallyWinner, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
@@ -14,6 +11,7 @@ import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
+import ExportPanel from "./components/ExportPanel";
 import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
 
@@ -73,15 +71,6 @@ const INVALID_RANGE_MESSAGE =
 export default function Editor({ projectId }: { projectId: number }) {
   const { data, update, undo, redo, reset, canUndo, canRedo } =
     useProjectDraft(DEFAULT_PROJECT_DATA);
-  const [exportPct, setExportPct] = useState<number | null>(null);
-  const [exportMsg, setExportMsg] = useState("");
-  const [exportEta, setExportEta] = useState<number | null>(null);
-  const [exportDoneId, setExportDoneId] = useState<number | null>(null);
-  const { data: yt } = useQuery(youtubeStatusOptions);
-  const ytConnected = yt?.connected ?? false;
-  const [ytUploading, setYtUploading] = useState(false);
-  const [ytUrl, setYtUrl] = useState<string | null>(null);
-  const [ytPostComment, setYtPostComment] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
@@ -162,87 +151,6 @@ export default function Editor({ projectId }: { projectId: number }) {
   const handleRedo = useCallback(() => {
     if (redo()) onRedone();
   }, [redo, onRedone]);
-
-  // 내보내기
-  const fmtEta = (sec: number) => {
-    if (sec <= 0) return "거의 완료...";
-    const m = Math.floor(sec / 60),
-      s = sec % 60;
-    return m > 0 ? `약 ${m}분 ${s}초 남음` : `약 ${s}초 남음`;
-  };
-
-  const { data: exportStatus } = useQuery({
-    ...exportStatusOptions(exportDoneId!),
-    refetchInterval: (query) => {
-      const url = query.state.data?.youtube_url;
-      return url && url !== "uploading" ? false : 3000;
-    },
-    enabled: ytUploading && exportDoneId != null,
-  });
-
-  useEffect(() => {
-    if (!ytUploading || !exportStatus) return;
-    if (exportStatus.youtube_url && exportStatus.youtube_url !== "uploading") {
-      // #31에서 내보내기/업로드 훅을 분리할 때 이 effect째 정리한다
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setYtUrl(exportStatus.youtube_url);
-      setYtUploading(false);
-    } else if (!exportStatus.youtube_url) {
-      setYtUploading(false);
-    }
-  }, [exportStatus, ytUploading]);
-
-  const startYoutubeUpload = async () => {
-    if (!exportDoneId) return;
-    setYtUploading(true);
-    try {
-      await exportsApi.uploadToYoutube(exportDoneId, ytPostComment);
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "YouTube 업로드 실패");
-      setYtUploading(false);
-    }
-  };
-
-  const startExport = async () => {
-    // 백엔드가 DB에서 읽어 영상을 만들므로, 미저장 변경사항을 먼저 반영해야 한다.
-    try {
-      await flushSave();
-    } catch {
-      setExportPct(0);
-      setExportMsg("저장에 실패해 내보내기를 중단했습니다.");
-      setTimeout(() => setExportPct(null), 3000);
-      return;
-    }
-
-    setExportPct(0);
-    setExportMsg("시작 중...");
-    setExportEta(null);
-    setExportDoneId(null);
-    let res;
-    try {
-      res = await exportsApi.start(projectId);
-    } catch (e: unknown) {
-      setExportMsg(e instanceof Error ? e.message : "내보내기 실패");
-      setTimeout(() => setExportPct(null), 3000);
-      return;
-    }
-    const ws = new WebSocket(exportsApi.wsUrl(res.export_id));
-    ws.onmessage = (e) => {
-      const d = JSON.parse(e.data);
-      setExportPct(d.pct);
-      setExportMsg(d.msg);
-      setExportEta(d.eta ?? null);
-      if (d.status === "done") {
-        ws.close();
-        setExportDoneId(res.export_id);
-        setTimeout(() => setExportPct(null), 500);
-      } else if (d.status === "error") {
-        ws.close();
-        setExportEta(null);
-        setTimeout(() => setExportPct(null), 3000);
-      }
-    };
-  };
 
   // 단축키
   useEffect(() => {
@@ -647,84 +555,11 @@ export default function Editor({ projectId }: { projectId: number }) {
 
           {/* 내보내기 */}
           <section className="mt-auto">
-            {exportPct !== null ? (
-              <div>
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                  <span>{exportMsg}</span>
-                  <span>{exportEta !== null ? fmtEta(exportEta) : ""}</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className="bg-blue-500 h-2 rounded-full transition-all"
-                    style={{ width: `${exportPct}%` }}
-                  />
-                </div>
-              </div>
-            ) : exportDoneId !== null ? (
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <a
-                    href={exportsApi.downloadUrl(exportDoneId)}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium transition-colors text-center"
-                  >
-                    다운로드
-                  </a>
-                  <button
-                    onClick={() => {
-                      setExportDoneId(null);
-                      setYtUrl(null);
-                    }}
-                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl transition-colors"
-                  >
-                    다시
-                  </button>
-                </div>
-                {ytUrl ? (
-                  <a
-                    href={ytUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-xl text-sm font-medium transition-colors text-center"
-                  >
-                    YouTube에서 보기 ↗
-                  </a>
-                ) : ytUploading ? (
-                  <div className="text-center text-xs text-gray-400 py-2">YouTube 업로드 중...</div>
-                ) : (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none px-1">
-                      <input
-                        type="checkbox"
-                        checked={ytPostComment}
-                        onChange={(e) => setYtPostComment(e.target.checked)}
-                        className="accent-red-500 w-3.5 h-3.5"
-                      />
-                      타임라인 댓글 자동 게시
-                    </label>
-                    <button
-                      onClick={startYoutubeUpload}
-                      disabled={!ytConnected}
-                      title={
-                        ytConnected
-                          ? "YouTube에 업로드"
-                          : "대시보드에서 YouTube 계정을 먼저 연결해주세요"
-                      }
-                      className="w-full bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2 rounded-xl text-sm font-medium transition-colors"
-                    >
-                      YouTube 업로드
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={startExport}
-                disabled={data.rallies.length === 0}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white py-3 rounded-xl font-medium transition-colors"
-              >
-                내보내기
-              </button>
-            )}
+            <ExportPanel
+              projectId={projectId}
+              canExport={data.rallies.length > 0}
+              flushSave={flushSave}
+            />
           </section>
         </div>
       </div>

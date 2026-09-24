@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { exports as exportsApi } from "@/api";
+import { exportDownloadUrl, uploadToYoutube } from "@/apis/exports";
 import { exportsOptions } from "@/queries/exports";
-import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export";
+import { STATUS_LABEL, STATUS_CLASS, YOUTUBE_UPLOADING, type ExportItem } from "@/models/export";
 
 export default function ExportRow({
   item,
@@ -19,12 +19,12 @@ export default function ExportRow({
   const queryClient = useQueryClient();
 
   const uploadMutation = useMutation({
-    mutationFn: () => exportsApi.uploadToYoutube(item.id, postComment),
+    mutationFn: () => uploadToYoutube(item.id, postComment),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey }),
     onError: (e: unknown) => alert(e instanceof Error ? e.message : "YouTube 업로드 실패"),
   });
 
-  const isUploading = item.youtube_url === "uploading" || uploadMutation.isPending;
+  const isUploading = item.youtube_url === YOUTUBE_UPLOADING || uploadMutation.isPending;
 
   return (
     <div className="bg-gray-800 rounded-xl p-4 flex items-center justify-between">
@@ -47,14 +47,14 @@ export default function ExportRow({
       <div className="flex gap-2 ml-4 shrink-0">
         {item.status === "done" && (
           <a
-            href={exportsApi.downloadUrl(item.id)}
+            href={exportDownloadUrl(item.id)}
             className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
           >
             다운로드
           </a>
         )}
         {item.status === "done" &&
-          (item.youtube_url && item.youtube_url !== "uploading" ? (
+          (item.youtube_url && item.youtube_url !== YOUTUBE_UPLOADING ? (
             <a
               href={item.youtube_url}
               target="_blank"
