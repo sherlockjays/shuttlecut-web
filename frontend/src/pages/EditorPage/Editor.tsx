@@ -1,20 +1,17 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { exportDownloadUrl } from "@/apis/exports";
 import { updateProject } from "@/apis/projects";
 import { videoStreamUrl } from "@/apis/video";
 import type { UploadedVideo } from "@/models/video";
-import { youtubeStatusOptions } from "@/queries/youtube";
 import { projectOptions, projectsOptions } from "@/queries/projects";
 import { RallyWinner, type ProjectData } from "@/models/project";
 import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
-import { useExport } from "./hooks/useExport";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
-import { useYoutubeUpload } from "./hooks/useYoutubeUpload";
+import ExportPanel from "./components/ExportPanel";
 import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
 
@@ -74,9 +71,6 @@ const INVALID_RANGE_MESSAGE =
 export default function Editor({ projectId }: { projectId: number }) {
   const { data, update, undo, redo, reset, canUndo, canRedo } =
     useProjectDraft(DEFAULT_PROJECT_DATA);
-  const { data: yt } = useQuery(youtubeStatusOptions);
-  const ytConnected = yt?.connected ?? false;
-  const [ytPostComment, setYtPostComment] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
@@ -112,19 +106,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     },
     () => alert("자동저장에 실패했습니다. 연결 상태를 확인해주세요."),
   );
-
-  const {
-    phase: exportPhase,
-    exportId,
-    start: handleExport,
-    reset: resetExport,
-  } = useExport({ projectId, flush: flushSave });
-
-  const {
-    state: ytState,
-    upload: uploadYoutube,
-    reset: resetYoutube,
-  } = useYoutubeUpload({ onStartFailed: (message) => alert(message) });
 
   useEffect(() => {
     if (!fetchedProject || seededRef.current === projectId) return;
@@ -170,14 +151,6 @@ export default function Editor({ projectId }: { projectId: number }) {
   const handleRedo = useCallback(() => {
     if (redo()) onRedone();
   }, [redo, onRedone]);
-
-  // 내보내기
-  const fmtEta = (sec: number) => {
-    if (sec <= 0) return "거의 완료...";
-    const m = Math.floor(sec / 60),
-      s = sec % 60;
-    return m > 0 ? `약 ${m}분 ${s}초 남음` : `약 ${s}초 남음`;
-  };
 
   // 단축키
   useEffect(() => {
@@ -582,95 +555,11 @@ export default function Editor({ projectId }: { projectId: number }) {
 
           {/* 내보내기 */}
           <section className="mt-auto">
-            {exportPhase.kind === "starting" ||
-            exportPhase.kind === "running" ||
-            exportPhase.kind === "failed" ? (
-              <div>
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                  <span>{exportPhase.kind === "starting" ? "시작 중..." : exportPhase.msg}</span>
-                  <span>
-                    {exportPhase.kind === "running" && exportPhase.eta !== null
-                      ? fmtEta(exportPhase.eta)
-                      : ""}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className="bg-blue-500 h-2 rounded-full transition-all"
-                    style={{ width: `${exportPhase.kind === "running" ? exportPhase.pct : 0}%` }}
-                  />
-                </div>
-              </div>
-            ) : exportPhase.kind === "done" && exportId !== null ? (
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <a
-                    href={exportDownloadUrl(exportId)}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium transition-colors text-center"
-                  >
-                    다운로드
-                  </a>
-                  <button
-                    onClick={() => {
-                      resetExport();
-                      resetYoutube();
-                    }}
-                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl transition-colors"
-                  >
-                    다시
-                  </button>
-                </div>
-                {ytState.kind === "done" ? (
-                  <a
-                    href={ytState.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-xl text-sm font-medium transition-colors text-center"
-                  >
-                    YouTube에서 보기 ↗
-                  </a>
-                ) : ytState.kind === "uploading" ? (
-                  <div className="text-center text-xs text-gray-400 py-2">YouTube 업로드 중...</div>
-                ) : (
-                  <div className="flex flex-col gap-1.5">
-                    {ytState.kind === "failed" && (
-                      <p className="text-center text-xs text-red-400">
-                        YouTube 업로드에 실패했습니다. 다시 시도해주세요.
-                      </p>
-                    )}
-                    <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none px-1">
-                      <input
-                        type="checkbox"
-                        checked={ytPostComment}
-                        onChange={(e) => setYtPostComment(e.target.checked)}
-                        className="accent-red-500 w-3.5 h-3.5"
-                      />
-                      타임라인 댓글 자동 게시
-                    </label>
-                    <button
-                      onClick={() => uploadYoutube(exportId, ytPostComment)}
-                      disabled={!ytConnected}
-                      title={
-                        ytConnected
-                          ? "YouTube에 업로드"
-                          : "대시보드에서 YouTube 계정을 먼저 연결해주세요"
-                      }
-                      className="w-full bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2 rounded-xl text-sm font-medium transition-colors"
-                    >
-                      YouTube 업로드
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={handleExport}
-                disabled={data.rallies.length === 0}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white py-3 rounded-xl font-medium transition-colors"
-              >
-                내보내기
-              </button>
-            )}
+            <ExportPanel
+              projectId={projectId}
+              canExport={data.rallies.length > 0}
+              flushSave={flushSave}
+            />
           </section>
         </div>
       </div>
