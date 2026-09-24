@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { exportDownloadUrl, uploadToYoutube } from "@/apis/exports";
 import { exportsOptions } from "@/queries/exports";
-import { STATUS_LABEL, STATUS_CLASS, type ExportItem } from "@/models/export";
+import { STATUS_LABEL, STATUS_CLASS, YOUTUBE_UPLOADING, type ExportItem } from "@/models/export";
 
 export default function ExportRow({
   item,
@@ -24,7 +24,7 @@ export default function ExportRow({
     onError: (e: unknown) => alert(e instanceof Error ? e.message : "YouTube 업로드 실패"),
   });
 
-  const isUploading = item.youtube_url === "uploading" || uploadMutation.isPending;
+  const isUploading = item.youtube_url === YOUTUBE_UPLOADING || uploadMutation.isPending;
 
   return (
     <div className="bg-gray-800 rounded-xl p-4 flex items-center justify-between">
@@ -54,7 +54,7 @@ export default function ExportRow({
           </a>
         )}
         {item.status === "done" &&
-          (item.youtube_url && item.youtube_url !== "uploading" ? (
+          (item.youtube_url && item.youtube_url !== YOUTUBE_UPLOADING ? (
             <a
               href={item.youtube_url}
               target="_blank"

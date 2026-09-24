@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { admin as adminApi } from "@/api";
 import { adminUsersOptions, adminStatsOptions, adminExportsOptions } from "@/queries/admin";
-import { STATUS_LABEL, STATUS_CLASS, STATUSES } from "@/models/export";
+import { STATUS_LABEL, STATUS_CLASS, STATUSES, YOUTUBE_UPLOADING } from "@/models/export";
 import { PLANS, type Plan } from "@/models/plan";
 
 const PLAN_BADGE: Record<Plan, string> = {
@@ -220,7 +220,7 @@ export default function AdminPage() {
                     {e.project_title}
                   </td>
                   <td className="py-2 pr-3 text-xs">
-                    {e.youtube_url && e.youtube_url !== "uploading" ? (
+                    {e.youtube_url && e.youtube_url !== YOUTUBE_UPLOADING ? (
                       <a
                         href={e.youtube_url}
                         target="_blank"
@@ -229,7 +229,7 @@ export default function AdminPage() {
                       >
                         ↗ YT
                       </a>
-                    ) : e.youtube_url === "uploading" ? (
+                    ) : e.youtube_url === YOUTUBE_UPLOADING ? (
                       <span className="text-blue-400">업로드중</span>
                     ) : (
                       <span className="text-gray-600">-</span>
