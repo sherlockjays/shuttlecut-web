@@ -8,11 +8,11 @@ import type { YoutubeUploadState } from "../youtubeUpload";
 
 const SECONDS_PER_MINUTE = 60;
 
-const formatEta = (sec: number) => {
-  if (sec <= 0) return "거의 완료...";
-  const m = Math.floor(sec / SECONDS_PER_MINUTE);
-  const s = sec % SECONDS_PER_MINUTE;
-  return m > 0 ? `약 ${m}분 ${s}초 남음` : `약 ${s}초 남음`;
+const formatRemainingTime = (seconds: number) => {
+  if (seconds <= 0) return "거의 완료...";
+  const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
+  const rest = seconds % SECONDS_PER_MINUTE;
+  return minutes > 0 ? `약 ${minutes}분 ${rest}초 남음` : `약 ${rest}초 남음`;
 };
 
 type Props = {
@@ -82,17 +82,20 @@ function ExportProgress({
 }: {
   phase: Exclude<ExportPhase, { kind: "idle" } | { kind: "done" }>;
 }) {
-  const msg = phase.kind === "starting" ? "시작 중..." : phase.msg;
-  const pct = phase.kind === "running" ? phase.pct : 0;
-  const eta = phase.kind === "running" ? phase.eta : null;
+  const message = phase.kind === "starting" ? "시작 중..." : phase.message;
+  const percent = phase.kind === "running" ? phase.percent : 0;
+  const remainingSeconds = phase.kind === "running" ? phase.remainingSeconds : null;
   return (
     <div>
       <div className="flex justify-between text-xs text-gray-400 mb-1">
-        <span>{msg}</span>
-        <span>{eta !== null ? formatEta(eta) : ""}</span>
+        <span>{message}</span>
+        <span>{remainingSeconds !== null ? formatRemainingTime(remainingSeconds) : ""}</span>
       </div>
       <div className="w-full bg-gray-700 rounded-full h-2">
-        <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+        <div
+          className="bg-blue-500 h-2 rounded-full transition-all"
+          style={{ width: `${percent}%` }}
+        />
       </div>
     </div>
   );

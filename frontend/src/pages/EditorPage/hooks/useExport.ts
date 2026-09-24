@@ -7,9 +7,9 @@ const EXPORT_ERROR_DISMISS_MS = 3000;
 export type ExportPhase =
   | { kind: "idle" }
   | { kind: "starting" }
-  | { kind: "running"; pct: number; msg: string; eta: number | null }
+  | { kind: "running"; percent: number; message: string; remainingSeconds: number | null }
   | { kind: "done" }
-  | { kind: "failed"; msg: string };
+  | { kind: "failed"; message: string };
 
 type Options = {
   projectId: number;
@@ -31,15 +31,15 @@ export function useExport({ projectId, flush }: Options) {
     try {
       await flush();
     } catch {
-      setPhase({ kind: "failed", msg: "저장에 실패해 내보내기를 중단했습니다." });
+      setPhase({ kind: "failed", message: "저장에 실패해 내보내기를 중단했습니다." });
       return;
     }
     try {
       const { export_id } = await startExport(projectId);
       setExportId(export_id);
-      setPhase({ kind: "running", pct: 0, msg: "시작 중...", eta: null });
+      setPhase({ kind: "running", percent: 0, message: "시작 중...", remainingSeconds: null });
     } catch (e: unknown) {
-      setPhase({ kind: "failed", msg: e instanceof Error ? e.message : "내보내기 실패" });
+      setPhase({ kind: "failed", message: e instanceof Error ? e.message : "내보내기 실패" });
     }
   };
 
@@ -48,22 +48,22 @@ export function useExport({ projectId, flush }: Options) {
     if (exportId === null) return;
     const ws = new WebSocket(exportWsUrl(exportId));
     ws.onmessage = (e) => {
-      const message: ExportProgressMessage = JSON.parse(e.data);
-      switch (message.status) {
+      const progress: ExportProgressMessage = JSON.parse(e.data);
+      switch (progress.status) {
         case "done":
           setPhase({ kind: "done" });
           ws.close();
           break;
         case "error":
-          setPhase({ kind: "failed", msg: message.msg });
+          setPhase({ kind: "failed", message: progress.msg });
           ws.close();
           break;
         default:
           setPhase({
             kind: "running",
-            pct: message.pct,
-            msg: message.msg,
-            eta: message.eta ?? null,
+            percent: progress.pct,
+            message: progress.msg,
+            remainingSeconds: progress.eta ?? null,
           });
       }
     };
