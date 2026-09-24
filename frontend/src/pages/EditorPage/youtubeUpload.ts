@@ -9,18 +9,21 @@ export type YoutubeUploadState =
  * 전자는 기다리는 중이고 후자는 서버가 실패를 알린 것이다.
  */
 export const deriveYoutubeUploadState = ({
+  exportId,
   isStarting,
   trackedId,
   exportStatus,
 }: {
-  /** 업로드 시작 요청이 아직 응답을 받지 못했다. */
+  /** 지금 화면이 다루는 내보내기. */
+  exportId: number | null;
+  /** 이 내보내기의 업로드 시작 요청이 아직 응답을 받지 못했다. */
   isStarting: boolean;
-  /** 시작 요청이 성공해 상태를 폴링 중인 내보내기. 없으면 시작 전이다. */
+  /** 시작 요청이 성공해 상태를 폴링 중인 내보내기. 현재 것이 아니면 무시한다. */
   trackedId: number | null;
   exportStatus: ExportStatusResponse | undefined;
 }): YoutubeUploadState => {
   if (isStarting) return { kind: "uploading" };
-  if (trackedId === null) return { kind: "idle" };
+  if (exportId === null || trackedId !== exportId) return { kind: "idle" };
   if (exportStatus === undefined) return { kind: "uploading" };
 
   const url = exportStatus.youtube_url;

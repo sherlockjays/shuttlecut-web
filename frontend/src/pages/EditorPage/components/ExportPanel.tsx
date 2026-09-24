@@ -28,7 +28,7 @@ type Props = {
  */
 export default function ExportPanel({ projectId, canExport, flushSave }: Props) {
   const { phase, exportId, start, reset: resetExport } = useExport({ projectId, flush: flushSave });
-  const youtube = useYoutubeUpload({ onStartFailed: (message) => alert(message) });
+  const youtube = useYoutubeUpload({ exportId, onStartFailed: (message) => alert(message) });
   // 업로드 폼이 실패 뒤 다시 열려도 선택이 남도록 폼 바깥에 둔다.
   const [postComment, setPostComment] = useState(true);
 
@@ -47,10 +47,7 @@ export default function ExportPanel({ projectId, canExport, flushSave }: Props) 
             다운로드
           </a>
           <button
-            onClick={() => {
-              resetExport();
-              youtube.reset();
-            }}
+            onClick={resetExport}
             className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl transition-colors"
           >
             다시
@@ -60,7 +57,7 @@ export default function ExportPanel({ projectId, canExport, flushSave }: Props) 
           state={youtube.state}
           postComment={postComment}
           onPostCommentChange={setPostComment}
-          onUpload={() => youtube.upload(exportId, postComment)}
+          onUpload={() => youtube.upload(postComment)}
         />
       </div>
     );
