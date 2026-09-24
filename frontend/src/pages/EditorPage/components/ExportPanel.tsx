@@ -126,13 +126,17 @@ function YoutubeUploadArea({
   }
 
   if (state.kind === "uploading") {
-    return <div className="text-center text-xs text-gray-400 py-2">YouTube 업로드 중...</div>;
+    return (
+      <div role="status" className="text-center text-xs text-gray-400 py-2">
+        YouTube 업로드 중...
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col gap-1.5">
       {state.kind === "failed" && (
-        <p className="text-center text-xs text-red-400">
+        <p role="status" className="text-center text-xs text-red-400">
           YouTube 업로드에 실패했습니다. 다시 시도해주세요.
         </p>
       )}

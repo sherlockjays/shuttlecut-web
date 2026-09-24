@@ -36,8 +36,8 @@ export function useExport({ projectId, flush }: Options) {
     }
     try {
       const { export_id } = await startExport(projectId);
+      // 첫 진행률 메시지가 올 때까지는 starting으로 둔다. running은 메시지를 받은 뒤다.
       setExportId(export_id);
-      setPhase({ kind: "running", percent: 0, message: "시작 중...", remainingSeconds: null });
     } catch (e: unknown) {
       setPhase({ kind: "failed", message: e instanceof Error ? e.message : "내보내기 실패" });
     }
