@@ -1,11 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 
+type VideoSize = { width: number; height: number };
+
 /**
  * <video> 엘리먼트를 소유하고 재생을 조작한다.
  * 초를 쓰는 DOM과 프레임으로만 말하는 랠리 도메인의 경계가 여기다.
  */
-export type VideoSize = { width: number; height: number };
-
 export function useVideoPlayer(fps: number) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [duration, setDuration] = useState(0);
