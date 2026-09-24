@@ -1,8 +1,8 @@
 import type { ProjectData } from "@/models/project";
 
 /**
- * 점수판 규격. 단위는 영상 원본 픽셀이다.
- * 결과물을 그리는 backend/core/exporter.py의 값과 같아야 미리보기가 결과물과 맞는다.
+ * 점수판 규격. 단위는 결과물 프레임 픽셀이다(워커가 세로 1080으로 줄인 뒤 얹는다. tasks.py 참고).
+ * nameMaxChars만 글자 수다. 결과물을 그리는 exporter.py·tasks.py의 값과 같아야 미리보기가 결과물과 맞는다.
  */
 export const SCOREBOARD_GEOMETRY = {
   margin: 11,
