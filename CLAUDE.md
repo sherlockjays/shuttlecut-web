@@ -65,7 +65,7 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 ## 두 곳을 같이 고쳐야 하는 것
 
 - **DB 컬럼 추가**: `models/database.py`의 Column과 [main.py](backend/main.py) startup의 `ALTER TABLE ... ADD COLUMN`. alembic은 설치만 되어 있고 안 쓴다. `init_db()`가 `create_all`을 돌리고 기존 테이블은 ALTER 문으로 때운다(실패하면 조용히 rollback)
-- **점수판 색**: 에디터 미리보기는 [theme.ts](frontend/src/models/theme.ts)의 `CANVAS_THEMES`(hex), 실제 렌더링은 [exporter.py](backend/core/exporter.py)의 `THEMES`(RGB 튜플). 한쪽만 고치면 미리보기와 결과물이 갈라진다
+- **점수판 색과 좌표**: 에디터 미리보기는 [theme.ts](frontend/src/models/theme.ts)의 `CANVAS_THEMES`(hex)와 [scoreboard.ts](frontend/src/pages/EditorPage/scoreboard.ts)의 `SCOREBOARD_GEOMETRY`, 실제 렌더링은 [exporter.py](backend/core/exporter.py)의 `THEMES`(RGB 튜플)와 `make_scoreboard_image` 안의 숫자. 한쪽만 고치면 미리보기와 결과물이 갈라진다
 - **파이썬 버전**: [.python-version](.python-version)과 [Dockerfile](backend/Dockerfile)의 `FROM python:3.11-slim`. `requirements.txt`는 패키지를 고정하지만 인터프리터는 고정하지 않는다. 어긋나면 numpy·opencv 같은 C 확장이 같은 버전이어도 ABI가 다른 바이너리가 된다. 한쪽만 고치면 워커와 NAS가 갈라진다
 - **환경변수 추가**: `require_env`/`optional_env` 호출부, [docker-compose.yml](docker-compose.yml)의 `backend.environment`(필수면 `${VAR:?}`), `.env.example` 3개(루트·`backend/`·`.env.native-worker.example`). 선택값이면 [deploy-nas.sh](scripts/deploy-nas.sh)의 `OPTIONAL_KEYS`에도 넣는다
 - **의존성**: [requirements.txt](backend/requirements.txt)를 고치면 NAS 백엔드 재빌드와 워커 `worker-venv` 재설치를 **둘 다** 해야 한다. 아래 참고

@@ -14,6 +14,7 @@ import { useVideoPlayer } from "./hooks/useVideoPlayer";
 import ExportPanel from "./components/ExportPanel";
 import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
+import { SCOREBOARD_GEOMETRY, getScoreboardLayout, getScoreboardHeaderLines } from "./scoreboard";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
@@ -182,91 +183,73 @@ export default function Editor({ projectId }: { projectId: number }) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const displayW = videoEl.clientWidth;
-    const displayH = videoEl.clientHeight;
-    canvas.width = displayW;
-    canvas.height = displayH;
-    ctx.clearRect(0, 0, displayW, displayH);
+    const display = { width: videoEl.clientWidth, height: videoEl.clientHeight };
+    // 크기를 대입하면 비트맵이 비워지므로 따로 지우지 않는다.
+    canvas.width = display.width;
+    canvas.height = display.height;
 
-    // 실제 영상 콘텐츠 영역 계산 (레터박스 대응)
-    const videoAspect = videoEl.videoWidth / videoEl.videoHeight;
-    const containerAspect = displayW / displayH;
-    let contentW: number, contentH: number, ox: number, oy: number;
-    if (videoAspect > containerAspect) {
-      contentW = displayW;
-      contentH = displayW / videoAspect;
-      ox = 0;
-      oy = (displayH - contentH) / 2;
-    } else {
-      contentH = displayH;
-      contentW = displayH * videoAspect;
-      ox = (displayW - contentW) / 2;
-      oy = 0;
-    }
-    const sf = contentW / videoEl.videoWidth;
-
-    const s = data.scoreboard_scale;
+    const layout = getScoreboardLayout({
+      display,
+      video: { width: videoEl.videoWidth, height: videoEl.videoHeight },
+      scale: data.scoreboard_scale,
+    });
+    const { x, y, boxWidth, pad, rowHeight, lineHeight, headerHeight, totalHeight } = layout;
+    const { fontSmall, fontMedium, fontScore, displayScale } = layout;
     const t = CANVAS_THEMES[data.scoreboard_theme] || CANVAS_THEMES.dark;
-
-    const x = ox + 11 * s * sf;
-    const y = oy + 11 * s * sf;
-    const bw = 236 * s * sf;
-    const pad = 6 * s * sf;
-    const row_h = 38 * s * sf;
-    const line_h = 17 * s * sf;
-    const header_h = line_h * 2 + pad;
-    const total_h = header_h + row_h * 2;
-
-    const fontSm = Math.max(8, Math.round(13 * s * sf));
-    const fontMd = Math.max(9, Math.round(16 * s * sf));
-    const fontScore = Math.max(11, Math.round(27 * s * sf));
 
     // 헤더
     ctx.fillStyle = t.header_bg;
-    ctx.fillRect(x, y, bw, header_h);
-    const line1 = [data.match_date, data.tournament_name].filter(Boolean).join("  /  ");
-    const line2 = [data.level, data.match_name].filter(Boolean).join("  /  ");
-    const headerLines = !line1 && !line2 ? ["ShuttleCut", ""] : [line1, line2];
+    ctx.fillRect(x, y, boxWidth, headerHeight);
     ctx.fillStyle = t.header_text;
-    ctx.font = `${fontSm}px sans-serif`;
+    ctx.font = `${fontSmall}px sans-serif`;
+    const headerLines = getScoreboardHeaderLines({
+      match_date: data.match_date,
+      tournament_name: data.tournament_name,
+      level: data.level,
+      match_name: data.match_name,
+    });
     headerLines.forEach((line, i) => {
-      if (line) ctx.fillText(line, x + pad, y + pad / 2 + (i + 1) * line_h - 2);
+      if (line) ctx.fillText(line, x + pad, y + pad / 2 + (i + 1) * lineHeight - 2);
     });
 
     // 선수 행
-    let y0 = y + header_h;
+    let y0 = y + headerHeight;
     for (const [name, score] of [
       [data.player1_name, data.player1_score],
       [data.player2_name, data.player2_score],
     ] as [string, number][]) {
       ctx.fillStyle = t.row_bg;
-      ctx.fillRect(x, y0, bw, row_h);
+      ctx.fillRect(x, y0, boxWidth, rowHeight);
       ctx.fillStyle = t.name_text;
-      ctx.font = `${fontMd}px sans-serif`;
-      ctx.fillText((name || "").slice(0, 18), x + pad, y0 + (row_h + fontMd) / 2 - 2);
+      ctx.font = `${fontMedium}px sans-serif`;
+      ctx.fillText(
+        (name || "").slice(0, SCOREBOARD_GEOMETRY.nameMaxChars),
+        x + pad,
+        y0 + (rowHeight + fontMedium) / 2 - 2,
+      );
       ctx.font = `bold ${fontScore}px sans-serif`;
       const scoreStr = String(score);
       const sw = ctx.measureText(scoreStr).width;
       ctx.fillStyle = t.score_text;
-      ctx.fillText(scoreStr, x + bw - sw - pad, y0 + (row_h + fontScore) / 2 - 4);
-      y0 += row_h;
+      ctx.fillText(scoreStr, x + boxWidth - sw - pad, y0 + (rowHeight + fontScore) / 2 - 4);
+      y0 += rowHeight;
     }
 
     // 테두리 / 구분선
     ctx.strokeStyle = t.border;
-    ctx.lineWidth = Math.max(1, 2 * sf);
-    ctx.strokeRect(x, y, bw, total_h);
+    ctx.lineWidth = Math.max(1, 2 * displayScale);
+    ctx.strokeRect(x, y, boxWidth, totalHeight);
     ctx.strokeStyle = t.divider;
-    ctx.lineWidth = Math.max(0.5, sf);
+    ctx.lineWidth = Math.max(0.5, displayScale);
     ctx.beginPath();
-    ctx.moveTo(x, y + header_h);
-    ctx.lineTo(x + bw, y + header_h);
+    ctx.moveTo(x, y + headerHeight);
+    ctx.lineTo(x + boxWidth, y + headerHeight);
     ctx.stroke();
     ctx.strokeStyle = t.row_div;
-    ctx.lineWidth = Math.max(1, 3 * sf);
+    ctx.lineWidth = Math.max(1, 3 * displayScale);
     ctx.beginPath();
-    ctx.moveTo(x + 1, y + header_h + row_h);
-    ctx.lineTo(x + bw - 1, y + header_h + row_h);
+    ctx.moveTo(x + 1, y + headerHeight + rowHeight);
+    ctx.lineTo(x + boxWidth - 1, y + headerHeight + rowHeight);
     ctx.stroke();
   }, [
     data.scoreboard_scale,
