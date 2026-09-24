@@ -6,15 +6,15 @@ import { videoStreamUrl } from "@/apis/video";
 import type { UploadedVideo } from "@/models/video";
 import { projectOptions, projectsOptions } from "@/queries/projects";
 import { RallyWinner, type ProjectData } from "@/models/project";
-import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
+import { THEMES, SIZES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
 import ExportPanel from "./components/ExportPanel";
+import ScoreboardOverlay from "./components/ScoreboardOverlay";
 import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
-import { SCOREBOARD_GEOMETRY, getScoreboardLayout, getScoreboardHeaderLines } from "./scoreboard";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
@@ -72,7 +72,6 @@ const INVALID_RANGE_MESSAGE =
 export default function Editor({ projectId }: { projectId: number }) {
   const { data, update, undo, redo, reset, canUndo, canRedo } =
     useProjectDraft(DEFAULT_PROJECT_DATA);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
   const seededRef = useRef<number | null>(null);
@@ -87,6 +86,7 @@ export default function Editor({ projectId }: { projectId: number }) {
   const {
     videoRef,
     duration,
+    videoSize,
     getCurrentFrame,
     seekToFrame,
     seekBy,
@@ -175,97 +175,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     // 의존성을 필요한 최소한으로 줄이는 것은 #33에서 다룬다.
   }, [toggleRally, addScore, handleUndo, handleRedo, togglePlay, seekBy]);
 
-  // 점수판 canvas 미리보기
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const videoEl = videoRef.current;
-    if (!canvas || !videoEl || !videoEl.videoWidth) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const display = { width: videoEl.clientWidth, height: videoEl.clientHeight };
-    // 크기를 대입하면 비트맵이 비워지므로 따로 지우지 않는다.
-    canvas.width = display.width;
-    canvas.height = display.height;
-
-    const layout = getScoreboardLayout({
-      display,
-      video: { width: videoEl.videoWidth, height: videoEl.videoHeight },
-      scale: data.scoreboard_scale,
-    });
-    const { x, y, boxWidth, pad, rowHeight, lineHeight, headerHeight, totalHeight } = layout;
-    const { fontSmall, fontMedium, fontScore, displayScale } = layout;
-    const t = CANVAS_THEMES[data.scoreboard_theme] || CANVAS_THEMES.dark;
-
-    // 헤더
-    ctx.fillStyle = t.header_bg;
-    ctx.fillRect(x, y, boxWidth, headerHeight);
-    ctx.fillStyle = t.header_text;
-    ctx.font = `${fontSmall}px sans-serif`;
-    const headerLines = getScoreboardHeaderLines({
-      match_date: data.match_date,
-      tournament_name: data.tournament_name,
-      level: data.level,
-      match_name: data.match_name,
-    });
-    headerLines.forEach((line, i) => {
-      if (line) ctx.fillText(line, x + pad, y + pad / 2 + (i + 1) * lineHeight - 2);
-    });
-
-    // 선수 행
-    let y0 = y + headerHeight;
-    for (const [name, score] of [
-      [data.player1_name, data.player1_score],
-      [data.player2_name, data.player2_score],
-    ] as [string, number][]) {
-      ctx.fillStyle = t.row_bg;
-      ctx.fillRect(x, y0, boxWidth, rowHeight);
-      ctx.fillStyle = t.name_text;
-      ctx.font = `${fontMedium}px sans-serif`;
-      ctx.fillText(
-        (name || "").slice(0, SCOREBOARD_GEOMETRY.nameMaxChars),
-        x + pad,
-        y0 + (rowHeight + fontMedium) / 2 - 2,
-      );
-      ctx.font = `bold ${fontScore}px sans-serif`;
-      const scoreStr = String(score);
-      const sw = ctx.measureText(scoreStr).width;
-      ctx.fillStyle = t.score_text;
-      ctx.fillText(scoreStr, x + boxWidth - sw - pad, y0 + (rowHeight + fontScore) / 2 - 4);
-      y0 += rowHeight;
-    }
-
-    // 테두리 / 구분선
-    ctx.strokeStyle = t.border;
-    ctx.lineWidth = Math.max(1, 2 * displayScale);
-    ctx.strokeRect(x, y, boxWidth, totalHeight);
-    ctx.strokeStyle = t.divider;
-    ctx.lineWidth = Math.max(0.5, displayScale);
-    ctx.beginPath();
-    ctx.moveTo(x, y + headerHeight);
-    ctx.lineTo(x + boxWidth, y + headerHeight);
-    ctx.stroke();
-    ctx.strokeStyle = t.row_div;
-    ctx.lineWidth = Math.max(1, 3 * displayScale);
-    ctx.beginPath();
-    ctx.moveTo(x + 1, y + headerHeight + rowHeight);
-    ctx.lineTo(x + boxWidth - 1, y + headerHeight + rowHeight);
-    ctx.stroke();
-  }, [
-    data.scoreboard_scale,
-    data.scoreboard_theme,
-    data.player1_name,
-    data.player2_name,
-    data.player1_score,
-    data.player2_score,
-    data.match_date,
-    data.tournament_name,
-    data.level,
-    data.match_name,
-    duration,
-    videoRef,
-  ]);
-
   // 업로드 때 ffprobe가 프레임 수를 못 읽으면 0으로 저장되므로 재생 길이로 대신한다.
   const totalFrames = data.total_frames > 0 ? data.total_frames : Math.round(duration * data.fps);
 
@@ -306,11 +215,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                   setHasPlaybackError(true);
                 }}
               />
-              <canvas
-                ref={canvasRef}
-                className="absolute inset-0 pointer-events-none rounded-xl"
-                style={{ width: "100%", height: "100%" }}
-              />
+              <ScoreboardOverlay scoreboard={data} videoSize={videoSize} />
               {hasPlaybackError && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center pointer-events-none rounded-xl bg-black/80">
                   <p className="text-base font-semibold text-red-300">영상을 재생할 수 없습니다.</p>
