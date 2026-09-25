@@ -6,12 +6,13 @@ import { videoStreamUrl } from "@/apis/video";
 import type { UploadedVideo } from "@/models/video";
 import { projectOptions, projectsOptions } from "@/queries/projects";
 import { RallyWinner, type ProjectData } from "@/models/project";
-import { THEMES, SIZES, CANVAS_THEMES } from "@/models/theme";
+import { THEMES, SIZES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
 import ExportPanel from "./components/ExportPanel";
+import ScoreboardOverlay from "./components/ScoreboardOverlay";
 import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
 
@@ -71,7 +72,6 @@ const INVALID_RANGE_MESSAGE =
 export default function Editor({ projectId }: { projectId: number }) {
   const { data, update, undo, redo, reset, canUndo, canRedo } =
     useProjectDraft(DEFAULT_PROJECT_DATA);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
   const seededRef = useRef<number | null>(null);
@@ -86,6 +86,7 @@ export default function Editor({ projectId }: { projectId: number }) {
   const {
     videoRef,
     duration,
+    videoSize,
     getCurrentFrame,
     seekToFrame,
     seekBy,
@@ -174,115 +175,6 @@ export default function Editor({ projectId }: { projectId: number }) {
     // 의존성을 필요한 최소한으로 줄이는 것은 #33에서 다룬다.
   }, [toggleRally, addScore, handleUndo, handleRedo, togglePlay, seekBy]);
 
-  // 점수판 canvas 미리보기
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const videoEl = videoRef.current;
-    if (!canvas || !videoEl || !videoEl.videoWidth) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const displayW = videoEl.clientWidth;
-    const displayH = videoEl.clientHeight;
-    canvas.width = displayW;
-    canvas.height = displayH;
-    ctx.clearRect(0, 0, displayW, displayH);
-
-    // 실제 영상 콘텐츠 영역 계산 (레터박스 대응)
-    const videoAspect = videoEl.videoWidth / videoEl.videoHeight;
-    const containerAspect = displayW / displayH;
-    let contentW: number, contentH: number, ox: number, oy: number;
-    if (videoAspect > containerAspect) {
-      contentW = displayW;
-      contentH = displayW / videoAspect;
-      ox = 0;
-      oy = (displayH - contentH) / 2;
-    } else {
-      contentH = displayH;
-      contentW = displayH * videoAspect;
-      ox = (displayW - contentW) / 2;
-      oy = 0;
-    }
-    const sf = contentW / videoEl.videoWidth;
-
-    const s = data.scoreboard_scale;
-    const t = CANVAS_THEMES[data.scoreboard_theme] || CANVAS_THEMES.dark;
-
-    const x = ox + 11 * s * sf;
-    const y = oy + 11 * s * sf;
-    const bw = 236 * s * sf;
-    const pad = 6 * s * sf;
-    const row_h = 38 * s * sf;
-    const line_h = 17 * s * sf;
-    const header_h = line_h * 2 + pad;
-    const total_h = header_h + row_h * 2;
-
-    const fontSm = Math.max(8, Math.round(13 * s * sf));
-    const fontMd = Math.max(9, Math.round(16 * s * sf));
-    const fontScore = Math.max(11, Math.round(27 * s * sf));
-
-    // 헤더
-    ctx.fillStyle = t.header_bg;
-    ctx.fillRect(x, y, bw, header_h);
-    const line1 = [data.match_date, data.tournament_name].filter(Boolean).join("  /  ");
-    const line2 = [data.level, data.match_name].filter(Boolean).join("  /  ");
-    const headerLines = !line1 && !line2 ? ["ShuttleCut", ""] : [line1, line2];
-    ctx.fillStyle = t.header_text;
-    ctx.font = `${fontSm}px sans-serif`;
-    headerLines.forEach((line, i) => {
-      if (line) ctx.fillText(line, x + pad, y + pad / 2 + (i + 1) * line_h - 2);
-    });
-
-    // 선수 행
-    let y0 = y + header_h;
-    for (const [name, score] of [
-      [data.player1_name, data.player1_score],
-      [data.player2_name, data.player2_score],
-    ] as [string, number][]) {
-      ctx.fillStyle = t.row_bg;
-      ctx.fillRect(x, y0, bw, row_h);
-      ctx.fillStyle = t.name_text;
-      ctx.font = `${fontMd}px sans-serif`;
-      ctx.fillText((name || "").slice(0, 18), x + pad, y0 + (row_h + fontMd) / 2 - 2);
-      ctx.font = `bold ${fontScore}px sans-serif`;
-      const scoreStr = String(score);
-      const sw = ctx.measureText(scoreStr).width;
-      ctx.fillStyle = t.score_text;
-      ctx.fillText(scoreStr, x + bw - sw - pad, y0 + (row_h + fontScore) / 2 - 4);
-      y0 += row_h;
-    }
-
-    // 테두리 / 구분선
-    ctx.strokeStyle = t.border;
-    ctx.lineWidth = Math.max(1, 2 * sf);
-    ctx.strokeRect(x, y, bw, total_h);
-    ctx.strokeStyle = t.divider;
-    ctx.lineWidth = Math.max(0.5, sf);
-    ctx.beginPath();
-    ctx.moveTo(x, y + header_h);
-    ctx.lineTo(x + bw, y + header_h);
-    ctx.stroke();
-    ctx.strokeStyle = t.row_div;
-    ctx.lineWidth = Math.max(1, 3 * sf);
-    ctx.beginPath();
-    ctx.moveTo(x + 1, y + header_h + row_h);
-    ctx.lineTo(x + bw - 1, y + header_h + row_h);
-    ctx.stroke();
-  }, [
-    data.scoreboard_scale,
-    data.scoreboard_theme,
-    data.player1_name,
-    data.player2_name,
-    data.player1_score,
-    data.player2_score,
-    data.match_date,
-    data.tournament_name,
-    data.level,
-    data.match_name,
-    duration,
-    videoRef,
-  ]);
-
   // 업로드 때 ffprobe가 프레임 수를 못 읽으면 0으로 저장되므로 재생 길이로 대신한다.
   const totalFrames = data.total_frames > 0 ? data.total_frames : Math.round(duration * data.fps);
 
@@ -323,11 +215,7 @@ export default function Editor({ projectId }: { projectId: number }) {
                   setHasPlaybackError(true);
                 }}
               />
-              <canvas
-                ref={canvasRef}
-                className="absolute inset-0 pointer-events-none rounded-xl"
-                style={{ width: "100%", height: "100%" }}
-              />
+              <ScoreboardOverlay scoreboard={data} videoSize={videoSize} />
               {hasPlaybackError && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center pointer-events-none rounded-xl bg-black/80">
                   <p className="text-base font-semibold text-red-300">영상을 재생할 수 없습니다.</p>
