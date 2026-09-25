@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { updateProject } from "@/apis/projects";
@@ -8,6 +8,7 @@ import { projectOptions, projectsOptions } from "@/queries/projects";
 import { RallyWinner, type ProjectData } from "@/models/project";
 import { THEMES, SIZES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
+import { useEditorShortcuts } from "./hooks/useEditorShortcuts";
 import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
@@ -15,6 +16,7 @@ import ExportPanel from "./components/ExportPanel";
 import ScoreboardOverlay from "./components/ScoreboardOverlay";
 import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
+import { SEEK_STEP_SECONDS, SEEK_STEP_LARGE_SECONDS } from "./shortcuts";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
@@ -143,37 +145,23 @@ export default function Editor({ projectId }: { projectId: number }) {
       onInvalidRange: () => alert(INVALID_RANGE_MESSAGE),
     });
 
-  // 단축키 effect의 의존성이라 매 렌더 새로 만들면 리스너가 계속 재등록된다.
-  const handleUndo = useCallback(() => {
+  const handleUndo = () => {
     const moved = undo();
     if (moved) onUndone(moved);
-  }, [undo, onUndone]);
+  };
 
-  const handleRedo = useCallback(() => {
+  const handleRedo = () => {
     if (redo()) onRedone();
-  }, [redo, onRedone]);
+  };
 
-  // 단축키
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
-      if (e.code === "Space") {
-        e.preventDefault();
-        togglePlay();
-      }
-      if (e.code === "KeyR") toggleRally();
-      if (e.code === "Digit1") addScore(RallyWinner.Team1);
-      if (e.code === "Digit2") addScore(RallyWinner.Team2);
-      if (e.code === "KeyZ" && e.ctrlKey && !e.shiftKey) handleUndo();
-      if ((e.code === "KeyZ" && e.ctrlKey && e.shiftKey) || (e.code === "KeyY" && e.ctrlKey))
-        handleRedo();
-      if (e.code === "ArrowLeft") seekBy(e.shiftKey ? -10 : -5);
-      if (e.code === "ArrowRight") seekBy(e.shiftKey ? 10 : 5);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-    // 의존성을 필요한 최소한으로 줄이는 것은 #33에서 다룬다.
-  }, [toggleRally, addScore, handleUndo, handleRedo, togglePlay, seekBy]);
+  useEditorShortcuts({
+    togglePlay,
+    toggleRally,
+    addScore,
+    undo: handleUndo,
+    redo: handleRedo,
+    seekBy,
+  });
 
   // 업로드 때 ffprobe가 프레임 수를 못 읽으면 0으로 저장되므로 재생 길이로 대신한다.
   const totalFrames = data.total_frames > 0 ? data.total_frames : Math.round(duration * data.fps);
@@ -231,17 +219,17 @@ export default function Editor({ projectId }: { projectId: number }) {
           {/* 재생 컨트롤 */}
           <div className="flex gap-2 text-sm">
             {[
-              ["⏮ 5초", -5],
-              ["⏮ 10초", -10],
-              ["10초 ⏭", 10],
-              ["5초 ⏭", 5],
-            ].map(([label, sec]) => (
+              -SEEK_STEP_SECONDS,
+              -SEEK_STEP_LARGE_SECONDS,
+              SEEK_STEP_LARGE_SECONDS,
+              SEEK_STEP_SECONDS,
+            ].map((sec) => (
               <button
-                key={label as string}
-                onClick={() => seekBy(sec as number)}
+                key={sec}
+                onClick={() => seekBy(sec)}
                 className="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors"
               >
-                {label}
+                {sec < 0 ? `⏮ ${-sec}초` : `${sec}초 ⏭`}
               </button>
             ))}
           </div>
