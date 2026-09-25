@@ -105,8 +105,9 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 
 ### EditorPage 훅
 
-- **draft는 `useProjectDraft`만 소유한다.** undo/redo 스택과 현재값이 한 state에 있어 어긋날 수 없다. 다른 훅은 draft를 갖지 않고 `update(patch)`로 바꿀 것만 넘긴다. 이전 값에서 파생되는 변경은 함수형 patch로 준다
-- 한 번에 일어나야 하는 변경은 한 번의 `update`로 묶는다. 되돌릴 때도 함께 돌아와야 하기 때문이다(랠리 추가 + 점수 증가)
+- **draft는 `useProjectDraft`만 소유한다.** 다른 훅은 draft를 갖지 않고 바꿀 것만 넘긴다. `update(patch)`는 값만 바꾸고 `record(patch)`는 이력을 남긴다. 이전 값에서 파생되는 변경은 함수형 patch로 준다
+- **undo/redo 스택에는 랠리와 점수(`rallies`, `player1_score`, `player2_score`)만 들어간다.** 전체 스냅샷을 남기면 되돌릴 때 그 사이 고친 텍스트까지 옛 값으로 돌아가기 때문이다. 스택의 `present`는 항상 `data`의 그 조각이고, 둘이 한 state에 있어 어긋날 수 없다. 자동저장은 `data`를 구독하므로 `update`로 바꾼 값도 저장된다
+- 한 번에 일어나야 하는 변경은 한 번의 `record`로 묶는다. 되돌릴 때도 함께 돌아와야 하기 때문이다(랠리 추가 + 점수 증가)
 - 콜백은 `optionsRef`에 담아 렌더마다 갱신한다(`useAutoSave`, `useRallyEditor`). 이벤트 핸들러와 타이머에서만 불리므로 안전하고, 호출부가 `useCallback`으로 감쌀 필요가 없다
 
 ## 내보내기는 다른 기계에서 돈다
