@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RallyWinner, type ScoringTeam } from "@/models/project";
 import { applyPoint, isValidRallyRange } from "../rally";
-import type { DraftPatch, DraftTransition } from "./useProjectDraft";
+import type { DraftTransition, RecordedPatch } from "./useProjectDraft";
 
 type Options = {
-  update: (patch: DraftPatch) => void;
+  record: (patch: RecordedPatch) => void;
   getCurrentFrame: () => number;
   seekToFrame: (frame: number) => void;
   /** 마킹 구간이 유효하지 않을 때. 알리는 수단은 호출부가 정한다. */
@@ -12,7 +12,7 @@ type Options = {
 };
 
 /**
- * 랠리 기록과 득점을 다룬다. draft를 소유하지 않고 무엇을 바꿀지만 update로 넘긴다.
+ * 랠리 기록과 득점을 다룬다. draft를 소유하지 않고 무엇을 바꿀지만 record로 넘긴다.
  * 시간 단위는 모르며 프레임으로만 말한다.
  */
 export function useRallyEditor(options: Options) {
@@ -33,7 +33,7 @@ export function useRallyEditor(options: Options) {
   const endRally = useCallback(
     (winner: RallyWinner) => {
       if (markStart === null) return;
-      const { getCurrentFrame, update, onInvalidRange } = optionsRef.current;
+      const { getCurrentFrame, record, onInvalidRange } = optionsRef.current;
       const end = getCurrentFrame();
       // 갱신 함수는 StrictMode에서 두 번 불릴 수 있어 순수해야 하므로 밖에서 검사한다.
       if (!isValidRallyRange(markStart, end)) {
@@ -41,7 +41,7 @@ export function useRallyEditor(options: Options) {
         return;
       }
       // 랠리와 점수를 한 번에 바꿔야 되돌릴 때도 함께 돌아온다.
-      update((prev) => ({
+      record((prev) => ({
         rallies: [
           ...prev.rallies,
           {
@@ -73,17 +73,17 @@ export function useRallyEditor(options: Options) {
         endRally(team);
         return;
       }
-      optionsRef.current.update((prev) => applyPoint(prev.player1_score, prev.player2_score, team));
+      optionsRef.current.record((prev) => applyPoint(prev.player1_score, prev.player2_score, team));
     },
     [markStart, endRally],
   );
 
   const resetScore = useCallback(() => {
-    optionsRef.current.update({ player1_score: 0, player2_score: 0 });
+    optionsRef.current.record({ player1_score: 0, player2_score: 0 });
   }, []);
 
   const deleteRally = useCallback((index: number) => {
-    optionsRef.current.update((prev) => ({
+    optionsRef.current.record((prev) => ({
       rallies: prev.rallies.filter((_, i) => i !== index),
     }));
   }, []);
