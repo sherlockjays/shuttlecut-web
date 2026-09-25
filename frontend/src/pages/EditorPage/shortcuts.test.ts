@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { getShortcutAction, type ShortcutKey } from "./shortcuts";
+import { getShortcutAction, type KeyPress } from "./shortcuts";
 
-const key = (code: string, mods: Partial<Omit<ShortcutKey, "code">> = {}): ShortcutKey => ({
+const key = (code: string, mods: Partial<Omit<KeyPress, "code">> = {}): KeyPress => ({
   code,
   ctrlKey: false,
   shiftKey: false,
