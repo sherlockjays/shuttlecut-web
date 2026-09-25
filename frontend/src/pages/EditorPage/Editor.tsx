@@ -16,6 +16,7 @@ import ExportPanel from "./components/ExportPanel";
 import ScoreboardOverlay from "./components/ScoreboardOverlay";
 import VideoDropzone from "./components/VideoDropzone";
 import { applyPoint } from "./rally";
+import { SEEK_STEP_SECONDS, SEEK_STEP_LARGE_SECONDS } from "./shortcuts";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   title: "",
@@ -218,17 +219,17 @@ export default function Editor({ projectId }: { projectId: number }) {
           {/* 재생 컨트롤 */}
           <div className="flex gap-2 text-sm">
             {[
-              ["⏮ 5초", -5],
-              ["⏮ 10초", -10],
-              ["10초 ⏭", 10],
-              ["5초 ⏭", 5],
-            ].map(([label, sec]) => (
+              -SEEK_STEP_SECONDS,
+              -SEEK_STEP_LARGE_SECONDS,
+              SEEK_STEP_LARGE_SECONDS,
+              SEEK_STEP_SECONDS,
+            ].map((sec) => (
               <button
-                key={label as string}
-                onClick={() => seekBy(sec as number)}
+                key={sec}
+                onClick={() => seekBy(sec)}
                 className="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors"
               >
-                {label}
+                {sec < 0 ? `⏮ ${-sec}초` : `${sec}초 ⏭`}
               </button>
             ))}
           </div>
