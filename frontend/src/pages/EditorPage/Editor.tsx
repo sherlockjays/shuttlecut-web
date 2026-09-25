@@ -9,7 +9,7 @@ import { RallyWinner, type ProjectData } from "@/models/project";
 import { THEMES, SIZES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useEditorShortcuts } from "./hooks/useEditorShortcuts";
-import { useProjectDraft } from "./hooks/useProjectDraft";
+import { useProjectDraft, type UnrecordedState } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
 import ExportPanel from "./components/ExportPanel";
@@ -42,7 +42,7 @@ const MATCH_INFO_FIELDS = [
   { key: "level", label: "급수", placeholder: "A조, 혼합복식" },
   { key: "match_name", label: "경기명", placeholder: "32강, 결승" },
 ] satisfies {
-  key: keyof ProjectData;
+  key: keyof UnrecordedState;
   label: string;
   placeholder: string;
 }[];
@@ -72,7 +72,7 @@ const INVALID_RANGE_MESSAGE =
   "랠리 종료 지점이 시작 지점보다 앞에 있습니다. 시작 지점 이후로 이동한 뒤 다시 시도해주세요.";
 
 export default function Editor({ projectId }: { projectId: number }) {
-  const { data, update, undo, redo, reset, canUndo, canRedo } =
+  const { data, update, record, undo, redo, reset, canUndo, canRedo } =
     useProjectDraft(DEFAULT_PROJECT_DATA);
 
   const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
@@ -139,7 +139,7 @@ export default function Editor({ projectId }: { projectId: number }) {
 
   const { marking, toggleRally, addScore, resetScore, deleteRally, onUndone, onRedone } =
     useRallyEditor({
-      update,
+      record,
       getCurrentFrame,
       seekToFrame,
       onInvalidRange: () => alert(INVALID_RANGE_MESSAGE),
