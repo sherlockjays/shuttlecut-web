@@ -42,6 +42,11 @@ export function useEditorShortcuts(handlers: Handlers) {
       case "seekBy":
         handlers.seekBy(action.seconds);
         break;
+      default: {
+        // 동작이 추가됐는데 여기 case가 빠지면 컴파일 오류가 난다.
+        const unreachable: never = action;
+        return unreachable;
+      }
     }
   });
 
