@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 type VideoSize = { width: number; height: number };
 
@@ -12,34 +12,28 @@ export function useVideoPlayer(fps: number) {
   // 원본 해상도. 미리보기가 레터박스를 보정할 때 쓴다.
   const [videoSize, setVideoSize] = useState<VideoSize | null>(null);
 
-  const getCurrentFrame = useCallback(
-    () => Math.round((videoRef.current?.currentTime || 0) * fps),
-    [fps],
-  );
+  const getCurrentFrame = () => Math.round((videoRef.current?.currentTime || 0) * fps);
 
-  const seekToFrame = useCallback(
-    (frame: number) => {
-      if (videoRef.current) videoRef.current.currentTime = frame / fps;
-    },
-    [fps],
-  );
+  const seekToFrame = (frame: number) => {
+    if (videoRef.current) videoRef.current.currentTime = frame / fps;
+  };
 
-  const seekBy = useCallback((seconds: number) => {
+  const seekBy = (seconds: number) => {
     if (videoRef.current) videoRef.current.currentTime += seconds;
-  }, []);
+  };
 
-  const togglePlay = useCallback(() => {
+  const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) video.play();
     else video.pause();
-  }, []);
+  };
 
-  const handleLoadedMetadata = useCallback(() => {
+  const handleLoadedMetadata = () => {
     const video = videoRef.current;
     setDuration(video?.duration || 0);
     setVideoSize(video?.videoWidth ? { width: video.videoWidth, height: video.videoHeight } : null);
-  }, []);
+  };
 
   return {
     videoRef,
