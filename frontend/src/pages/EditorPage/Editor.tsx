@@ -6,16 +6,17 @@ import { videoStreamUrl } from "@/apis/video";
 import type { UploadedVideo } from "@/models/video";
 import { projectOptions, projectsOptions } from "@/queries/projects";
 import { RallyWinner, type ProjectData } from "@/models/project";
-import { THEMES, SIZES } from "@/models/theme";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useEditorShortcuts } from "./hooks/useEditorShortcuts";
-import { useProjectDraft, type UnrecordedState } from "./hooks/useProjectDraft";
+import { useProjectDraft } from "./hooks/useProjectDraft";
 import { useRallyEditor } from "./hooks/useRallyEditor";
 import { useVideoPlayer } from "./hooks/useVideoPlayer";
 import ExportPanel from "./components/ExportPanel";
+import MatchInfoForm from "./components/MatchInfoForm";
+import RallyPanel from "./components/RallyPanel";
 import ScoreboardOverlay from "./components/ScoreboardOverlay";
+import ScoreboardPanel from "./components/ScoreboardPanel";
 import VideoDropzone from "./components/VideoDropzone";
-import { applyPoint } from "./rally";
 import { SEEK_STEP_SECONDS, SEEK_STEP_LARGE_SECONDS } from "./shortcuts";
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
@@ -36,36 +37,10 @@ const DEFAULT_PROJECT_DATA: ProjectData = {
   scoreboard_theme: "dark",
 };
 
-const MATCH_INFO_FIELDS = [
-  { key: "match_date", label: "날짜", placeholder: "YYYY-MM-DD" },
-  { key: "tournament_name", label: "대회명", placeholder: "대회명" },
-  { key: "level", label: "급수", placeholder: "A조, 혼합복식" },
-  { key: "match_name", label: "경기명", placeholder: "32강, 결승" },
-] satisfies {
-  key: keyof UnrecordedState;
-  label: string;
-  placeholder: string;
-}[];
-
-const RALLY_WINNER_COLORS: Record<
-  RallyWinner,
-  { timelineClass: string; listBgClass: string; listText: string }
-> = {
-  [RallyWinner.Team1]: {
-    timelineClass: "bg-blue-500",
-    listBgClass: "bg-blue-950",
-    listText: "text-blue-300",
-  },
-  [RallyWinner.Team2]: {
-    timelineClass: "bg-red-500",
-    listBgClass: "bg-red-900",
-    listText: "text-red-300",
-  },
-  [RallyWinner.None]: {
-    timelineClass: "bg-gray-500",
-    listBgClass: "bg-gray-700",
-    listText: "text-gray-300",
-  },
+const RALLY_WINNER_COLORS: Record<RallyWinner, { timelineClass: string }> = {
+  [RallyWinner.Team1]: { timelineClass: "bg-blue-500" },
+  [RallyWinner.Team2]: { timelineClass: "bg-red-500" },
+  [RallyWinner.None]: { timelineClass: "bg-gray-500" },
 };
 
 const INVALID_RANGE_MESSAGE =
@@ -268,175 +243,30 @@ export default function Editor({ projectId }: { projectId: number }) {
 
         {/* 오른쪽: 정보 + 점수 + 랠리 */}
         <div className="w-72 bg-gray-800 border-l border-gray-700 flex flex-col p-4 gap-4 overflow-y-auto">
-          {/* 경기 정보 */}
-          <section>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">경기 정보</h3>
-            <div className="space-y-2">
-              {MATCH_INFO_FIELDS.map(({ key, label, placeholder }) => (
-                <div key={key}>
-                  <label className="text-xs text-gray-500">{label}</label>
-                  <input
-                    value={data[key]}
-                    placeholder={placeholder}
-                    onChange={(e) => update({ [key]: e.target.value })}
-                    className="w-full bg-gray-700 text-white text-sm rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 mt-0.5"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
+          <MatchInfoForm values={data} onChange={update} />
+          <ScoreboardPanel
+            scoreboard={data}
+            onChange={update}
+            onAddScore={addScore}
+            onResetScore={resetScore}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+          />
+          <RallyPanel
+            rallies={data.rallies}
+            marking={marking}
+            onToggleMarking={toggleRally}
+            onSeek={seekToFrame}
+            onDeleteRally={deleteRally}
+          />
 
-          {/* 점수판 */}
-          <section>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">점수판</h3>
-            {/* 크기 선택 */}
-            <div className="flex items-center gap-1 mb-2">
-              <span className="text-xs text-gray-500 w-8">크기</span>
-              {SIZES.map((sz) => (
-                <button
-                  key={sz.value}
-                  onClick={() => update({ scoreboard_scale: sz.value })}
-                  className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${data.scoreboard_scale === sz.value ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
-                >
-                  {sz.label}
-                </button>
-              ))}
-            </div>
-            {/* 테마 선택 */}
-            <div className="flex items-center gap-1 mb-2">
-              <span className="text-xs text-gray-500 w-8">테마</span>
-              {THEMES.map((th) => (
-                <button
-                  key={th.id}
-                  onClick={() => update({ scoreboard_theme: th.id })}
-                  title={th.label}
-                  className={`flex-1 h-6 rounded text-xs transition-all ${data.scoreboard_theme === th.id ? "ring-2 ring-white scale-110" : "opacity-70 hover:opacity-100"}`}
-                  style={{
-                    backgroundColor: th.bg,
-                    color: th.accent,
-                    border: `1px solid ${th.accent}`,
-                  }}
-                >
-                  {th.label[0]}
-                </button>
-              ))}
-            </div>
-            <div className="rounded-xl overflow-hidden text-center">
-              <div className="grid grid-cols-2">
-                <div className="flex flex-col items-center p-3 bg-blue-900">
-                  <input
-                    value={data.player1_name}
-                    onChange={(e) => update({ player1_name: e.target.value })}
-                    className="bg-transparent text-yellow-300 font-medium text-sm w-full text-center outline-none"
-                  />
-                  <span className="text-2xl font-bold text-white">{data.player1_score}</span>
-                </div>
-                <div className="flex flex-col items-center p-3 bg-red-900">
-                  <input
-                    value={data.player2_name}
-                    onChange={(e) => update({ player2_name: e.target.value })}
-                    className="bg-transparent text-yellow-300 font-medium text-sm w-full text-center outline-none"
-                  />
-                  <span className="text-2xl font-bold text-white">{data.player2_score}</span>
-                </div>
-              </div>
-              <div className="flex gap-0">
-                <button
-                  onClick={() => addScore(RallyWinner.Team1)}
-                  className="flex-1 bg-blue-700 hover:bg-blue-600 text-white py-2 text-sm transition-colors"
-                >
-                  1팀 득점 (1)
-                </button>
-                <button
-                  onClick={() => addScore(RallyWinner.Team2)}
-                  className="flex-1 bg-red-700 hover:bg-red-600 text-white py-2 text-sm transition-colors"
-                >
-                  2팀 득점 (2)
-                </button>
-              </div>
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={handleUndo}
-                  disabled={!canUndo}
-                  title="되돌리기 (Ctrl+Z)"
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 py-1.5 rounded-lg text-xs transition-colors"
-                >
-                  ↩ 되돌리기
-                </button>
-                <button
-                  onClick={handleRedo}
-                  disabled={!canRedo}
-                  title="다시하기 (Ctrl+Y)"
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 py-1.5 rounded-lg text-xs transition-colors"
-                >
-                  ↪ 다시하기
-                </button>
-              </div>
-              <div className="flex gap-2 mt-1">
-                <button
-                  onClick={resetScore}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-1.5 rounded-lg text-xs transition-colors"
-                >
-                  점수 리셋
-                </button>
-              </div>
-            </div>
-          </section>
-
-          {/* 랠리 마킹 */}
-          <section>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">랠리 마킹</h3>
-            <button
-              onClick={toggleRally}
-              className={`w-full py-3 rounded-xl font-medium text-sm transition-colors ${
-                marking
-                  ? "bg-red-600 hover:bg-red-700 animate-pulse"
-                  : "bg-green-600 hover:bg-green-700"
-              }`}
-            >
-              {marking ? "● 마킹 중... (R로 종료)" : "랠리 시작 (R)"}
-            </button>
-
-            {/* 랠리 목록 */}
-            <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
-              {data.rallies.map((r, i) => {
-                const scoreAfterRally = applyPoint(r.p1Score, r.p2Score, r.winner);
-                return (
-                  <div
-                    key={i}
-                    onClick={() => seekToFrame(r.start)}
-                    className={`flex items-center justify-between rounded px-2 py-1.5 text-xs cursor-pointer hover:brightness-125 transition-all ${RALLY_WINNER_COLORS[r.winner].listBgClass}`}
-                  >
-                    <span className="text-gray-300 w-10 shrink-0">랠리 {i + 1}</span>
-                    <span
-                      className={`font-mono font-medium ${RALLY_WINNER_COLORS[r.winner].listText}`}
-                    >
-                      {r.p1Score}-{r.p2Score} → {scoreAfterRally.player1_score}-
-                      {scoreAfterRally.player2_score}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteRally(i);
-                      }}
-                      className="text-gray-500 hover:text-red-400 ml-1 shrink-0"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* 내보내기 */}
-          <section className="mt-auto">
-            <ExportPanel
-              projectId={projectId}
-              canExport={data.rallies.length > 0}
-              flushSave={flushSave}
-            />
-          </section>
+          <ExportPanel
+            projectId={projectId}
+            canExport={data.rallies.length > 0}
+            flushSave={flushSave}
+          />
         </div>
       </div>
     </div>
