@@ -54,19 +54,19 @@ export function useProjectDraft(initial: ProjectData) {
 
   // undo/redo는 옮겨간 구간을 호출부에 알려줘야 해서 현재 렌더의 state를 직접 읽는다.
   // 이벤트 핸들러에서만 호출되므로 함수형 갱신과 달리 경합할 일이 없다.
-  const undo = useCallback((): DraftTransition | null => {
+  const undo = (): DraftTransition | null => {
     if (state.history.past.length === 0) return null;
     const next = undoHistory(state.history);
     setState({ data: { ...state.data, ...next.present }, history: next });
     return { from: state.history.present, to: next.present };
-  }, [state]);
+  };
 
-  const redo = useCallback((): DraftTransition | null => {
+  const redo = (): DraftTransition | null => {
     if (state.history.future.length === 0) return null;
     const next = redoHistory(state.history);
     setState({ data: { ...state.data, ...next.present }, history: next });
     return { from: state.history.present, to: next.present };
-  }, [state]);
+  };
 
   /**
    * 다른 프로젝트를 열거나 서버 값을 새로 받았을 때. 이전 이력은 남기지 않는다.
