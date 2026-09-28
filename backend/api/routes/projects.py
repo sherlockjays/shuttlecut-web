@@ -30,8 +30,9 @@ class ProjectBody(BaseModel):
     scoreboard_theme: Optional[str] = "dark"
 
 
-# video_id는 video_path에서 계산하는 파생 필드라 DB 컬럼도 요청 바디도 아니다.
+# id와 video_id는 요청 바디에 없다. video_id는 video_path에서 계산하는 파생 필드라 DB 컬럼도 아니다.
 class ProjectDetail(ProjectBody):
+    id: int
     video_id: Optional[str] = None
 
 
@@ -49,7 +50,7 @@ def create_project(body: ProjectBody, user: User = Depends(current_user), db: Se
     return {"id": p.id}
 
 
-@router.get("/{pid}")
+@router.get("/{pid}", response_model=ProjectDetail)
 def get_project(pid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     p = db.query(Project).filter(Project.id == pid, Project.user_id == user.id).first()
     if not p:
