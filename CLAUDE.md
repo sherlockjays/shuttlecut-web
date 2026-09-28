@@ -108,7 +108,7 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 - **draft는 `useProjectDraft`만 소유한다.** 다른 훅은 draft를 갖지 않고 바꿀 것만 넘긴다. `update(patch)`는 값만 바꾸고 `record(patch)`는 이력을 남긴다. 이전 값에서 파생되는 변경은 함수형 patch로 준다
 - **undo/redo 스택에는 랠리와 점수(`rallies`, `player1_score`, `player2_score`)만 들어간다.** 전체 스냅샷을 남기면 되돌릴 때 그 사이 고친 텍스트까지 옛 값으로 돌아가기 때문이다. 스택의 `present`는 항상 `data`의 그 조각이고, 둘이 한 state에 있어 어긋날 수 없다. 자동저장은 `data`를 구독하므로 `update`로 바꾼 값도 저장된다
 - 한 번에 일어나야 하는 변경은 한 번의 `record`로 묶는다. 되돌릴 때도 함께 돌아와야 하기 때문이다(랠리 추가 + 점수 증가)
-- **서버 값은 마운트 때 한 번만 draft로 들어간다.** `index.tsx`의 게이트가 쿼리에 데이터가 생긴 뒤에만 `Editor`를 마운트하고, `Editor`는 받은 `project`를 `useProjectDraft` 초기값으로만 쓴다. 저장 성공으로 캐시가 바뀌어도 draft에는 흐르지 않는다(`video_id`만 캐시를 따른다). effect로 서버 값을 state에 넣지 않는다. 마운트 시 draft와 자동저장 기준선이 같은 참조라 프로젝트를 여는 것만으로는 저장이 나가지 않는다
+- **서버 값은 마운트 때 한 번만 draft로 들어간다.** `index.tsx`의 게이트가 쿼리에 데이터가 생긴 뒤에만 `Editor`를 마운트하고, `Editor`는 받은 `initProject`를 `useProjectDraft` 초기값으로만 쓴다. 저장 성공으로 캐시가 바뀌어도 draft에는 흐르지 않는다(`video_id`만 캐시를 따른다). effect로 서버 값을 state에 넣지 않는다. 마운트 시 draft와 자동저장 기준선이 같은 참조라 프로젝트를 여는 것만으로는 저장이 나가지 않는다
 - 훅이 돌려주는 함수는 평범한 함수로 둔다. `useCallback`으로 고정하는 건 상태 setter만 감싸 우회 없이 늘 같은 객체라 `setState`와 같은 보증이 되는 draft 변경 API일 때(`update`/`record`)뿐이다. ref로 옵션을 읽어야만 고정되는 함수는 고정하지 않는다
 - `useAutoSave`만 넘겨받은 콜백을 ref에 담는다. 디바운스 세이버가 생성 시점의 콜백을 고정하기 때문이다. `memo`는 측정 후 호출부와 함께 넣는다
 - `update`는 섹션 컴포넌트에 그대로 넘기지 않는다. 컴포넌트는 자기가 바꿀 수 있는 필드로 좁힌 patch 타입의 `onChange`를 선언하고, `Editor.tsx`가 거기에 `update`를 꽂는다(`Partial<X>`가 `Partial<UnrecordedState>`의 부분집합이라 감싸는 함수가 필요 없다). 어느 필드든 바꿀 수 있는 함수를 받으면 경계가 타입에 남지 않는다
