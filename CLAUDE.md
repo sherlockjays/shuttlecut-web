@@ -110,6 +110,7 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 - 한 번에 일어나야 하는 변경은 한 번의 `record`로 묶는다. 되돌릴 때도 함께 돌아와야 하기 때문이다(랠리 추가 + 점수 증가)
 - 훅이 돌려주는 함수는 평범한 함수로 둔다. `useCallback`으로 고정하는 건 정체성에 반응하는 소비자가 있을 때(`reset` ← `Editor.tsx` 시드 effect)와, 상태 setter만 감싸 우회 없이 늘 같은 객체라 `setState`와 같은 보증이 되는 draft 변경 API일 때(`update`/`record`)뿐이다. ref로 옵션을 읽어야만 고정되는 함수는 고정하지 않는다
 - `useAutoSave`만 넘겨받은 콜백을 ref에 담는다. 디바운스 세이버가 생성 시점의 콜백을 고정하기 때문이다. `memo`는 측정 후 호출부와 함께 넣는다
+- `update`는 섹션 컴포넌트에 그대로 넘기지 않는다. 컴포넌트는 자기가 바꿀 수 있는 필드로 좁힌 patch 타입의 `onChange`를 선언하고, `Editor.tsx`가 거기에 `update`를 꽂는다(`Partial<X>`가 `Partial<UnrecordedState>`의 부분집합이라 감싸는 함수가 필요 없다). 어느 필드든 바꿀 수 있는 함수를 받으면 경계가 타입에 남지 않는다
 
 ## 내보내기는 다른 기계에서 돈다
 

@@ -32,46 +32,50 @@ export default function ExportPanel({ projectId, canExport, flushSave }: Props) 
   // 업로드 폼이 실패 뒤 다시 열려도 선택이 남도록 폼 바깥에 둔다.
   const [postComment, setPostComment] = useState(true);
 
-  if (phase.kind === "starting" || phase.kind === "running" || phase.kind === "failed") {
-    return <ExportProgress phase={phase} />;
-  }
+  const renderContent = () => {
+    if (phase.kind === "starting" || phase.kind === "running" || phase.kind === "failed") {
+      return <ExportProgress phase={phase} />;
+    }
 
-  if (phase.kind === "done" && exportId !== null) {
-    return (
-      <div className="flex flex-col gap-2">
-        <div className="flex gap-2">
-          <a
-            href={exportDownloadUrl(exportId)}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium transition-colors text-center"
-          >
-            다운로드
-          </a>
-          <button
-            onClick={resetExport}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl transition-colors"
-          >
-            다시
-          </button>
+    if (phase.kind === "done" && exportId !== null) {
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <a
+              href={exportDownloadUrl(exportId)}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium transition-colors text-center"
+            >
+              다운로드
+            </a>
+            <button
+              onClick={resetExport}
+              className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl transition-colors"
+            >
+              다시
+            </button>
+          </div>
+          <YoutubeUploadArea
+            state={youtube.state}
+            postComment={postComment}
+            onPostCommentChange={setPostComment}
+            onUpload={() => youtube.upload(postComment)}
+          />
         </div>
-        <YoutubeUploadArea
-          state={youtube.state}
-          postComment={postComment}
-          onPostCommentChange={setPostComment}
-          onUpload={() => youtube.upload(postComment)}
-        />
-      </div>
-    );
-  }
+      );
+    }
 
-  return (
-    <button
-      onClick={start}
-      disabled={!canExport}
-      className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white py-3 rounded-xl font-medium transition-colors"
-    >
-      내보내기
-    </button>
-  );
+    return (
+      <button
+        onClick={start}
+        disabled={!canExport}
+        className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white py-3 rounded-xl font-medium transition-colors"
+      >
+        내보내기
+      </button>
+    );
+  };
+
+  return <section className="mt-auto">{renderContent()}</section>;
 }
 
 function ExportProgress({
