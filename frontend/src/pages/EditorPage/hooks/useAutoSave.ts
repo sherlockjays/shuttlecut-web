@@ -66,5 +66,5 @@ export function useAutoSave(
     return () => clearTimeout(timer);
   }, [status]);
 
-  return { status, flush: saver.flush, markSaved: saver.markSaved };
+  return { status, flush: saver.flush };
 }

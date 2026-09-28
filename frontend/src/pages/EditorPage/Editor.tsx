@@ -1,11 +1,10 @@
-import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { updateProject } from "@/apis/projects";
 import { videoStreamUrl } from "@/apis/video";
 import type { UploadedVideo } from "@/models/video";
 import { projectOptions, projectsOptions } from "@/queries/projects";
-import type { ProjectData } from "@/models/project";
+import type { ProjectDetail } from "@/models/project";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useEditorShortcuts } from "./hooks/useEditorShortcuts";
 import { useProjectDraft } from "./hooks/useProjectDraft";
@@ -20,36 +19,15 @@ import ScoreboardPanel from "./components/ScoreboardPanel";
 import VideoDropzone from "./components/VideoDropzone";
 import VideoPlayer from "./components/VideoPlayer";
 
-const DEFAULT_PROJECT_DATA: ProjectData = {
-  title: "",
-  video_path: "",
-  fps: 30,
-  total_frames: 0,
-  match_date: "",
-  tournament_name: "",
-  level: "",
-  match_name: "",
-  player1_name: "1팀",
-  player2_name: "2팀",
-  player1_score: 0,
-  player2_score: 0,
-  rallies: [],
-  scoreboard_scale: 1.0,
-  scoreboard_theme: "dark",
-};
-
 const INVALID_RANGE_MESSAGE =
   "랠리 종료 지점이 시작 지점보다 앞에 있습니다. 시작 지점 이후로 이동한 뒤 다시 시도해주세요.";
 
-export default function Editor({ projectId }: { projectId: number }) {
-  const { data, update, record, undo, redo, reset, canUndo, canRedo } =
-    useProjectDraft(DEFAULT_PROJECT_DATA);
-
-  const { data: fetchedProject, isError } = useQuery(projectOptions(projectId));
-  const seededRef = useRef<number | null>(null);
+export default function Editor({ initProject }: { initProject: ProjectDetail }) {
+  const projectId = initProject.id;
+  const { data, update, record, undo, redo, canUndo, canRedo } = useProjectDraft(initProject);
   const queryClient = useQueryClient();
 
-  const videoId = fetchedProject?.video_id ?? "";
+  const videoId = initProject.video_id ?? "";
   const hasVideo = videoId !== "";
   const videoSrc = hasVideo ? videoStreamUrl(videoId) : "";
 
@@ -64,11 +42,7 @@ export default function Editor({ projectId }: { projectId: number }) {
     handleLoadedMetadata,
   } = useVideoPlayer(data.fps);
 
-  const {
-    status: saveStatus,
-    flush: flushSave,
-    markSaved,
-  } = useAutoSave(
+  const { status: saveStatus, flush: flushSave } = useAutoSave(
     data,
     async (d) => {
       const updated = await updateProject(projectId, d);
@@ -78,26 +52,12 @@ export default function Editor({ projectId }: { projectId: number }) {
     () => alert("자동저장에 실패했습니다. 연결 상태를 확인해주세요."),
   );
 
-  useEffect(() => {
-    if (!fetchedProject || seededRef.current === projectId) return;
-    seededRef.current = projectId;
-    const seeded = {
-      ...DEFAULT_PROJECT_DATA,
-      ...fetchedProject,
-      scoreboard_scale: fetchedProject.scoreboard_scale ?? 1.0,
-      scoreboard_theme: fetchedProject.scoreboard_theme ?? "dark",
-    };
-    reset(seeded); // 다른 프로젝트를 열면 이전 undo 이력도 함께 비운다
-    markSaved(seeded); // 서버에서 막 읽어온 값이라 되쓸 필요가 없다
-  }, [fetchedProject, projectId, reset, markSaved]);
-
   // #52 작업 완료 시 불필요해질 부분
   const handleUploaded = (video: UploadedVideo) => {
-    queryClient.setQueryData(projectOptions(projectId).queryKey, (prev) => ({
-      ...prev,
-      video_id: video.video_id,
-      video_path: video.path,
-    }));
+    queryClient.setQueryData(
+      projectOptions(projectId).queryKey,
+      (prev) => prev && { ...prev, video_id: video.video_id, video_path: video.path },
+    );
     update({
       video_path: video.path,
       fps: video.fps,
@@ -149,7 +109,6 @@ export default function Editor({ projectId }: { projectId: number }) {
         {saveStatus === "saved" && <span className="text-green-400 text-xs">저장됨 ✓</span>}
         {saveStatus === "error" && <span className="text-red-400 text-xs">저장 실패 ⚠</span>}
       </header>
-      {isError && <p className="text-red-400 text-sm px-4 pt-2">프로젝트를 불러오지 못했습니다.</p>}
 
       <div className="flex flex-1 overflow-hidden">
         {/* 왼쪽: 영상 + 컨트롤 */}

@@ -68,21 +68,12 @@ export function useProjectDraft(initial: ProjectData) {
     return { from: state.history.present, to: next.present };
   };
 
-  /**
-   * 다른 프로젝트를 열거나 서버 값을 새로 받았을 때. 이전 이력은 남기지 않는다.
-   * data가 next 그대로여야 자동저장이 이 값을 "이미 저장됨"으로 알아본다.
-   */
-  const reset = useCallback((next: ProjectData) => {
-    setState({ data: next, history: createHistory(pickRecorded(next)) });
-  }, []);
-
   return {
     data: state.data,
     update,
     record,
     undo,
     redo,
-    reset,
     canUndo: state.history.past.length > 0,
     canRedo: state.history.future.length > 0,
   };

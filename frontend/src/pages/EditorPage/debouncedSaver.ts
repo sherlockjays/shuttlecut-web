@@ -7,11 +7,6 @@ export type DebouncedSaver<T> = {
    * 저장에 실패하면 거부된다.
    */
   flush(): Promise<void>;
-  /**
-   * 서버에서 막 읽어온 값처럼, 저장할 필요가 없는 값을 기준선으로 지정한다.
-   * 마운트 후에 뒤늦게 도착하는 서버 값을 위한 것으로, 처음부터 서버 값으로 마운트하게 되면(#39) 필요 없어진다.
-   */
-  markSaved(value: T): void;
 };
 
 /**
@@ -81,12 +76,6 @@ export function createDebouncedSaver<T>({
     flush: () => {
       clearTimer();
       return saveNow(latest);
-    },
-
-    markSaved: (value) => {
-      clearTimer();
-      latest = value;
-      saved = value;
     },
   };
 }

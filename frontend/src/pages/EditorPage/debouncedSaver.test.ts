@@ -118,9 +118,8 @@ describe("flush", () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { saver } = setup(save);
 
-    saver.markSaved("시드값");
     const flushed = saver.flush();
-    saver.schedule("낡은값"); // 낡은 클로저를 든 effect가 끼어드는 상황
+    saver.schedule("끼어든값"); // flush가 끝나기 전에 끼어든 변경은 자기 타이머로 따로 나간다
     await flushed;
 
     expect(save).not.toHaveBeenCalled();
@@ -135,30 +134,6 @@ describe("flush", () => {
     await saver.flush();
 
     expect(save).toHaveBeenCalledOnce();
-  });
-});
-
-describe("markSaved", () => {
-  it("지정한 값은 저장 대상에서 제외된다", async () => {
-    const save = vi.fn().mockResolvedValue(undefined);
-    const { saver } = setup(save);
-
-    saver.markSaved("시드값");
-    saver.schedule("시드값");
-    await vi.advanceTimersByTimeAsync(DELAY);
-
-    expect(save).not.toHaveBeenCalled();
-  });
-
-  it("대기 중이던 저장을 취소한다", async () => {
-    const save = vi.fn().mockResolvedValue(undefined);
-    const { saver } = setup(save);
-
-    saver.schedule("a");
-    saver.markSaved("시드값");
-    await vi.advanceTimersByTimeAsync(DELAY);
-
-    expect(save).not.toHaveBeenCalled();
   });
 });
 
