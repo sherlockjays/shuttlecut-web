@@ -81,23 +81,16 @@ export default function Editor({ projectId }: { projectId: number }) {
   useEffect(() => {
     if (!fetchedProject || seededRef.current === projectId) return;
     seededRef.current = projectId;
-    const seeded = {
-      ...DEFAULT_PROJECT_DATA,
-      ...fetchedProject,
-      scoreboard_scale: fetchedProject.scoreboard_scale ?? 1.0,
-      scoreboard_theme: fetchedProject.scoreboard_theme ?? "dark",
-    };
-    reset(seeded); // 다른 프로젝트를 열면 이전 undo 이력도 함께 비운다
-    markSaved(seeded); // 서버에서 막 읽어온 값이라 되쓸 필요가 없다
+    reset(fetchedProject); // 다른 프로젝트를 열면 이전 undo 이력도 함께 비운다
+    markSaved(fetchedProject); // 서버에서 막 읽어온 값이라 되쓸 필요가 없다
   }, [fetchedProject, projectId, reset, markSaved]);
 
   // #52 작업 완료 시 불필요해질 부분
   const handleUploaded = (video: UploadedVideo) => {
-    queryClient.setQueryData(projectOptions(projectId).queryKey, (prev) => ({
-      ...prev,
-      video_id: video.video_id,
-      video_path: video.path,
-    }));
+    queryClient.setQueryData(
+      projectOptions(projectId).queryKey,
+      (prev) => prev && { ...prev, video_id: video.video_id, video_path: video.path },
+    );
     update({
       video_path: video.path,
       fps: video.fps,
