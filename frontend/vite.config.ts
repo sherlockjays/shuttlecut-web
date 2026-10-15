@@ -26,14 +26,12 @@ export default defineConfig(({ mode }) => {
       },
     },
     // 운영 nginx와 같은 모양으로 맞춘다. 개발도 same-origin이 되어 CORS가 필요 없다.
-    // ws는 내보내기 진행률(/api/export/ws/{id})이 WebSocket이라 필요하다.
     // 로컬 백엔드가 아닌 곳에 붙일 때는 .env.local의 DEV_API_TARGET으로 덮는다.
     server: {
       proxy: {
         "/api": {
           target: apiProxyTarget,
           changeOrigin: true,
-          ws: true,
         },
       },
     },
