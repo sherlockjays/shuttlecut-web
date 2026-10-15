@@ -121,7 +121,7 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 - 워커 체크아웃을 가르는 표식은 `.env.native-worker`다. 이 파일이 없는 체크아웃에서는 `start-native-worker.ps1`과 `scripts/deploy-worker.ps1`이 둘 다 멈춘다
 - **워커와 NAS는 파일시스템을 공유하지 않는다.** 워커는 원본을 `GET /api/internal/video`로 받고 결과물을 `POST /api/internal/export/{id}`로 올린다
 - 이 두 엔드포인트는 JWT가 아니라 `X-Worker-Secret`으로 인증하고, 경로가 `STORAGE_PATH` 아래인지 검사한다([internal.py](backend/api/routes/internal.py))
-- 진행률은 워커가 Redis 채널 `export_progress:{export_id}`에 publish하고 백엔드가 `/api/export/ws/{export_id}`로 중계한다. WS 핸들러가 연결 시점에 DB status를 먼저 확인하는 이유는, 연결 전에 끝난 작업의 pub/sub 메시지를 놓치기 때문이다
+- 진행률은 워커가 [export_progress.py](backend/core/export_progress.py)로 Redis에 스냅샷을 남기고, `GET /api/export/{export_id}/status`가 DB status와 합쳐 돌려준다. 프론트는 이 엔드포인트를 폴링한다. 완료 여부의 진실은 DB status다
 - 내보내기 동작을 고칠 땐 `workers/tasks.py`를 고친다. `core/exporter.py`에도 ffmpeg 처리가 따로 있지만 실제 내보내기는 그쪽을 타지 않는다
 
 ## 배포

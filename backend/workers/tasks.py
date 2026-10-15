@@ -1,5 +1,5 @@
 """Celery 작업 - 영상 내보내기"""
-import os, json, redis, sys, time, subprocess, tempfile, logging
+import os, json, sys, time, subprocess, tempfile, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 log = logging.getLogger(__name__)
@@ -9,6 +9,7 @@ from celery import Celery
 from sqlalchemy.orm import Session
 
 from core.config import require_env
+from core.export_progress import save_progress
 
 REDIS_URL      = require_env("REDIS_URL")
 USE_GPU        = os.getenv("ENABLE_GPU", "0") == "1"
@@ -27,7 +28,6 @@ def _nas_backend_url() -> str:
 
 
 celery = Celery("shuttlecut", broker=REDIS_URL, backend=REDIS_URL)
-r = redis.from_url(REDIS_URL)
 
 
 def _download_remote_video(video_path: str, tmpdir: str) -> str:
@@ -60,13 +60,6 @@ def _upload_export_remote(local_path: str, export_id: int) -> str:
         )
     resp.raise_for_status()
     return resp.json()["path"]
-
-
-def _publish(export_id: int, pct: int, msg: str, status: str = "processing", eta: int | None = None):
-    payload = {"pct": pct, "msg": msg, "status": status}
-    if eta is not None:
-        payload["eta"] = eta
-    r.publish(f"export_progress:{export_id}", json.dumps(payload))
 
 
 def _calc_eta(pct: int, start_time: float) -> int | None:
@@ -189,7 +182,7 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # NAS HTTP 다운로드 (워커 로컬에 캐시). 워커와 NAS는 파일시스템을 공유하지 않는다
-        _publish(export_id, 12, "영상 다운로드 중...", eta=None)
+        save_progress(export_id, 12, "영상 다운로드 중...", eta=None)
         t0 = time.time()
         video_path = _download_remote_video(video_path, tmpdir)
         log.warning(f"[TIMING] NAS 다운로드: {time.time()-t0:.1f}s")
@@ -247,14 +240,14 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
                 clip_scts[idx] = sct
                 done_count += 1
                 pct = 20 + int(done_count / total * 40)
-                _publish(export_id, pct, f"클립 {done_count}/{total} 추출 중...", eta=_calc_eta(pct, start_time))
+                save_progress(export_id, pct, f"클립 {done_count}/{total} 추출 중...", eta=_calc_eta(pct, start_time))
         log.warning(f"[TIMING] Step1 클립추출 ({total}개, workers={max_workers}): {time.time()-t0:.1f}s")
 
         if is_hlg:
             hlg_chain = ""
 
         # ── 클립 연결 (스트림 복사) ──
-        _publish(export_id, 62, "클립 연결 중...", eta=_calc_eta(62, start_time))
+        save_progress(export_id, 62, "클립 연결 중...", eta=_calc_eta(62, start_time))
         concat_txt = f"{tmpdir}/concat.txt"
         with open(concat_txt, "w") as f:
             for rp in raw_clips:
@@ -280,7 +273,7 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
         log.warning(f"[TIMING] 클립 ffprobe ({total}개): {time.time()-t0:.1f}s")
 
         # ── 점수판 PNG 생성 ──
-        _publish(export_id, 68, "점수판 생성 중...", eta=_calc_eta(68, start_time))
+        save_progress(export_id, 68, "점수판 생성 중...", eta=_calc_eta(68, start_time))
         t0 = time.time()
         for i, rally in enumerate(rallies):
             p1a, p2a = rally.p1_score, rally.p2_score
@@ -291,7 +284,7 @@ def _run_ffmpeg_export(export_id: int, rallies, pd: dict, out: str, start_time: 
         log.warning(f"[TIMING] 점수판 PNG 생성 ({total}개): {time.time()-t0:.1f}s")
 
         # ── 2단계: 오버레이 + 인코딩 1회 ──
-        _publish(export_id, 72, "영상 인코딩 중...", eta=_calc_eta(72, start_time))
+        save_progress(export_id, 72, "영상 인코딩 중...", eta=_calc_eta(72, start_time))
 
         step2_hw = ["-hwaccel", "cuda"] if (USE_GPU and ENABLE_NVDEC) else []
         cmd = ["ffmpeg", "-y"] + step2_hw + ["-i", raw_concat]
@@ -350,7 +343,7 @@ def run_export(export_id: int, project_data: dict):
         export.status = "processing"
         db.commit()
         _start = time.time()
-        _publish(export_id, 5, "내보내기 시작...")
+        save_progress(export_id, 5, "내보내기 시작...", eta=None)
 
         rallies = [
             Rally(r[0], r[1], r[2], r[3], r[4] if len(r) > 4 else 0)
@@ -361,10 +354,10 @@ def run_export(export_id: int, project_data: dict):
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = str(output_dir / f"export_{export_id}.mp4")
 
-        _publish(export_id, 10, "영상 처리 시작...", eta=None)
+        save_progress(export_id, 10, "영상 처리 시작...", eta=None)
         _run_ffmpeg_export(export_id, rallies, project_data, output_path, _start)
 
-        _publish(export_id, 98, "NAS 업로드 중...", eta=None)
+        save_progress(export_id, 98, "NAS 업로드 중...", eta=None)
         output_path = _upload_export_remote(output_path, export_id)
 
         export.status = "done"
@@ -378,12 +371,9 @@ def run_export(export_id: int, project_data: dict):
                 user.export_count += 1
                 db.commit()
 
-        _publish(export_id, 100, "완료!", status="done")
-
     except Exception as e:
         export.status = "error"
         export.error_msg = str(e)
         db.commit()
-        _publish(export_id, 0, str(e), status="error")
     finally:
         db.close()
