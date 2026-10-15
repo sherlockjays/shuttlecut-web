@@ -36,7 +36,11 @@ export function useExport({ projectId, flush }: Options) {
       }
       return startExport(projectId);
     },
-    onSuccess: ({ export_id }) => setExportId(export_id),
+    onSuccess: ({ export_id }) => {
+      setExportId(export_id);
+      // 서버가 기록에 pending 행을 만들었다.
+      queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey });
+    },
   });
 
   const { data: exportStatus } = useQuery({
@@ -61,11 +65,11 @@ export function useExport({ projectId, flush }: Options) {
     return () => clearTimeout(timer);
   }, [phase.kind, resetStart]);
 
-  // 워커가 export_count를 올리고 기록에 한 줄을 보탰다. 다음 방문 때 옛 값이 보이지 않게 한다.
+  // 끝나면 기록 행의 status가 바뀌고, 성공이면 export_count도 오른다. 다음 방문 때 옛 값이 보이지 않게 한다.
   useEffect(() => {
-    if (phase.kind !== "done") return;
-    queryClient.invalidateQueries({ queryKey: meOptions.queryKey });
+    if (phase.kind !== "done" && phase.kind !== "failed") return;
     queryClient.invalidateQueries({ queryKey: exportsOptions.queryKey });
+    if (phase.kind === "done") queryClient.invalidateQueries({ queryKey: meOptions.queryKey });
   }, [phase.kind, queryClient]);
 
   // mutate의 첫 인자는 뮤테이션 변수라, onClick에 그대로 주면 클릭 이벤트가 변수로 저장된다.
