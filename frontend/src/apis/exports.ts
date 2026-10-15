@@ -9,11 +9,6 @@ export const startExport = (projectId: number): Promise<{ export_id: number }> =
 export const getExportStatus = (exportId: number): Promise<ExportStatusResponse> =>
   apiFetch<ExportStatusResponse>(`/api/export/${exportId}/status`);
 
-export const exportWsUrl = (exportId: number) => {
-  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${proto}//${window.location.host}/api/export/ws/${exportId}`;
-};
-
 // 다운로드는 <a href>로 열리므로 헤더를 못 싣는다. 토큰이 쿼리로 가는 건 #36에서 다룬다.
 export const exportDownloadUrl = (exportId: number) =>
   `/api/export/${exportId}/download?token=${localStorage.getItem("token") || ""}`;

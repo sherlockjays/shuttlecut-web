@@ -1,17 +1,15 @@
-"""내보내기 - Celery 비동기 + WebSocket 진행률"""
-import json
-import os
+"""내보내기 - Celery 비동기 + 진행률 상태 폴링"""
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, Depends, WebSocket, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from models.database import get_db, User, Project, Export
 from api.routes.auth import current_user, SECRET_KEY, ALGORITHM
-from core.config import require_env
 from core.crypto import decrypt_token
+from core.export_progress import load_progress
 from workers.tasks import run_export
 
 router = APIRouter()
@@ -179,6 +177,7 @@ def export_status(export_id: int, user: User = Depends(current_user), db: Sessio
         "output_path": export.output_path,
         "youtube_url": export.youtube_url,
         "error_msg": export.error_msg,
+        "progress": load_progress(export_id) if export.status == "processing" else None,
     }
 
 
@@ -261,35 +260,3 @@ def delete_export(export_id: int, user: User = Depends(current_user), db: Sessio
     db.delete(export)
     db.commit()
     return {"ok": True}
-
-
-@router.websocket("/ws/{export_id}")
-async def export_ws(websocket: WebSocket, export_id: int, db: Session = Depends(get_db)):
-    """내보내기 진행률 실시간 WebSocket"""
-    await websocket.accept()
-    import redis.asyncio as aioredis
-
-    # WS 연결 시점에 이미 완료된 경우 즉시 응답 (pub/sub 메시지 놓침 방지)
-    export = db.query(Export).filter(Export.id == export_id).first()
-    if export and export.status == "done":
-        await websocket.send_json({"status": "done", "pct": 100, "msg": "완료"})
-        await websocket.close()
-        return
-    if export and export.status == "error":
-        await websocket.send_json({"status": "error", "pct": 0, "msg": export.error_msg or "오류"})
-        await websocket.close()
-        return
-
-    r = aioredis.from_url(require_env("REDIS_URL"))
-    channel = f"export_progress:{export_id}"
-
-    async with r.pubsub() as ps:
-        await ps.subscribe(channel)
-        async for msg in ps.listen():
-            if msg["type"] == "message":
-                data = json.loads(msg["data"])
-                await websocket.send_json(data)
-                if data.get("status") in ("done", "error"):
-                    break
-
-    await websocket.close()
