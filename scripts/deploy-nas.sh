@@ -223,7 +223,8 @@ pg_db="$(env_value POSTGRES_DB)"
 [[ -n "$pg_user" && -n "$pg_db" ]] || die ".env에서 POSTGRES_USER/POSTGRES_DB를 읽지 못했습니다."
 
 # 체크아웃 안에 만들지 않는다. git status가 더러워지면 0단계의 확인이 의미를 잃는다.
-dump_path="$BACKUP_DIR/db-$(date +%Y%m%d).sql"
+# 시각까지 넣는다. 날짜만 쓰면 같은 날 두 번째 배포가 앞선 덤프를 덮어쓴다.
+dump_path="$BACKUP_DIR/db-$(date +%Y%m%d-%H%M%S).sql"
 sudo mkdir -p "$BACKUP_DIR"
 # redirect를 sudo bash -c 안쪽에 둬야 한다. 바깥에 두면 쓸 권한이 없다.
 sudo bash -c "$DOCKER_BIN exec $POSTGRES_CONTAINER pg_dump -U '$pg_user' -d '$pg_db' > '$dump_path'"

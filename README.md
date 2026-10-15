@@ -296,8 +296,10 @@ bash scripts/deploy-nas.sh --help    # 옵션
 ```bash
 # redirect를 sudo bash -c 안쪽에 둬야 합니다
 sudo bash -c "docker exec shuttlecut-web-postgres-1 pg_dump -U shuttlecut -d shuttlecut \
-  > /volume1/docker/shuttlecut-backups/db-$(date +%Y%m%d).sql"
+  > /volume1/docker/shuttlecut-backups/db-$(date +%Y%m%d-%H%M%S).sql"
 ```
+
+파일 이름에 시각까지 넣는 이유는 같은 날 두 번 배포해도 앞선 덤프가 덮어써지지 않게 하기 위해서입니다.
 
 이미지에는 따로 손댈 것이 없습니다. 이미지 이름에 커밋 SHA가 붙어 있어서 지금 돌고 있는 이미지가 재빌드로 밀려나지 않습니다. 되돌릴 대상은 이미 이름을 갖고 있습니다.
 
