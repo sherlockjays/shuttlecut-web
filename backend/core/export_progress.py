@@ -19,8 +19,8 @@ def _key(export_id: int) -> str:
     return f"export_progress:{export_id}"
 
 
-def save_progress(export_id: int, pct: int, msg: str, eta: int | None) -> None:
-    payload = {"pct": pct, "msg": msg, "eta": eta}
+def save_progress(export_id: int, percent: int, message: str, remaining_seconds: int | None) -> None:
+    payload = {"percent": percent, "message": message, "remaining_seconds": remaining_seconds}
     _r.set(_key(export_id), json.dumps(payload), ex=PROGRESS_TTL_SEC)
 
 
