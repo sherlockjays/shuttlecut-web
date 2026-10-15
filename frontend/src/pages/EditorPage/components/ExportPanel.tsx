@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { exportDownloadUrl } from "@/apis/exports";
 import { youtubeStatusOptions } from "@/queries/youtube";
-import { useExport, type ExportPhase } from "../hooks/useExport";
+import { useExport } from "../hooks/useExport";
 import { useYoutubeUpload } from "../hooks/useYoutubeUpload";
+import type { ExportPhase } from "../exportPhase";
 import type { YoutubeUploadState } from "../youtubeUpload";
 
 const SECONDS_PER_MINUTE = 60;
@@ -24,7 +25,7 @@ type Props = {
 
 /**
  * 내보내기와 유튜브 업로드의 상태를 소유한다.
- * 진행률이 WS 메시지마다 바뀌므로 그 리렌더가 Editor 전체로 번지지 않게 여기서 멈춘다.
+ * 진행률이 폴링 결과마다 바뀌므로 그 리렌더가 Editor 전체로 번지지 않게 여기서 멈춘다.
  */
 export default function ExportPanel({ projectId, canExport, flushSave }: Props) {
   const { phase, exportId, start, reset: resetExport } = useExport({ projectId, flush: flushSave });

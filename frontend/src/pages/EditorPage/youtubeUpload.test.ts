@@ -7,6 +7,7 @@ const status = (youtube_url: ExportStatusResponse["youtube_url"]): ExportStatusR
   output_path: "/exports/1.mp4",
   youtube_url,
   error_msg: null,
+  progress: null,
 });
 
 const base = { exportId: 7, isStarting: false, trackedId: 7, exportStatus: undefined };

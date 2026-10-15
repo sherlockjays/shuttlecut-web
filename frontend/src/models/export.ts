@@ -30,20 +30,20 @@ export type ExportItem = {
   created_at: string | null;
 };
 
+// 워커가 남기는 진행률 스냅샷. 남은 시간은 가늠할 수 없는 구간에서 null이다.
+export type ExportProgress = {
+  percent: number;
+  message: string;
+  remaining_seconds: number | null;
+};
+
 export type ExportStatusResponse = {
   status: ExportStatus;
   output_path: string | null;
   youtube_url: YoutubeUrl;
   error_msg: string | null;
-};
-
-// 워커가 Redis 채널에 발행하고 백엔드가 WS로 중계하는 진행률 메시지.
-// 백엔드가 DB 상태를 보고 바로 보내는 완료/오류 메시지에는 eta가 없다.
-export type ExportProgressMessage = {
-  status: "processing" | "done" | "error";
-  pct: number;
-  msg: string;
-  eta?: number | null;
+  // processing일 때만 실린다. 그 안에서도 워커가 첫 스냅샷을 남기기 전에는 null이다.
+  progress: ExportProgress | null;
 };
 
 export type AdminExport = {
