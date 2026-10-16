@@ -1,5 +1,5 @@
 import { RallyWinner, type Rally } from "@/models/project";
-import { applyPoint } from "../rally";
+import { applyPoint } from "../utils/rally";
 
 const WINNER_LIST_CLASSES: Record<RallyWinner, { bg: string; text: string }> = {
   [RallyWinner.Team1]: { bg: "bg-blue-950", text: "text-blue-300" },

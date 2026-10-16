@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent } from "react";
 import type { ScoringTeam } from "@/models/project";
-import { getShortcutAction } from "../shortcuts";
+import { getShortcutAction } from "../utils/shortcuts";
 
 type Handlers = {
   togglePlay: () => void;

@@ -1,6 +1,12 @@
 import { useCallback, useState } from "react";
 import type { ProjectData } from "@/models/project";
-import { createHistory, pushHistory, redoHistory, undoHistory, type History } from "../history";
+import {
+  createHistory,
+  pushHistory,
+  redoHistory,
+  undoHistory,
+  type History,
+} from "../utils/history";
 
 /** undo/redo가 되돌리는 필드. 득점은 랠리를 끝내는 수단이라 랠리와 함께 움직인다. */
 export type RecordedState = Pick<ProjectData, "rallies" | "player1_score" | "player2_score">;

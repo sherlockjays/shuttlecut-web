@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ProjectData } from "@/models/project";
-import { createDebouncedSaver, type DebouncedSaver } from "../debouncedSaver";
+import { createDebouncedSaver, type DebouncedSaver } from "../utils/debouncedSaver";
 
 export const AUTO_SAVE_DELAY_MS = 3000;
 const SAVED_INDICATOR_MS = 2000;
