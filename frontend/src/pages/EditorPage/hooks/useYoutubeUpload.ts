@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { uploadToYoutube } from "@/apis/exports";
 import { YOUTUBE_UPLOADING } from "@/models/export";
 import { exportStatusOptions, YOUTUBE_UPLOAD_POLL_MS } from "@/queries/exports";
-import { deriveYoutubeUploadState } from "../youtubeUpload";
+import { deriveYoutubeUploadState } from "../utils/youtubeUpload";
 
 type Options = {
   /** 업로드할 내보내기. 완료된 내보내기가 없으면 null. */

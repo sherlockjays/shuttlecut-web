@@ -1,4 +1,4 @@
-import { SEEK_STEP_SECONDS, SEEK_STEP_LARGE_SECONDS } from "../shortcuts";
+import { SEEK_STEP_SECONDS, SEEK_STEP_LARGE_SECONDS } from "../utils/shortcuts";
 
 // ←→ 단축키와 같은 걸음이다. 버튼은 그 마우스판이다.
 const SEEK_BUTTON_STEPS = [

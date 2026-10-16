@@ -7,7 +7,7 @@ import {
   type ScoreboardFields,
   type ScoreboardLayout,
   type Size,
-} from "../scoreboard";
+} from "../utils/scoreboard";
 
 type Props = {
   scoreboard: ScoreboardFields;

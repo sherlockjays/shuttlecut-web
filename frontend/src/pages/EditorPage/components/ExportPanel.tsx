@@ -4,8 +4,8 @@ import { exportDownloadUrl } from "@/apis/exports";
 import { youtubeStatusOptions } from "@/queries/youtube";
 import { useExport } from "../hooks/useExport";
 import { useYoutubeUpload } from "../hooks/useYoutubeUpload";
-import type { ExportPhase } from "../exportPhase";
-import type { YoutubeUploadState } from "../youtubeUpload";
+import type { ExportPhase } from "../utils/exportPhase";
+import type { YoutubeUploadState } from "../utils/youtubeUpload";
 
 const SECONDS_PER_MINUTE = 60;
 

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { startExport } from "@/apis/exports";
 import { meOptions } from "@/queries/auth";
 import { exportStatusOptions, exportsOptions, pollWhileExporting } from "@/queries/exports";
-import { deriveExportPhase } from "../exportPhase";
+import { deriveExportPhase } from "../utils/exportPhase";
 
 const EXPORT_ERROR_DISMISS_MS = 3000;
 

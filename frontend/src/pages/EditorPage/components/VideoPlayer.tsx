@@ -1,5 +1,5 @@
 import { useState, type RefObject } from "react";
-import type { ScoreboardFields, Size } from "../scoreboard";
+import type { ScoreboardFields, Size } from "../utils/scoreboard";
 import ScoreboardOverlay from "./ScoreboardOverlay";
 
 type Props = {

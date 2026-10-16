@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RallyWinner, type ScoringTeam } from "@/models/project";
-import { applyPoint, isValidRallyRange } from "../rally";
+import { applyPoint, isValidRallyRange } from "../utils/rally";
 import type { DraftTransition, RecordedPatch } from "./useProjectDraft";
 
 type Options = {

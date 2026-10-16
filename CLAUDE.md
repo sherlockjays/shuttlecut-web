@@ -15,8 +15,8 @@ npm run build               # tsc -b && vite build
 npm run lint
 npm run format              # prettier --write .
 npm run test                # vitest run
-npx vitest run src/pages/EditorPage/rally.test.ts    # 파일 하나만
-npx vitest run -t "이미 저장된 값"                    # 케이스 이름으로
+npx vitest run src/pages/EditorPage/utils/rally.test.ts    # 파일 하나만
+npx vitest run -t "이미 저장된 값"                          # 케이스 이름으로
 
 # 백엔드 (backend/)
 venv\Scripts\uvicorn main:app --reload --port 8000
@@ -65,7 +65,7 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 ## 두 곳을 같이 고쳐야 하는 것
 
 - **DB 컬럼 추가**: `models/database.py`의 Column과 [main.py](backend/main.py) startup의 `ALTER TABLE ... ADD COLUMN`. alembic은 설치만 되어 있고 안 쓴다. `init_db()`가 `create_all`을 돌리고 기존 테이블은 ALTER 문으로 때운다(실패하면 조용히 rollback)
-- **점수판 색과 좌표**: 에디터 미리보기는 [theme.ts](frontend/src/models/theme.ts)의 `CANVAS_THEMES`(hex)와 [scoreboard.ts](frontend/src/pages/EditorPage/scoreboard.ts)의 `SCOREBOARD_GEOMETRY`, 실제 렌더링은 [exporter.py](backend/core/exporter.py)의 `THEMES`(RGB 튜플)와 `make_scoreboard_image` 안의 숫자, 그리고 [tasks.py](backend/workers/tasks.py)의 overlay 위치(`ox`/`oy`)와 세로 1080 캡. `draw_scoreboard`에도 같은 숫자가 있지만 실제 내보내기가 타지 않는 경로다. 한쪽만 고치면 미리보기와 결과물이 갈라진다
+- **점수판 색과 좌표**: 에디터 미리보기는 [theme.ts](frontend/src/models/theme.ts)의 `CANVAS_THEMES`(hex)와 [scoreboard.ts](frontend/src/pages/EditorPage/utils/scoreboard.ts)의 `SCOREBOARD_GEOMETRY`, 실제 렌더링은 [exporter.py](backend/core/exporter.py)의 `THEMES`(RGB 튜플)와 `make_scoreboard_image` 안의 숫자, 그리고 [tasks.py](backend/workers/tasks.py)의 overlay 위치(`ox`/`oy`)와 세로 1080 캡. `draw_scoreboard`에도 같은 숫자가 있지만 실제 내보내기가 타지 않는 경로다. 한쪽만 고치면 미리보기와 결과물이 갈라진다
 - **파이썬 버전**: [.python-version](.python-version)과 [Dockerfile](backend/Dockerfile)의 `FROM python:3.11-slim`. `requirements.txt`는 패키지를 고정하지만 인터프리터는 고정하지 않는다. 어긋나면 numpy·opencv 같은 C 확장이 같은 버전이어도 ABI가 다른 바이너리가 된다. 한쪽만 고치면 워커와 NAS가 갈라진다
 - **환경변수 추가**: `require_env`/`optional_env` 호출부, [docker-compose.yml](docker-compose.yml)의 `backend.environment`(필수면 `${VAR:?}`), `.env.example` 3개(루트·`backend/`·`.env.native-worker.example`). 선택값이면 [deploy-nas.sh](scripts/deploy-nas.sh)의 `OPTIONAL_KEYS`에도 넣는다
 - **의존성**: [requirements.txt](backend/requirements.txt)를 고치면 NAS 백엔드 재빌드와 워커 `worker-venv` 재설치를 **둘 다** 해야 한다. 아래 참고
@@ -97,7 +97,7 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 
 ### 자동저장
 
-[debouncedSaver.ts](frontend/src/pages/EditorPage/debouncedSaver.ts)가 핵심이다. 아래 셋 중 하나라도 깨지면 편집 내용이 유실된다.
+[debouncedSaver.ts](frontend/src/pages/EditorPage/utils/debouncedSaver.ts)가 핵심이다. 아래 셋 중 하나라도 깨지면 편집 내용이 유실된다.
 
 - `flush()`가 보낼 값은 **부르는 순간** 확정된다. 실행 시점에 읽으면 그 사이 끼어든 값이 나간다
 - 저장은 한 번에 하나씩만 보낸다. 겹치면 늦게 도착한 옛 값이 서버를 되돌린다
