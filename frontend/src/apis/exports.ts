@@ -1,4 +1,4 @@
-import { apiFetch } from "@/api";
+import { apiFetch } from "@/apis/client";
 import type { ExportItem, ExportStatusResponse } from "@/models/export";
 
 export const listExports = (): Promise<ExportItem[]> => apiFetch<ExportItem[]>("/api/export/");
