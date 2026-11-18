@@ -39,7 +39,9 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 
 **CI에 맡기지 말고 로컬에서 먼저 돌린다.**
 
-- Claude가 `git commit`을 실행하면 커밋 게이트([check-before-commit.mjs](.claude/hooks/check-before-commit.mjs))가 바뀐 쪽의 검사를 먼저 돌리고, 실패하면 커밋을 막는다. 프론트는 CI와 같은 네 가지, 백엔드는 `compileall`이다
+- Claude가 `git commit`을 실행하면 커밋 게이트([check-before-commit.mjs](.claude/hooks/check-before-commit.mjs))가 스테이징된 파일이 속한 쪽의 검사를 먼저 돌리고, 실패하면 커밋을 막는다. 프론트는 CI와 같은 네 가지, 백엔드는 `compileall`이다
+- `git add`와 `git commit`은 따로 실행한다. 한 명령에 섞거나 `git commit -a`를 쓰면 게이트가 막는다. 훅이 명령보다 먼저 돌아서 무엇이 커밋될지 볼 수 없기 때문이다
+- 게이트는 스테이징된 내용이 아니라 작업 트리를 검사한다. 일부만 스테이징했으면 스테이징하지 않은 변경도 검사에 섞인다
 - 게이트는 포맷을 고쳐주지 않는다. 변경 내용을 보여주기 전에 `npm run format`을 먼저 돌린다. 검토가 끝난 뒤에 포맷이 바뀌면 본 것과 커밋되는 것이 달라진다
 - 터미널에서 직접 하는 커밋에는 게이트가 걸리지 않는다. Claude Code 훅이지 git 훅이 아니다
 - 백엔드에는 테스트가 없다. CI는 문법 오류와 이미지 빌드 가능 여부까지만 본다. 동작 확인은 띄워서 한다
