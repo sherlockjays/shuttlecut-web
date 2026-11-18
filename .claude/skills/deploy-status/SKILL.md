@@ -40,8 +40,15 @@ allowed-tools: Bash(git fetch *) Bash(git describe *) Bash(git log *) Bash(git d
 | `backend/` | 백엔드와 워커. 워커가 `backend/`를 직접 import하므로 둘은 같은 커밋이어야 한다 |
 | `backend/requirements.txt` | 위에 더해 워커 `worker-venv` 재설치. `deploy-worker.ps1`이 감지해서 처리한다 |
 | `frontend/` | 프론트엔드 |
-| `docker-compose.yml`, `.env.example` | 환경변수가 추가됐는지 확인한다. NAS 루트 `.env`에 없으면 기동이 멈춘다 |
-| 그 밖(문서, `.claude/`, `.github/`, `scripts/`) | 갱신할 대상 없음 |
+| `docker-compose.yml` | NAS 재배포. 서비스 정의가 바뀌면 컨테이너를 다시 만들어야 한다. 환경변수가 추가됐는지도 확인한다 |
+| `.env.example` | 환경변수가 추가됐는지 확인한다. NAS 루트 `.env`에 없으면 기동이 멈춘다 |
+| `start-native-worker.ps1`, `scripts/deploy-worker.ps1` | 워커. 워커 체크아웃을 새 커밋으로 맞춰야 바뀐 스크립트로 뜬다 |
+| `.env.native-worker.example` | 워커. 워커 PC의 `.env.native-worker`에 추가된 키가 있는지 확인한다 |
+| `.python-version` | 워커. `worker-venv`를 그 버전으로 다시 만들어야 하는지 확인한다. NAS 쪽 버전은 `backend/Dockerfile`이 정한다 |
+| `scripts/deploy-nas.sh`, `scripts/rollback-nas.sh`, `docker-compose.maintenance.yml`, `maintenance/` | 갱신할 대상은 없다. 다만 NAS 체크아웃이 새 커밋이 되어야 바뀐 스크립트가 쓰이므로 다음 배포에 함께 나간다 |
+| 그 밖(문서, `.claude/`, `.github/`) | 갱신할 대상 없음 |
+
+표에 없는 경로가 바뀌었으면 "갱신할 대상 없음"으로 넘기지 말고, 그 파일을 열어 운영에 영향이 있는지 확인한 뒤 판정한다.
 
 ## 보고 형식
 
