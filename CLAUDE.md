@@ -39,6 +39,11 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 
 **CI에 맡기지 말고 로컬에서 먼저 돌린다.**
 
+- Claude가 `git commit`을 실행하면 커밋 게이트([check-before-commit.mjs](.claude/hooks/check-before-commit.mjs))가 스테이징된 파일이 속한 쪽의 검사를 먼저 돌리고, 실패하면 커밋을 막는다. 프론트는 CI와 같은 네 가지, 백엔드는 `compileall`이다
+- `git add`와 `git commit`은 따로 실행한다. 한 명령에 섞거나 `git commit -a`를 쓰면 게이트가 막는다. 훅이 명령보다 먼저 돌아서 무엇이 커밋될지 볼 수 없기 때문이다
+- 게이트는 스테이징된 내용이 아니라 작업 트리를 검사한다. 일부만 스테이징했으면 스테이징하지 않은 변경도 검사에 섞인다
+- 게이트는 포맷을 고쳐주지 않는다. 변경 내용을 보여주기 전에 `npm run format`을 먼저 돌린다. 검토가 끝난 뒤에 포맷이 바뀌면 본 것과 커밋되는 것이 달라진다
+- 터미널에서 직접 하는 커밋에는 게이트가 걸리지 않는다. Claude Code 훅이지 git 훅이 아니다
 - 백엔드에는 테스트가 없다. CI는 문법 오류와 이미지 빌드 가능 여부까지만 본다. 동작 확인은 띄워서 한다
 - vitest가 `environment: "node"`라 DOM이 없다. 테스트는 순수 로직 모듈에만 있고, 컴포넌트 테스트를 쓰려면 jsdom 설정부터 추가해야 한다
 - 테스트 파일은 소스 옆에 둔다. `__tests__` 디렉터리를 만들지 않는다
@@ -68,6 +73,7 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 - **점수판 색과 좌표**: 에디터 미리보기는 [theme.ts](frontend/src/models/theme.ts)의 `CANVAS_THEMES`(hex)와 [scoreboard.ts](frontend/src/pages/EditorPage/utils/scoreboard.ts)의 `SCOREBOARD_GEOMETRY`, 실제 렌더링은 [exporter.py](backend/core/exporter.py)의 `THEMES`(RGB 튜플)와 `make_scoreboard_image` 안의 숫자, 그리고 [tasks.py](backend/workers/tasks.py)의 overlay 위치(`ox`/`oy`)와 세로 1080 캡. `draw_scoreboard`에도 같은 숫자가 있지만 실제 내보내기가 타지 않는 경로다. 한쪽만 고치면 미리보기와 결과물이 갈라진다
 - **파이썬 버전**: [.python-version](.python-version)과 [Dockerfile](backend/Dockerfile)의 `FROM python:3.11-slim`. `requirements.txt`는 패키지를 고정하지만 인터프리터는 고정하지 않는다. 어긋나면 numpy·opencv 같은 C 확장이 같은 버전이어도 ABI가 다른 바이너리가 된다. 한쪽만 고치면 워커와 NAS가 갈라진다
 - **환경변수 추가**: `require_env`/`optional_env` 호출부, [docker-compose.yml](docker-compose.yml)의 `backend.environment`(필수면 `${VAR:?}`), `.env.example` 3개(루트·`backend/`·`.env.native-worker.example`). 선택값이면 [deploy-nas.sh](scripts/deploy-nas.sh)의 `OPTIONAL_KEYS`에도 넣는다
+- **CI 검사 항목**: [ci.yml](.github/workflows/ci.yml)의 job과 커밋 게이트([check-before-commit.mjs](.claude/hooks/check-before-commit.mjs))의 검사 목록. 한쪽만 고치면 로컬에서 통과한 커밋이 CI에서 막힌다
 - **의존성**: [requirements.txt](backend/requirements.txt)를 고치면 NAS 백엔드 재빌드와 워커 `worker-venv` 재설치를 **둘 다** 해야 한다. 아래 참고
 
 ### 의존성을 올릴 때
@@ -130,6 +136,8 @@ PR과 main push에서 [ci.yml](.github/workflows/ci.yml)이 자동으로 돈다.
 
 NAS는 `scripts/deploy-nas.sh`와 `scripts/rollback-nas.sh`로, 워커는 `scripts/deploy-worker.ps1`로 한다. 아래 규칙 중 순서·검증·`--no-build`는 이들이 강제하므로, 손으로 할 때만 직접 지키면 된다.
 
+배포가 밀렸는지와 붙여넣을 명령은 `/deploy-status`가 알려준다. Claude는 배포 스크립트를 직접 실행하지 않는다. 스크립트가 터미널 입력을 받아야 해서 SSH 너머로 돌리면 중간에 멈춘다. 이 저장소는 공개라 NAS 주소를 적지 않고 SSH 별칭 `shuttlecut-nas`로만 쓴다.
+
 - **운영에 뭐가 떠 있는지 추측하지 않는다.** 셋 다 git 체크아웃이라 명령으로 답이 나온다. NAS는 `git -C /volume1/docker/shuttlecut-web rev-parse HEAD`, 워커는 워커 전용 체크아웃에서 같은 명령
 - **배포 대상은 셋이고(NAS 백엔드, NAS 프론트엔드, 워커 PC) 셋이 같은 커밋이어야 한다.** 워커가 `backend/` 패키지를 직접 import하기 때문이다. 순서는 **백엔드 → 워커 → 프론트엔드**
 - **워커 체크아웃은 detached로 배포 SHA에 고정한다.** 브랜치를 따라가면 고정이 깨진다. `deploy-worker.ps1`이 `--detach`로 강제한다
@@ -156,6 +164,8 @@ NAS는 `scripts/deploy-nas.sh`와 `scripts/rollback-nas.sh`로, 워커는 `scrip
 - 이슈 → 브랜치 → PR. 브랜치 이름은 `refactor/issue-NN`, `fix/issue-NN`
 - `.github/`의 이슈/PR 템플릿을 쓴다
 - 커밋: `type: 한글 내용`. 본문은 복잡한 수정이거나 배경 설명이 필요할 때만 적는다
-- 커밋은 하나 만들 때마다 멈추고 확인을 받은 뒤 다음으로 넘어간다
+- 커밋은 하나 만들 때마다 멈추고 확인을 받은 뒤 다음으로 넘어간다. `git commit`과 `git push`는 하네스가 매번 확인 창을 띄운다([settings.json](.claude/settings.json))
+- 커밋이 3개 이상이거나 "깨지기 쉬운 계약"을 건드리는 계획은 실행 전에 `/plan-review`로 검토한다
+- PR을 만든 뒤 `/fresh-review`로 새 세션 리뷰를 받는다. 반영하기로 한 지적만 PR 코멘트로 남기고, 동작 결함이 없는 라운드가 나오면 끝낸다
 - PR: `type(scope): 한글 내용`. scope는 fix/refactor/feat처럼 어디를 고쳤는지가 의미 있을 때만 붙이고, style/docs 같은 작업에는 생략한다
 - 코드를 고치다 이 문서의 내용이 사실과 달라지면 같은 PR에서 함께 고친다
