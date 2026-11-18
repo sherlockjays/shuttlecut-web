@@ -1,6 +1,6 @@
 const REQUEST_TIMEOUT_MS = 10_000;
 
-/** 서버가 응답했지만 실패한 요청. 타임아웃은 여기 담기지 않고 fetch의 TimeoutError가 그대로 나간다. */
+/** 서버가 응답했지만 실패한 요청. 응답이 없어 끊긴 경우는 RequestTimeoutError다. */
 export class ApiError extends Error {
   status: number;
 
@@ -8,6 +8,14 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
     this.status = status;
+  }
+}
+
+/** REQUEST_TIMEOUT_MS 안에 응답이 없어 끊긴 요청. 브라우저의 TimeoutError 문구가 영어라 한국어로 바꿔 던진다. */
+export class RequestTimeoutError extends Error {
+  constructor() {
+    super("서버 응답이 없습니다. 잠시 후 다시 시도해주세요.");
+    this.name = "RequestTimeoutError";
   }
 }
 
@@ -32,6 +40,9 @@ export async function apiFetch<T = unknown>(path: string, opts: RequestInit = {}
     ...opts,
     headers: { ...headers(), ...(opts.headers || {}) },
     signal: opts.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  }).catch((e: unknown) => {
+    if (e instanceof DOMException && e.name === "TimeoutError") throw new RequestTimeoutError();
+    throw e;
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));

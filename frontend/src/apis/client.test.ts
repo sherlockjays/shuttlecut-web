@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { apiFetch, ApiError, isRetriableError } from "./client";
+import { apiFetch, ApiError, RequestTimeoutError, isRetriableError } from "./client";
 
 const jsonResponse = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status });
@@ -61,14 +61,24 @@ describe("apiFetch", () => {
   });
 
   // AbortSignal.timeout은 Node 내부 타이머를 써서 가짜 타이머로 만료시킬 수 없다.
-  // 만료 자체는 브라우저 검증에서 보고, 여기서는 그 결과가 변형 없이 나가는지만 본다.
-  it("fetch가 TimeoutError로 거부하면 ApiError로 감싸지 않고 그대로 전파한다", async () => {
-    const timeout = new DOMException("시간 초과", "TimeoutError");
-    stubFetch(() => Promise.reject(timeout));
+  // 만료 자체는 브라우저 검증에서 보고, 여기서는 그 결과가 한국어 에러로 바뀌는지만 본다.
+  it("fetch가 TimeoutError로 거부하면 한국어 문구의 RequestTimeoutError로 바꿔 던진다", async () => {
+    stubFetch(() => Promise.reject(new DOMException("signal timed out", "TimeoutError")));
 
     const error = await apiFetch("/api/x").catch((e: unknown) => e);
 
-    expect(error).toBe(timeout);
+    expect(error).toBeInstanceOf(RequestTimeoutError);
+    expect(error).not.toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ message: "서버 응답이 없습니다. 잠시 후 다시 시도해주세요." });
+  });
+
+  it("호출부가 중단한 요청(AbortError)은 그대로 전파한다", async () => {
+    const aborted = new DOMException("The user aborted a request.", "AbortError");
+    stubFetch(() => Promise.reject(aborted));
+
+    const error = await apiFetch("/api/x").catch((e: unknown) => e);
+
+    expect(error).toBe(aborted);
   });
 });
 
@@ -85,6 +95,6 @@ describe("isRetriableError", () => {
 
   it("ApiError가 아닌 실패(네트워크 단절, 타임아웃)는 재시도한다", () => {
     expect(isRetriableError(new TypeError("Failed to fetch"))).toBe(true);
-    expect(isRetriableError(new DOMException("시간 초과", "TimeoutError"))).toBe(true);
+    expect(isRetriableError(new RequestTimeoutError())).toBe(true);
   });
 });
