@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { auth, saveToken } from "@/api";
+import { auth } from "@/api";
+import { saveToken } from "@/apis/client";
 import type { VerifyBanner } from "@/models/auth";
 import LoginPage from "@/pages/LoginPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";

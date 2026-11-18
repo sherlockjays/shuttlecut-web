@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { auth, saveToken } from "@/api";
+import { auth } from "@/api";
+import { saveToken } from "@/apis/client";
 import { VERIFY_BANNERS, type VerifyBanner } from "@/models/auth";
 
 interface Props {
