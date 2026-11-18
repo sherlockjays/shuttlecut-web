@@ -33,26 +33,29 @@ gh pr diff <번호> --name-only
 | 둘 다 | 둘 다, 동시에 |
 | 둘 다 아님 | 내장 `code-review` |
 
+`frontend-code-review`는 저장소가 아니라 개인 폴더(`~/.claude/skills/frontend-code-review/`)에 있는 스킬이다. 그 PC에 없으면 프론트도 내장 `code-review`로 돌리고, 대신 돌렸다는 것을 결과와 함께 알린다.
+
 ## 2. 새 세션에 넘길 문장
 
 **아래 문장을 그대로 쓴다. 이 세션의 맥락을 덧붙이지 않는다.** "특히 여기를 봐줘"나 작업 중 내린 판단을 넣으면 리뷰어가 그 판단을 따라간다. 의도와 결정 근거는 PR 본문에 있고 리뷰어가 직접 읽는다.
 
-PR에 리뷰 코멘트가 이미 있는지로 라운드를 가른다.
+PR에 코멘트가 이미 있는지로 라운드를 가른다. 줄 단위 리뷰 코멘트와 일반 코멘트를 둘 다 센다. 줄을 특정하지 못한 지적은 일반 코멘트로 남기기 때문이다.
 
 ```bash
 gh api "repos/{owner}/{repo}/pulls/<번호>/comments" -q 'length'
+gh pr view <번호> --json comments -q '.comments | length'
 ```
 
-**1라운드(코멘트 0개)**
+**1라운드(둘 다 0개)**
 
 ```
 /frontend-code-review #<번호> PR 본문과 관련 메모리 및 변경사항 확인하고 리뷰해줘. 파일과 메모리는 수정하지 말고, PR에 코멘트도 달지 말고, 리뷰 결과만 출력해줘.
 ```
 
-**2라운드 이후(코멘트 1개 이상)**: 위 문장 끝에 덧붙인다.
+**2라운드 이후(하나라도 1개 이상)**: 위 문장 끝에 덧붙인다.
 
 ```
-PR에 달린 리뷰 코멘트도 읽고, 그 지적이 이후 커밋에서 해결됐는지 확인해줘.
+PR에 달린 리뷰 코멘트와 일반 코멘트도 읽고, 그 지적이 이후 커밋에서 해결됐는지 확인해줘.
 ```
 
 백엔드 리뷰는 맨 앞의 `/frontend-code-review #<번호>`를 `/code-review <번호>`로 바꾼다. 노력 수준은 적지 않는다.
@@ -67,11 +70,12 @@ claude -p "<2의 문장>" \
     "Bash(git diff *)" "Bash(git show *)" "Bash(git log *)" "Bash(git status *)" \
     "Bash(git rev-parse *)" "Bash(git merge-base *)" "Bash(git symbolic-ref *)" \
     "Bash(gh pr view *)" "Bash(gh pr diff *)" "Bash(gh pr checks *)" \
-    "Bash(gh issue view *)" "Bash(gh api *)" \
+    "Bash(gh issue view *)" "Bash(gh api repos/*/pulls/*/comments)" \
     "Bash(npm run lint)" "Bash(npm run test)" "Bash(npm run build)" \
   --output-format text > <결과 파일> 2> <결과 파일>.err
 ```
 
+- `gh api`는 리뷰 코멘트를 읽는 경로 하나만 허용한다. `gh api *`로 열면 `-X POST`로 쓰기 요청까지 허용되어 리뷰 세션이 PR에 코멘트를 달 수 있다
 - Windows의 Git Bash에서는 `claude` 대신 `claude.cmd`로 부른다. `claude`는 실행되지 않는다
 - 결과 파일은 저장소 밖 임시 폴더에 둔다. 저장소 안에 두면 추적되지 않는 파일이 생긴다
 - 프론트 리뷰는 5분, 백엔드 리뷰는 3분쯤 걸린다. 백그라운드로 돌리고 끝나면 이어간다. 기다리는 동안 다른 일을 하지 않는다
@@ -102,9 +106,24 @@ claude -p "<2의 문장>" \
 사용자가 반영하기로 한 지적만 남긴다. 기각한 지적은 PR에 적지 않는다.
 
 1. 코멘트 본문 초안을 채팅에 보여주고 확인을 받는다
-2. `~/.claude/skills/frontend-code-review/references/posting-comments.md`의 형식과 규칙을 따라 해당 줄에 단다. 줄 번호는 그 문서의 방법으로 다시 계산하고, 계산한 줄에 지적이 인용한 코드가 있는지 확인한다
-3. 줄을 특정할 수 없으면 일반 코멘트로 단다
+2. 해당 줄에 단다. 줄 번호는 PR의 최신 커밋 기준 새 파일의 줄이고, 그 줄에 지적이 인용한 코드가 있는지 확인한 뒤 단다
+
+   ```bash
+   gh api "repos/{owner}/{repo}/pulls/<번호>/comments" \
+     -f body="<본문>" -f path="<파일 경로>" \
+     -f commit_id="$(gh pr view <번호> --json headRefOid -q .headRefOid)" \
+     -F line=<줄 번호> -f side="RIGHT"
+   ```
+
+3. 줄 단위 코멘트는 동작에 영향이 큰 것부터 5개까지만 단다. 나머지와 줄을 특정할 수 없는 지적은 일반 코멘트(`gh pr comment`) 하나로 묶는다
 4. 단 코멘트의 URL을 알린다
+
+본문은 심각도(🔴 머지 전 수정, 🟠 고려할 것), 한 줄 주장, 구체적인 실패 시나리오 순으로 쓰고 아래 꼬리말로 끝낸다. 사람의 리뷰로 오해하지 않게 하기 위해서다.
+
+```
+---
+> 🤖 Claude Code 자동 리뷰입니다. 승인/거부는 사람이 판단합니다.
+```
 
 `gh pr review --approve`와 `--request-changes`는 쓰지 않는다. 승인은 사람이 한다.
 
